@@ -1,0 +1,9 @@
+.env.local
+.env.loacl
+.env
+.next
+node_modules
+.claude
+tsconfig.tsbuildinfo
+.DS_Store
+._*

@@ -1,0 +1,374 @@
+"use server";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 출고 신청 처리 모듈
+// 직원이 물품 출고를 신청하면 이 파일의 함수들이 실행됩니다.
+// LOT 재고 검색 → 잔여수량 확인 → 출고 관리 레코드 생성 순서로 처리됩니다.
+// 실제 재고 차감은 관리자가 승인할 때 admin.ts에서 수행됩니다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { revalidatePath } from "next/cache";
+
+// Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+/** 입고 관리 테이블 경로 (URL 인코딩 처리) */
+function inboundTablePath(): string {
+  return encodeURIComponent(
+    process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리"
+  );
+}
+
+/** 출고 관리 테이블 경로 (URL 인코딩 처리) */
+function outboundTablePath(): string {
+  return encodeURIComponent(
+    process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리"
+  );
+}
+
+/** LOT별 재고 → 입고 관리 링크 필드명(기본 `입고관리링크`). `AIRTABLE_LOT_TO_INBOUND_FIELD` 로 덮어쓰기 가능 */
+const LOT_TO_INBOUND_FIELD =
+  process.env.AIRTABLE_LOT_TO_INBOUND_FIELD?.trim() || "입고관리링크";
+/** 입고 관리에서 출고 후 차감할 잔여 수량 필드명(number) */
+const INBOUND_REMAINING_QTY_FIELD = "잔여수량";
+
+/**
+ * 주어진 문자열이 Airtable 레코드 ID 형식인지 확인합니다.
+ * Airtable의 모든 행(레코드)은 "rec"으로 시작하는 고유 ID를 가집니다.
+ */
+function isRecordId(id: string): boolean {
+  return /^rec[a-zA-Z0-9]+$/.test(id);
+}
+
+/**
+ * 링크 필드 값(배열 또는 단일 문자열)에서 첫 번째 유효한 레코드 ID를 추출합니다.
+ * Airtable 링크 필드는 연결된 레코드 ID의 배열로 저장됩니다.
+ */
+function firstLinkedRecordId(raw: unknown): string | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const first = raw[0];
+  if (typeof first !== "string" || !isRecordId(first)) return null;
+  return first;
+}
+
+/**
+ * 작업자명으로 작업자 테이블에서 record id 1건 조회 (출고 저장용)
+ * 출고 신청 시 작업자를 Airtable 링크 필드로 연결하기 위해 필요합니다.
+ */
+async function getWorkerRecordIdByName(name: string): Promise<string | null> {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) return null;
+  const escaped = trimmed.replace(/'/g, "\\'");
+  const tablePath = encodeURIComponent("작업자");
+  const formula = encodeURIComponent(`{작업자명}='${escaped}'`);
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tablePath}?filterByFormula=${formula}&maxRecords=1`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) {
+    console.error("[getWorkerRecordIdByName] Airtable 조회 실패:", res.status);
+    return null;
+  }
+  const data = await res.json();
+  const id = data.records?.[0]?.id;
+  return typeof id === "string" && isRecordId(id) ? id : null;
+}
+
+/**
+ * LOT별 재고 레코드에서 `LOT_TO_INBOUND_FIELD`(기본 `입고관리링크`)의 첫 linked record id 추출
+ * 출고 시 LOT 재고 레코드를 통해 원래 입고 관리 레코드를 찾아야 잔여수량을 차감할 수 있습니다.
+ */
+async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | null> {
+  const lotTable = encodeURIComponent("LOT별 재고");
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${lotTable}/${lotRecordId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) {
+    console.error("[getInboundRecordIdFromLot] LOT 조회 실패:", res.status, lotRecordId);
+    return null;
+  }
+  const data = await res.json();
+  const fields = data.fields as Record<string, unknown> | undefined;
+  const fieldKeys = fields ? Object.keys(fields) : [];
+  console.log("[getInboundRecordIdFromLot] table:", "LOT별 재고");
+  console.log("[getInboundRecordIdFromLot] recordId:", lotRecordId);
+  console.log("[getInboundRecordIdFromLot] fieldKeys:", fieldKeys);
+  console.log(
+    "[getInboundRecordIdFromLot] hasInboundLinkField:",
+    fieldKeys.includes(LOT_TO_INBOUND_FIELD),
+    "(LOT_TO_INBOUND_FIELD:",
+    LOT_TO_INBOUND_FIELD + ")"
+  );
+  if (!fields) return null;
+  const linked = firstLinkedRecordId(fields[LOT_TO_INBOUND_FIELD]);
+  if (linked) return linked;
+  console.error("[getInboundRecordIdFromLot] 링크 없음:", {
+    lotRecordId,
+    field: LOT_TO_INBOUND_FIELD,
+    hasField: LOT_TO_INBOUND_FIELD in fields,
+  });
+  return null;
+}
+
+/**
+ * 입고 관리 레코드에서 현재 잔여수량을 읽어옵니다.
+ * 출고 수량이 잔여수량을 초과하지 않는지 확인하기 위해 사용됩니다.
+ * 보관처 정보도 함께 반환하여 출고 관리에 자동으로 기록합니다.
+ */
+async function getInboundRemainingQty(
+  inboundRecordId: string
+): Promise<{ currentQty: number; fieldKeys: string[]; storage: string } | null> {
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}/${inboundRecordId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    console.error("[getInboundRemainingQty] 입고 관리 조회 실패:", {
+      inboundRecordId,
+      status: res.status,
+      responseBody: errBody || "(empty)",
+    });
+    return null;
+  }
+
+  const data = await res.json();
+  const fields = data.fields as Record<string, unknown> | undefined;
+  const fieldKeys = fields ? Object.keys(fields) : [];
+  const rawQty = fields?.[INBOUND_REMAINING_QTY_FIELD];
+  const currentQty = Number(rawQty);
+
+  console.log("[getInboundRemainingQty] fieldKeys:", fieldKeys);
+  console.log("[getInboundRemainingQty] remainingQtyField:", INBOUND_REMAINING_QTY_FIELD);
+  console.log("[getInboundRemainingQty] remainingQtyRaw:", rawQty);
+
+  if (!Number.isFinite(currentQty)) {
+    console.error("[getInboundRemainingQty] 잔여수량 숫자 변환 실패:", {
+      inboundRecordId,
+      field: INBOUND_REMAINING_QTY_FIELD,
+      rawQty,
+    });
+    return null;
+  }
+
+  const storage = String(fields?.["보관처"] ?? "");
+  return { currentQty, fieldKeys, storage };
+}
+
+/**
+ * [출고용] LOT 번호 또는 키워드로 재고 검색
+ *
+ * 출고 신청 화면에서 직원이 검색어를 입력하면 이 함수가 호출됩니다.
+ * LOT번호, 품목명, 원산지 중 하나라도 검색어가 포함되면 결과에 포함됩니다.
+ * 재고수량이 0인 항목은 이미 소진된 것이므로 결과에서 제외합니다.
+ */
+export async function searchLotByKeyword(keyword: string) {
+  try {
+    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      console.error("[searchLotByKeyword] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
+      return { success: false, records: [], error: "서버 환경 설정 오류" };
+    }
+    const tableName = encodeURIComponent("LOT별 재고");
+    // OR 조건: LOT번호, 품목명, 원산지 중 하나라도 키워드 포함 시 조회
+    const response = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=OR(FIND('${keyword}', {LOT번호}), FIND('${keyword}', {품목명}), FIND('${keyword}', {원산지}))`,
+      {
+        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+        next: { revalidate: 0 }
+      }
+    );
+
+    if (!response.ok) {
+      let msg = `HTTP ${response.status}`;
+      try {
+        const errBody = await response.json();
+        msg = errBody?.error?.message ?? msg;
+      } catch {
+        /* ignore */
+      }
+      console.error("[searchLotByKeyword] Airtable 응답 실패:", msg);
+      return { success: false, records: [], error: msg };
+    }
+
+    const data = await response.json();
+    // 재고수량이 1 이상인 항목만 필터링 (소진된 재고 제외)
+    const records = (data.records || []).filter((r: any) => {
+      const raw = r.fields?.["재고수량"];
+      const qty = Number(Array.isArray(raw) ? raw[0] : raw) || 0;
+      return qty > 0;
+    });
+    return { success: true, records };
+  } catch (error) {
+    console.error("🔴 출고 검색 에러:", error);
+    return { success: false, records: [], error: "검색 중 서버 오류" };
+  }
+}
+
+/**
+ * [출고용] 출고 내역 등록
+ *
+ * 직원이 출고 신청 폼을 제출하면 이 함수가 실행됩니다.
+ * 아래 순서로 처리됩니다:
+ *   1. LOT 레코드 ID와 작업자 유효성 확인
+ *   2. 입고 관리의 잔여수량 조회 → 출고 수량이 초과하면 즉시 실패 반환
+ *   3. 출고 관리 레코드 생성 (승인 대기 상태)
+ * 실제 재고 차감(잔여수량 감소)은 관리자 승인 시 admin.ts에서 처리됩니다.
+ */
+export async function createOutboundRecord(payload: any) {
+  try {
+    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      console.error("[createOutboundRecord] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
+      return { success: false, error: "서버 환경 설정 오류" };
+    }
+
+    /** LOT별 재고 행 id (검색·선택 결과의 `id`) */
+    const lotInventoryRecordId =
+      typeof payload?.lotRecordId === "string" ? payload.lotRecordId.trim() : "";
+    if (!isRecordId(lotInventoryRecordId)) {
+      return { success: false, error: "LOT 레코드 ID가 필요합니다." };
+    }
+
+    // payload에서 입고 관리 레코드 ID를 직접 받거나, 없으면 LOT 레코드를 통해 조회
+    const inboundFromPayload =
+      typeof payload?.inboundRecordId === "string"
+        ? payload.inboundRecordId.trim()
+        : "";
+    const inboundRecordId = isRecordId(inboundFromPayload)
+      ? inboundFromPayload
+      : await getInboundRecordIdFromLot(lotInventoryRecordId);
+    if (!inboundRecordId) {
+      return {
+        success: false,
+        error: `LOT에 연결된 입고 관리 레코드를 찾을 수 없습니다. (링크 필드: ${LOT_TO_INBOUND_FIELD})`,
+      };
+    }
+
+    // 작업자 레코드 ID 확인 (직접 ID 전달 또는 이름으로 조회)
+    const workerFromPayload =
+      typeof payload?.workerRecordId === "string" ? payload.workerRecordId.trim() : "";
+    let workerRecordId: string | null = isRecordId(workerFromPayload)
+      ? workerFromPayload
+      : null;
+    if (!workerRecordId) {
+      workerRecordId = await getWorkerRecordIdByName(payload?.worker ?? "");
+    }
+    if (!workerRecordId) {
+      return { success: false, error: "작업자를 찾을 수 없습니다. (작업자명 또는 작업자 레코드 ID 확인)" };
+    }
+
+    // 출고 수량 유효성 검사
+    const qty = Number(payload?.quantity ?? 0);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { success: false, error: "출고 수량이 올바르지 않습니다." };
+    }
+
+    // 입고 관리의 현재 잔여수량 조회 — 재고 부족 시 출고 불가
+    const inboundRemain = await getInboundRemainingQty(inboundRecordId);
+    if (!inboundRemain) {
+      return {
+        success: false,
+        error: `입고 관리의 ${INBOUND_REMAINING_QTY_FIELD}를 확인할 수 없습니다.`,
+      };
+    }
+    const currentRemain = inboundRemain.currentQty;
+    if (qty > currentRemain) {
+      // 출고 요청 수량이 잔여 재고보다 많으면 신청 자체를 거부
+      console.error("[createOutboundRecord] 잔여수량 부족(출고 관리 미생성):", {
+        inboundRecordId,
+        qty,
+        currentRemain,
+      });
+      return {
+        success: false,
+        error: `입고 관리 ${INBOUND_REMAINING_QTY_FIELD}가 부족합니다. (잔여: ${currentRemain}, 출고: ${qty})`,
+      };
+    }
+
+    // 출고 관리 레코드에 저장할 필드 구성
+    const fields: Record<string, unknown> = {
+      "출고일": payload?.date,
+      "LOT번호": [inboundRecordId],         // 입고 관리 레코드 링크 (출고 승인 시 잔여수량 차감용)
+      "출고수량": qty,
+      "작업자": [workerRecordId],
+      "승인상태": "승인 대기",
+      "LOT재고레코드ID": lotInventoryRecordId, // LOT별 재고 레코드 ID (승인 시 재고수량 차감용)
+    };
+    // 선택적 필드: 값이 있을 때만 추가
+    if (payload?.spec) fields["규격"] = String(payload.spec);
+    if (payload?.origin) fields["원산지"] = String(payload.origin);
+    if (payload?.misu) fields["미수"] = String(payload.misu);
+    if (inboundRemain.storage) fields["보관처"] = inboundRemain.storage; // 입고 관리에서 보관처 자동 복사
+    if (payload?.seller) fields["판매처"] = String(payload.seller);
+    if (payload?.salePrice != null && payload.salePrice !== "") fields["판매가"] = Number(payload.salePrice);
+
+    const postUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${outboundTablePath()}`;
+    const requestBody = JSON.stringify({ fields });
+
+    console.log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리");
+    console.log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
+
+    const response = await fetch(postUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: requestBody,
+    });
+
+    const responseBodyRaw = await response.text().catch(() => "");
+    console.log("[createOutboundRecord] POST response.status:", response.status);
+    console.log("[createOutboundRecord] POST response.ok:", response.ok);
+    console.log("[createOutboundRecord] POST response.body (raw):", responseBodyRaw || "(empty)");
+
+    if (!response.ok) {
+      let message = "저장 실패";
+      let errorType: string | undefined;
+      try {
+        const errorData = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
+        message = errorData?.error?.message ?? message;
+        errorType = errorData?.error?.type;
+      } catch {
+        message = responseBodyRaw?.trim()
+          ? responseBodyRaw.slice(0, 500)
+          : `HTTP ${response.status}`;
+      }
+      console.error("[createOutboundRecord] POST 실패 — 명시 처리:", {
+        table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리",
+        status: response.status,
+        ok: response.ok,
+        errorType,
+        message,
+        requestFields: fields,
+        responseBodyRaw: responseBodyRaw || "(empty)",
+      });
+      return { success: false, error: message };
+    }
+
+    try {
+      const created = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
+      console.log("[createOutboundRecord] POST 성공:", {
+        createdRecordId: created?.id ?? null,
+        createdFieldKeys:
+          created?.fields && typeof created.fields === "object"
+            ? Object.keys(created.fields as object)
+            : [],
+      });
+    } catch {
+      console.log("[createOutboundRecord] POST 성공(본문 JSON 파싱 생략)");
+    }
+
+    // 관리자 대시보드 캐시 초기화 (새 출고 신청이 바로 보이도록)
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch (error) {
+    console.error("[createOutboundRecord] 예외:", error);
+    const msg = error instanceof Error ? error.message : "서버 오류가 발생했습니다.";
+    return { success: false, error: msg };
+  }
+}
