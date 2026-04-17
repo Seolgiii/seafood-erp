@@ -6,4 +6,4 @@ node_modules
 .claude
 tsconfig.tsbuildinfo
 .DS_Store
-._*
+._*.env*.local
