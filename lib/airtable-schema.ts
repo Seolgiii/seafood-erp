@@ -36,6 +36,18 @@ export const LOT_FIELDS = {
   /** kg·박스 등 단가(원). 없으면 UI에서 수매가÷총중량 등으로 계산 가능 */
   unitPrice: "단가",
   memo: "비고",
+  /** 보관처명 — 보관처 비용 이력 테이블과 조인 키 */
+  storage: "보관처",
+  /** 입고일자 YYYY-MM-DD — 비용 이력 적용 기준 */
+  inboundDate: "입고일자",
+  /** 입고 승인 시 보관처 비용 이력에서 읽어 저장하는 냉장료 단가 */
+  refrigerationFeePerUnit: "냉장료단가",
+  /** 출고시점 단가 계산용 총중량 */
+  totalWeight: "총중량",
+  /** LOT에 저장/룩업된 입출고비 단가 */
+  inOutFeeStored: "입출고비",
+  /** LOT에 저장/룩업된 노조비 단가 */
+  unionFeeStored: "노조비",
 } as const;
 
 /** 품목 마스터 테이블 필드 */

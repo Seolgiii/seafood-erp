@@ -15,6 +15,8 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { getMyRequests } from "../my-requests";
 import type { RequestItem } from "../my-requests";
+import { getStorageCostForLot } from "@/lib/storage-cost";
+import { seoulDateString } from "@/lib/date";
 import {
   generateInboundPdf,
   generateOutboundPdf,
@@ -325,6 +327,21 @@ async function createLotOnInboundApproval(
   if (workerLinkId) {
     lotPatchFields["입고자"] = [workerLinkId]; // 작업자 테이블 링크 배열 형태로 저장
   }
+
+  // 현재 적용 중인 냉장료단가를 보관처 비용 이력에서 조회해 LOT에 저장
+  const storage = String(inboundFields["보관처"] ?? "").trim();
+  if (storage) {
+    try {
+      const today = seoulDateString();
+      const cost = await getStorageCostForLot(storage, today);
+      if (cost?.refrigerationFee != null) {
+        lotPatchFields["냉장료단가"] = cost.refrigerationFee;
+      }
+    } catch (e) {
+      console.warn("[createLotOnInboundApproval] 냉장료단가 조회 실패 (승인은 계속 진행):", e);
+    }
+  }
+
   const patched = await patchRecord("LOT별 재고", lotRecord.id, lotPatchFields);
   if (!patched) {
     return { success: false, message: "LOT별 재고 수량 업데이트에 실패했습니다." };
@@ -404,6 +421,47 @@ async function deductStockOnOutboundApproval(
       await patchRecord("LOT별 재고", lotInventoryRecordId, {
         재고수량: Math.max(0, currentLotQty - outQty),
       });
+
+      // 5. 출고시점 비용 계산 → 출고 관리에 저장
+      try {
+        const num = (v: unknown) =>
+          Number(Array.isArray(v) ? v[0] : v) || 0;
+
+        const purchasePrice = num(lotFields["수매가"]);
+        const totalWeight = num(lotFields["총중량"]);
+        const refrigerationFeePerUnit = num(lotFields["냉장료단가"]);
+        const inOutFee = num(lotFields["입출고비"]);
+        const unionFee = num(lotFields["노조비"]);
+        const lotInboundDate = String(lotFields["입고일자"] ?? "").trim();
+
+        const outboundDate = String(outFields["출고일"] ?? "").trim();
+        const saleAmount = num(outFields["판매금액"]);
+
+        // 출고시점 단가: 수매가 ÷ 총중량
+        const unitCost = totalWeight > 0 ? purchasePrice / totalWeight : 0;
+
+        // 출고시점 냉장료: 냉장료단가 × 보관일수
+        let daysHeld = 0;
+        if (lotInboundDate && outboundDate) {
+          const diff = new Date(outboundDate).getTime() - new Date(lotInboundDate).getTime();
+          daysHeld = Math.max(0, Math.floor(diff / 86_400_000));
+        }
+        const refrigerationCost = refrigerationFeePerUnit * daysHeld;
+
+        const totalCost = unitCost + refrigerationCost + inOutFee + unionFee;
+
+        await patchRecord("출고 관리", outboundRecordId, {
+          "출고시점 단가": unitCost,
+          "출고시점 냉장료": refrigerationCost,
+          "출고시점 입출고비": inOutFee,
+          "출고시점 노조비": unionFee,
+          "출고시점 판매원가": totalCost,
+          "출고시점 판매금액": saleAmount,
+          "출고시점 손익": saleAmount - totalCost,
+        });
+      } catch (e) {
+        console.warn("[deductStockOnOutboundApproval] 출고시점 비용 저장 실패 (승인은 계속 진행):", e);
+      }
     } else {
       console.warn("[deductStockOnOutboundApproval] LOT재고레코드ID 있으나 레코드 없음:", lotInventoryRecordId);
     }

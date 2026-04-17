@@ -8,6 +8,7 @@ import {
   PRODUCT_FIELDS,
 } from "@/lib/airtable-schema";
 import { fetchAirtable, tablePathSegment } from "@/lib/airtable";
+import { getStorageCostsBatch } from "@/lib/storage-cost";
 
 export type { LotSearchCard } from "@/lib/inventory-types";
 
@@ -180,6 +181,8 @@ export async function searchLotsBySuffixDigits(
     LOT.qtyBase,
     LOT.qtyDetail,
     LOT.approvalStatus,
+    LOT.storage,
+    LOT.inboundDate,
   ] as const;
   const fieldsQs = lotFields
     .map((f) => `fields[]=${encodeURIComponent(f)}`)
@@ -201,7 +204,14 @@ export async function searchLotsBySuffixDigits(
 
   const products = await fetchProductsByIds(productIds);
 
-  const cards: LotSearchCard[] = records.map((r) => {
+  // storage/inboundDate 추출 후 배치로 비용 조회
+  const storageMeta = records.map((r) => ({
+    storage: String(r.fields[LOT.storage] ?? "").trim(),
+    inboundDate: String(r.fields[LOT.inboundDate] ?? "").trim(),
+  }));
+  const storageCosts = await getStorageCostsBatch(storageMeta);
+
+  const cards: LotSearchCard[] = records.map((r, i) => {
     const f = r.fields;
     const lotNumber = String(f[LOT.lotNumber] ?? "").trim();
     const pid = firstLinkedId(f[LOT.productLink]);
@@ -244,6 +254,9 @@ export async function searchLotsBySuffixDigits(
       detailUnitLabel: detailU,
       detailPerBase: ratio != null && ratio > 0 ? ratio : null,
       productRecordId: pid,
+      storage: storageMeta[i].storage,
+      inboundDate: storageMeta[i].inboundDate,
+      storageCost: storageCosts[i],
     };
   });
 
