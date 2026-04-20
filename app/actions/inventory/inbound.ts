@@ -83,6 +83,7 @@ async function getWorkerRecordIdByName(name: string): Promise<string | null> {
  * 품목마스터는 물품의 기본 정보(품목명, 품목코드, 규격 등)를 관리하는 테이블입니다.
  * 처음 입고되는 물품이면 자동으로 품목마스터에 새 항목을 추가합니다.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function resolveProductMasterForInbound(formData: any): Promise<{
   masterId: string;
   productCode: string;
@@ -233,6 +234,7 @@ function buildLotNumber(opts: {
  *   4. LOT별 재고 레코드 생성 (재고수량=0, 승인 후 실제 수량 반영)
  *   5. 품목마스터에 새 LOT 연결
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createInventoryRecord(formData: any) {
   try {
     // 환경변수(API키, 데이터베이스ID) 누락 시 오류 반환
@@ -448,6 +450,7 @@ export async function getStorageOptions(): Promise<string[]> {
     const inboundTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리";
 
     // tbl… ID 또는 이름으로 테이블 탐색
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const table = (data.tables as any[]).find(
       (t) => t.id === inboundTableName || t.name === inboundTableName
     );
@@ -457,6 +460,7 @@ export async function getStorageOptions(): Promise<string[]> {
     }
 
     // '보관처' 필드가 SingleSelect 타입인지 확인
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const field = (table.fields as any[]).find((f) => f.name === "보관처");
     if (!field || field.type !== "singleSelect") {
       console.warn("[getStorageOptions] 보관처 singleSelect 필드를 찾을 수 없음");
@@ -464,6 +468,7 @@ export async function getStorageOptions(): Promise<string[]> {
     }
 
     // 선택 옵션 이름만 배열로 반환
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (field.options?.choices ?? []).map((c: any) => String(c.name));
   } catch (e) {
     console.error("[getStorageOptions] 예외:", e);

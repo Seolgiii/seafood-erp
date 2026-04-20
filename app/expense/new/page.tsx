@@ -51,6 +51,7 @@ export default function NewExpensePage() {
         applicantRecordId: s.workerId,
       }));
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const info: any = await getApplicantInfo(s.workerName);
       console.log("getApplicantInfo result", info);
       if (info) {

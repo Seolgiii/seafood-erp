@@ -170,7 +170,7 @@ export default function StockStatusPage() {
                   </p>
                 </div>
                 <span className="shrink-0 text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                  {stock.fields['승인상태'] || '정상'}
+                  {String(stock.fields['승인상태'] || '정상')}
                 </span>
               </div>
 

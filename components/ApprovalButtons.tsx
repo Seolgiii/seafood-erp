@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { updateExpenseStatus } from "@/app/actions";
+import { updateApprovalStatus } from "@/app/actions";
 import { CheckCircle, XCircle } from "lucide-react";
 import { readSession } from "@/lib/session";
 
@@ -24,24 +24,23 @@ export const ApprovalButtons = ({ id, currentStatus }: { id: string, currentStat
 
   if (role !== "ADMIN" && role !== "MASTER") return null;
 
-  const handleStatusUpdate = async (status: '승인' | '반려') => {
-    const result = await updateExpenseStatus(id, status);
-    if (result.success) {
-      // 성공 로직
-    }
+  const handleStatusUpdate = async (status: '승인 완료' | '반려') => {
+    setLoading(true);
+    await updateApprovalStatus(id, "EXPENSE", status);
+    setLoading(false);
   };
 
   return (
     <div className="flex gap-2 mb-3">
       <button
-        onClick={() => handleApproval("승인완료")}
+        onClick={() => handleStatusUpdate("승인 완료")}
         disabled={loading}
         className="flex-1 py-2.5 bg-green-100 text-green-700 rounded-xl text-sm font-bold flex justify-center items-center gap-1 hover:bg-green-200 active:scale-95 transition-all"
       >
         <CheckCircle size={16} /> {loading ? "처리중..." : "승인"}
       </button>
       <button
-        onClick={() => handleApproval("반려")}
+        onClick={() => handleStatusUpdate("반려")}
         disabled={loading}
         className="flex-1 py-2.5 bg-red-100 text-red-700 rounded-xl text-sm font-bold flex justify-center items-center gap-1 hover:bg-red-200 active:scale-95 transition-all"
       >

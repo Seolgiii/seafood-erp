@@ -81,7 +81,7 @@ export default function InventoryRecordPage() {
         if (!formData.origin || formData.origin === "국내산") {
           setFormData((prev) => ({
             ...prev,
-            origin: masterData["원산지"] || "국내산",
+            origin: String(masterData["원산지"] || "국내산"),
           }));
         }
       } else {

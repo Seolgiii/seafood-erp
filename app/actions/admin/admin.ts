@@ -328,17 +328,17 @@ async function createLotOnInboundApproval(
     lotPatchFields["입고자"] = [workerLinkId]; // 작업자 테이블 링크 배열 형태로 저장
   }
 
-  // 현재 적용 중인 냉장료단가를 보관처 비용 이력에서 조회해 LOT에 저장
+  // 입고일자 기준으로 보관처 비용 이력에서 냉장료단가·입출고비·노조비를 조회해 LOT에 저장
   const storage = String(inboundFields["보관처"] ?? "").trim();
+  const inboundDate = String(inboundFields["입고일"] ?? "").trim() || seoulDateString();
   if (storage) {
     try {
-      const today = seoulDateString();
-      const cost = await getStorageCostForLot(storage, today);
-      if (cost?.refrigerationFee != null) {
-        lotPatchFields["냉장료단가"] = cost.refrigerationFee;
-      }
+      const cost = await getStorageCostForLot(storage, inboundDate);
+      if (cost?.refrigerationFee != null) lotPatchFields["냉장료단가"] = cost.refrigerationFee;
+      if (cost?.inOutFee != null) lotPatchFields["입출고비"] = cost.inOutFee;
+      if (cost?.unionFee != null) lotPatchFields["노조비"] = cost.unionFee;
     } catch (e) {
-      console.warn("[createLotOnInboundApproval] 냉장료단가 조회 실패 (승인은 계속 진행):", e);
+      console.warn("[createLotOnInboundApproval] 보관처 비용 조회 실패 (승인은 계속 진행):", e);
     }
   }
 

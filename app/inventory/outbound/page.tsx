@@ -41,7 +41,9 @@ export default function OutboundRecordPage() {
 
   const [searchMode, setSearchMode] = useState<'manual' | 'barcode'>('manual');
   const [keyword, setKeyword] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedLot, setSelectedLot] = useState<any | null>(null);
   const hasLoggedSelectedLotRef = useRef(false);
 

@@ -6,6 +6,7 @@ import { ExpensePDF } from './ExpensePDF'; // [핵심] 중괄호 필수!
 import { FileText } from "lucide-react";
 
 // [핵심] export const 로 내보냅니다.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const PDFButton = ({ data }: { data: any }) => {
   const [mounted, setMounted] = useState(false);
 

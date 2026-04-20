@@ -50,6 +50,7 @@ export default async function ExpenseListPage() {
         {expenses.length === 0 ? (
           <div className="py-20 text-center text-gray-400 font-bold">데이터가 없습니다.</div>
         ) : (
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           expenses.map((item: any) => {
             const status = item.fields.승인상태 || '검토중';
             const statusColor = status === '승인완료' ? 'bg-green-100 text-green-700' : status === '반려' ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-600';

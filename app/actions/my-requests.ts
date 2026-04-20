@@ -159,6 +159,7 @@ function fieldToDisplayString(val: unknown): string {
  */
 function normalizeStatus(raw: string): RequestItem["status"] {
   const VALID: RequestItem["status"][] = ["승인 대기", "승인 완료", "반려", "취소", "최종 승인 대기"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return VALID.includes(raw as any) ? (raw as RequestItem["status"]) : "승인 대기";
 }
 

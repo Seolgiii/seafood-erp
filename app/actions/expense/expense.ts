@@ -31,6 +31,7 @@ export async function getApplicantInfo(name: string) {
 }
 
 // 지출결의 신청
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createExpenseRecord(formData: any) {
   try {
     const expenseDate = typeof formData.date === "string" ? formData.date.trim() : "";

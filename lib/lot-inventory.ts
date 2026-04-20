@@ -172,7 +172,7 @@ export async function searchLotsBySuffixDigits(
   const len = q.length;
   const esc = escapeFormulaString(q);
   const lotField = LOT.lotNumber;
-  const formula = `RIGHT({${lotField}}, ${len})="${esc}"`;
+  const formula = `AND(RIGHT({${lotField}}, ${len})="${esc}", {${LOT.qtyBase}} > 0)`;
 
   const tbl = lotTable();
   const lotFields = [

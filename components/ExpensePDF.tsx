@@ -30,6 +30,7 @@ const styles = StyleSheet.create({
   footer: { marginTop: 50, textAlign: 'center', color: 'gray', fontSize: 9 }
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ExpensePDF = ({ data }: { data: any }) => (
   <Document>
     <Page size="A4" style={styles.page}>

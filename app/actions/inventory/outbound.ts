@@ -197,6 +197,7 @@ export async function searchLotByKeyword(keyword: string) {
 
     const data = await response.json();
     // 재고수량이 1 이상인 항목만 필터링 (소진된 재고 제외)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const records = (data.records || []).filter((r: any) => {
       const raw = r.fields?.["재고수량"];
       const qty = Number(Array.isArray(raw) ? raw[0] : raw) || 0;
@@ -219,6 +220,7 @@ export async function searchLotByKeyword(keyword: string) {
  *   3. 출고 관리 레코드 생성 (승인 대기 상태)
  * 실제 재고 차감(잔여수량 감소)은 관리자 승인 시 admin.ts에서 처리됩니다.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createOutboundRecord(payload: any) {
   try {
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {

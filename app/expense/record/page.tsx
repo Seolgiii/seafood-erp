@@ -121,7 +121,7 @@ export default function InventoryRecordPage() {
       alert('입고 등록 완료!');
       router.push('/');
     } else {
-      alert(`저장 실패: ${result.error}`);
+      alert(`저장 실패: ${'message' in result ? result.message : ''}`);
     }
     setIsSubmitting(false);
   };
