@@ -65,7 +65,7 @@ export const PRODUCT_FIELDS = {
 /** 보관처 비용 이력 테이블 필드 */
 export const STORAGE_COST_FIELDS = {
   /** 보관처명 (텍스트 또는 링크 룩업) */
-  storage: "보관처",
+  storage: "보관처명",
   startDate: "적용시작일",
   endDate: "적용종료일",
   refrigerationFee: "냉장료",
