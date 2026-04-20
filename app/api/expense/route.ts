@@ -1,16 +1,18 @@
 ﻿import { NextResponse } from "next/server";
 import Airtable from "airtable";
 
-const pat = process.env.AIRTABLE_API_KEY;
-const baseId = process.env.AIRTABLE_BASE_ID;
-
-if (!pat || !baseId) {
-  throw new Error("Missing AIRTABLE_API_KEY or AIRTABLE_BASE_ID");
-}
-
-const base = new Airtable({ apiKey: pat }).base(baseId);
-
 export async function POST(request: Request) {
+  const pat = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+
+  if (!pat || !baseId) {
+    return NextResponse.json(
+      { success: false, error: "Missing AIRTABLE_API_KEY or AIRTABLE_BASE_ID" },
+      { status: 500 }
+    );
+  }
+
+  const base = new Airtable({ apiKey: pat }).base(baseId);
   const body = (await request.json()) as {
     amount?: number | string;
     item?: string;
