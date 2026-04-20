@@ -78,19 +78,16 @@ function airtableErrorHint(status: number): string {
 
 /**
  * 환경변수에서 Airtable 인증 정보를 읽어옵니다.
- * AIRTABLE_PAT (신형) 또는 AIRTABLE_API_KEY (구형) 중 하나와
- * AIRTABLE_BASE_ID가 반드시 설정되어 있어야 합니다.
+ * AIRTABLE_API_KEY와 AIRTABLE_BASE_ID가 반드시 설정되어 있어야 합니다.
  * 없으면 즉시 에러를 발생시킵니다.
  */
 export function getBaseCredentials() {
-  const rawPat = process.env.AIRTABLE_PAT;
   const rawKey = process.env.AIRTABLE_API_KEY;
   const rawBase = process.env.AIRTABLE_BASE_ID;
-  const token = stripWrappingQuotes(rawPat ?? rawKey ?? "");
+  const token = stripWrappingQuotes(rawKey ?? "");
   const baseId = stripWrappingQuotes(rawBase ?? "");
 
   console.log("[airtable] getBaseCredentials debug:", {
-    AIRTABLE_PAT_set: !!rawPat,
     AIRTABLE_API_KEY_set: !!rawKey,
     AIRTABLE_BASE_ID_set: !!rawBase,
     token_prefix: token.slice(0, 10) || "(empty)",
@@ -99,7 +96,7 @@ export function getBaseCredentials() {
   });
 
   if (!token || !baseId) {
-    throw new Error("Set AIRTABLE_PAT (or AIRTABLE_API_KEY) and AIRTABLE_BASE_ID in .env.local");
+    throw new Error("Missing AIRTABLE_API_KEY or AIRTABLE_BASE_ID");
   }
   return { token, baseId };
 }
