@@ -83,8 +83,21 @@ function airtableErrorHint(status: number): string {
  * 없으면 즉시 에러를 발생시킵니다.
  */
 export function getBaseCredentials() {
-  const token = stripWrappingQuotes(process.env.AIRTABLE_PAT ?? process.env.AIRTABLE_API_KEY ?? "");
-  const baseId = stripWrappingQuotes(process.env.AIRTABLE_BASE_ID ?? "");
+  const rawPat = process.env.AIRTABLE_PAT;
+  const rawKey = process.env.AIRTABLE_API_KEY;
+  const rawBase = process.env.AIRTABLE_BASE_ID;
+  const token = stripWrappingQuotes(rawPat ?? rawKey ?? "");
+  const baseId = stripWrappingQuotes(rawBase ?? "");
+
+  console.log("[airtable] getBaseCredentials debug:", {
+    AIRTABLE_PAT_set: !!rawPat,
+    AIRTABLE_API_KEY_set: !!rawKey,
+    AIRTABLE_BASE_ID_set: !!rawBase,
+    token_prefix: token.slice(0, 10) || "(empty)",
+    token_length: token.length,
+    baseId_prefix: baseId.slice(0, 6) || "(empty)",
+  });
+
   if (!token || !baseId) {
     throw new Error("Set AIRTABLE_PAT (or AIRTABLE_API_KEY) and AIRTABLE_BASE_ID in .env.local");
   }
