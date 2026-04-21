@@ -36,6 +36,49 @@ function isRecordId(id: string): boolean {
 }
 
 /**
+ * 서울 시간(KST=UTC+9) 기준 영업일 반환.
+ * 오전 9시 이전이면 전날을 영업일로 처리.
+ */
+function getBizDateSeoul(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (kst.getUTCHours() < 9) {
+    kst.setUTCDate(kst.getUTCDate() - 1);
+  }
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * LOT별 재고 테이블 전체를 조회해 마지막 4자리 일련번호의 최댓값을 반환.
+ * 새 LOT 번호 = 최댓값 + 1.
+ */
+async function getMaxLotSequence(): Promise<number> {
+  let maxSeq = 0;
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams();
+    params.append("fields[]", "LOT번호");
+    params.append("pageSize", "100");
+    if (offset) params.set("offset", offset);
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?${params}`,
+      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } }
+    );
+    if (!res.ok) break;
+    const data = await res.json() as { records?: { fields?: Record<string, unknown> }[]; offset?: string };
+    for (const rec of data.records ?? []) {
+      const m = String(rec.fields?.["LOT번호"] ?? "").match(/-(\d{4})$/);
+      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+    }
+    offset = data.offset;
+  } while (offset);
+  return maxSeq + 1;
+}
+
+/**
  * 입고일자 문자열을 Airtable에 저장 가능한 날짜 형식(YYYY-MM-DD)으로 변환합니다.
  * 예: "2024.3.5" → "2024-03-05"
  */
@@ -164,62 +207,25 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
 }
 
 /**
- * 입고 관리 레코드 GET → Airtable Auto ID 읽기
- * Auto ID는 Airtable이 각 행에 자동으로 부여하는 순번 숫자입니다.
- * 이 번호를 LOT번호 생성에 활용합니다.
- */
-async function getInboundAutoId(inboundRecordId: string): Promise<number | null> {
-  const inboundTable = encodeURIComponent("입고 관리");
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTable}/${inboundRecordId}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  const raw = await res.text().catch(() => "");
-  if (!res.ok) {
-    console.error("[getInboundAutoId] GET 실패:", { status: res.status, body: raw || "(empty)" });
-    return null;
-  }
-  try {
-    const data = raw ? JSON.parse(raw) : null;
-    const fields = data?.fields as Record<string, unknown> | undefined;
-    const autoIdRaw = fields?.["Auto ID"] ?? fields?.["AutoID"] ?? fields?.["auto_id"];
-    const autoId = Number(autoIdRaw);
-    console.log("[getInboundAutoId] fieldKeys:", fields ? Object.keys(fields) : []);
-    console.log("[getInboundAutoId] autoIdRaw:", autoIdRaw, "→ parsed:", autoId);
-    if (Number.isFinite(autoId) && autoId > 0) {
-      return autoId;
-    }
-    return null;
-  } catch {
-    console.error("[getInboundAutoId] 응답 파싱 실패:", raw);
-    return null;
-  }
-}
-
-/**
- * LOT번호를 서버에서 직접 조합: YYMMDD-품목코드-규격-미수-XXXX
+ * LOT번호를 서버에서 직접 조합: YYMMDD-품목코드-규격-[미수숫자-]전체일련번호
  *
- * LOT번호는 물품 묶음을 추적하기 위한 고유 식별 번호입니다.
- * 예: 240305-SALMON-500g-A급-0042
- *     (입고날짜-품목코드-규격-미수-순번)
+ * - 미수: "미" 글자 제거 후 빈 값이면 해당 세그먼트 생략
+ * - seq: 전체 LOT 통틀어 최대 일련번호 + 1
+ * 예: 260417-MC1-11-26-0001 / 260417-FMC-24-0003
  */
 function buildLotNumber(opts: {
   bizDate: string;
   productCode: string;
   spec: string;
   misu: string;
-  autoId: number;
+  seq: number;
 }): string {
-  const yymmdd = opts.bizDate.replace(/-/g, "").slice(2); // YYMMDD 형식으로 변환
-  const seq = String(opts.autoId).padStart(4, "0");       // 순번을 4자리로 맞춤 (예: 42 → 0042)
-  const parts = [
-    yymmdd,
-    opts.productCode || "NOCODE",
-    opts.spec || "-",
-    opts.misu || "-",
-    seq,
-  ];
+  const yymmdd = opts.bizDate.replace(/-/g, "").slice(2);
+  const seqStr = String(opts.seq).padStart(4, "0");
+  const misuClean = opts.misu.replace(/미$/, "").trim();
+  const parts: string[] = [yymmdd, opts.productCode || "NOCODE", opts.spec || "-"];
+  if (misuClean) parts.push(misuClean);
+  parts.push(seqStr);
   return parts.join("-");
 }
 
@@ -309,23 +315,16 @@ export async function createInventoryRecord(formData: any) {
       return { success: false, message: "입고 관리 등록 실패" };
     }
 
-    // ── 2. Auto ID 읽기 → LOT번호 서버 조합 ──
-    const autoId = await getInboundAutoId(inboundRecordId);
-    let lotNumber: string;
-    if (autoId) {
-      // Auto ID 확보 성공: 정상적인 LOT번호 생성
-      lotNumber = buildLotNumber({
-        bizDate,
-        productCode: productMaster.productCode,
-        spec,
-        misu,
-        autoId,
-      });
-    } else {
-      // Auto ID 확보 실패: 레코드 ID 끝 4자리로 대체 (비상 처리)
-      lotNumber = `${bizDate.replace(/-/g, "").slice(2)}-${productMaster.productCode || "NOCODE"}-${spec || "-"}-${misu || "-"}-${inboundRecordId.slice(-4)}`;
-      console.warn("[createInventoryRecord] Auto ID 미확보 — record id 끝 4자리로 대체:", { lotNumber });
-    }
+    // ── 2. 영업일 + 전체 일련번호 → LOT번호 생성 ──
+    const lotBizDate = getBizDateSeoul();
+    const nextSeq = await getMaxLotSequence();
+    const lotNumber = buildLotNumber({
+      bizDate: lotBizDate,
+      productCode: productMaster.productCode,
+      spec,
+      misu,
+      seq: nextSeq,
+    });
     console.log("[createInventoryRecord] LOT번호 생성:", lotNumber);
 
     // ── 3. 입고 관리에 LOT번호 PATCH ──

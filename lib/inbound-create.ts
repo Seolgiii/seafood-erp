@@ -52,22 +52,64 @@ type CreateInboundArgs = {
   memo?: string;
 };
 
-/**
- * LOT 번호 고유 접미사 생성: HHmmss(6자리) + 랜덤 3자리
- *
- * Airtable 읽기 없이 서버 생성 시점 기준으로만 만들어 경쟁 조건을 제거한다.
- * 같은 초에 두 요청이 동시에 들어오더라도 랜덤 3자리(0~999)가 다를 확률이 99.9%이며,
- * 추가로 호출자가 재시도하면 충분히 고유성이 보장된다.
- *
- * 예시: "143052_047" → 14시 30분 52초, 랜덤 047
- */
-function generateLotSuffix(): string {
+/** 서울 시간(KST=UTC+9) 기준 영업일(오전 9시 이전이면 전날). */
+function getBizDateSeoul(): string {
   const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  const rand = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
-  return `${hh}${mm}${ss}_${rand}`;
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (kst.getUTCHours() < 9) {
+    kst.setUTCDate(kst.getUTCDate() - 1);
+  }
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** LOT별 재고 전체 스캔 → 마지막 4자리 일련번호 최댓값 + 1 반환. */
+async function getMaxLotSequence(lotsPath: string): Promise<number> {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  if (!apiKey || !baseId) return 1;
+  let maxSeq = 0;
+  let offset: string | undefined;
+  do {
+    const params = new URLSearchParams();
+    params.append("fields[]", "LOT번호");
+    params.append("pageSize", "100");
+    if (offset) params.set("offset", offset);
+    const res = await fetch(
+      `https://api.airtable.com/v0/${baseId}/${lotsPath}?${params}`,
+      { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } }
+    );
+    if (!res.ok) break;
+    const data = await res.json() as { records?: { fields?: Record<string, unknown> }[]; offset?: string };
+    for (const rec of data.records ?? []) {
+      const match = String(rec.fields?.["LOT번호"] ?? "").match(/-(\d{4})$/);
+      if (match) maxSeq = Math.max(maxSeq, parseInt(match[1], 10));
+    }
+    offset = data.offset;
+  } while (offset);
+  return maxSeq + 1;
+}
+
+/**
+ * LOT번호 조합: YYMMDD-품목코드-규격-[미수숫자-]전체일련번호(4자리)
+ * 미수의 "미" 글자를 제거하고, 빈 값이면 세그먼트 생략.
+ */
+function buildLotNumber(opts: {
+  bizDate: string;
+  productCode: string;
+  spec: string;
+  misu: string;
+  seq: number;
+}): string {
+  const yymmdd = opts.bizDate.replace(/-/g, "").slice(2);
+  const seqStr = String(opts.seq).padStart(4, "0");
+  const misuClean = opts.misu.replace(/미$/, "").trim();
+  const parts: string[] = [yymmdd, opts.productCode || "NOCODE", opts.spec || "-"];
+  if (misuClean) parts.push(misuClean);
+  parts.push(seqStr);
+  return parts.join("-");
 }
 
 /** 새 LOT 생성 + 입고 트랜잭션 기록 */
@@ -97,6 +139,7 @@ export async function createInboundLotAndTxn(
 
   let resolvedProductId = productRecordId?.trim() || "";
   let name = "";
+  let productCode = "";
   let baseSpec = "";
   let baseDetailSpec = "";
   let baseUnit = "";
@@ -109,6 +152,7 @@ export async function createInboundLotAndTxn(
     const pf = productRec.fields;
     name = String(pf[PRODUCT_FIELDS.name] ?? "").trim();
     if (!name) throw new Error("Product name is empty");
+    productCode = String(pf["품목코드"] ?? "").trim();
     baseSpec = String(pf[PRODUCT_FIELDS.spec] ?? "").trim();
     baseDetailSpec = String(pf[PRODUCT_FIELDS.detailSpec] ?? "").trim();
     baseUnit = String(pf[PRODUCT_FIELDS.baseUnit] ?? "").trim();
@@ -134,13 +178,18 @@ export async function createInboundLotAndTxn(
   }
 
   const effectiveMisu = misuInput.trim() || baseDetailSpec;
+  const effectiveSpec = specInput.trim() || baseSpec;
 
-  // YYMMDD-품목명-미수-HHmmss_RRR
-  const yyyymmdd = bizDate.replace(/-/g, "");
-  const yymmdd = yyyymmdd.slice(2); // 앞의 20 제거
-  const prefix = `${yymmdd}-${name}-${effectiveMisu}`;
   const lotsPath = lotTable();
-  const lotNumber = `${prefix}-${generateLotSuffix()}`;
+  const lotBizDate = getBizDateSeoul();
+  const nextSeq = await getMaxLotSequence(lotsPath);
+  const lotNumber = buildLotNumber({
+    bizDate: lotBizDate,
+    productCode,
+    spec: effectiveSpec,
+    misu: effectiveMisu,
+    seq: nextSeq,
+  });
 
   const qtyBase = qtyBoxes;
   const qtyDetail =
