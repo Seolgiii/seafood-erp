@@ -176,7 +176,7 @@ export async function searchLotByKeyword(keyword: string) {
     const tableName = encodeURIComponent("LOT별 재고");
     // OR 조건: LOT번호, 품목명, 원산지 중 하나라도 키워드 포함 시 조회
     const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=OR(FIND('${keyword}', {LOT번호}), FIND('${keyword}', {품목명}), FIND('${keyword}', {원산지}))`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=FIND('${keyword}', {LOT번호})`,
       {
         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
         next: { revalidate: 0 }
