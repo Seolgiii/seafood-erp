@@ -50,14 +50,6 @@ export default function WorkerDashboard() {
           로그아웃
         </button>
 
-        <div className="text-right leading-tight">
-          <p className="text-[12px] text-gray-500 font-medium">
-            {role === "ADMIN" || role === "MASTER" ? "관리자" : "작업자"}
-          </p>
-          <p className="text-[16px] font-bold text-gray-900">
-            {workerName ? `${workerName} 님` : "로그인 중..."}
-          </p>
-        </div>
       </header>
 
       {/* 메인 콘텐츠 영역 */}
