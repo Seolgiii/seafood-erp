@@ -48,6 +48,8 @@ export const LOT_FIELDS = {
   inOutFeeStored: "입출고비",
   /** LOT에 저장/룩업된 노조비 단가 */
   unionFeeStored: "노조비",
+  /** 판매 원가 */
+  salePrice: "판매원가",
 } as const;
 
 /** 품목 마스터 테이블 필드 */

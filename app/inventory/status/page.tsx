@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  ChevronLeftIcon, 
-  FunnelIcon, 
+import {
+  ChevronLeftIcon,
+  FunnelIcon,
   XMarkIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
@@ -30,28 +30,12 @@ function lotProductTitle(fields: Record<string, unknown>): string {
   return '-';
 }
 
-/** 표시 단가(원/kg): `단가` 필드 우선, 없으면 수매가÷총중량(기준단위_재고). */
-function formatUnitPricePerKg(fields: Record<string, unknown>): string | null {
-  const direct = fields[LOT_FIELDS.unitPrice];
-  const directN = typeof direct === 'number' ? direct : Number(direct);
-  if (Number.isFinite(directN) && directN > 0) {
-    return `${Math.round(directN).toLocaleString('ko-KR')}원/kg`;
-  }
-  const purchase = Number(fields[LOT_FIELDS.purchasePrice] ?? 0);
-  const stockKg = Number(fields[LOT_FIELDS.qtyBase] ?? 0);
-  if (purchase > 0 && stockKg > 0) {
-    return `${Math.round(purchase / stockKg).toLocaleString('ko-KR')}원/kg`;
-  }
-  return null;
-}
-
 export default function StockStatusPage() {
   const [stocks, setStocks] = useState<LotStockRecord[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<LotStockRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // 상세 필터 상태
   const [filters, setFilters] = useState({
     searchTerm: '',
     startDate: '',
@@ -61,7 +45,6 @@ export default function StockStatusPage() {
     origin: '',
   });
 
-  // 데이터 가져오기 (최신순 정렬 포함)
   const fetchStocks = useCallback(async () => {
     setLoading(true);
     try {
@@ -82,16 +65,12 @@ export default function StockStatusPage() {
     fetchStocks();
   }, [fetchStocks]);
 
-  // 필터 적용 로직
   const applyFilters = () => {
     let result = [...stocks];
 
     if (filters.searchTerm) {
       const q = filters.searchTerm;
-      result = result.filter((s) => {
-        const title = lotProductTitle(s.fields);
-        return title.includes(q);
-      });
+      result = result.filter((s) => lotProductTitle(s.fields).includes(q));
     }
     if (filters.spec) {
       const q = filters.spec;
@@ -110,8 +89,7 @@ export default function StockStatusPage() {
         return misu.includes(q) || d1.includes(q) || d2.includes(q);
       });
     }
-    // 원산지 및 기간 설정은 데이터 구조에 따라 추가 가능
-    
+
     setFilteredStocks(result);
     setIsFilterOpen(false);
   };
@@ -130,7 +108,7 @@ export default function StockStatusPage() {
           <Link href="/" className="p-2 -ml-2"><ChevronLeftIcon className="w-6 h-6 text-gray-600" /></Link>
           <h1 className="text-lg font-bold text-gray-800 ml-2">실시간 재고 현황</h1>
         </div>
-        <button 
+        <button
           onClick={() => setIsFilterOpen(true)}
           className="p-2 bg-blue-50 rounded-xl text-blue-600 active:scale-95 transition-all"
         >
@@ -138,68 +116,45 @@ export default function StockStatusPage() {
         </button>
       </div>
 
-      {/* 재고 리스트 (최신순) */}
-      <div className="p-4 space-y-3">
+      {/* 재고 리스트 */}
+      <div className="bg-white mt-2 px-4">
         {loading ? (
           <div className="text-center py-20 text-gray-400">최신 재고를 불러오는 중...</div>
         ) : filteredStocks.length > 0 ? (
           filteredStocks.map((stock) => {
             const specRaw = firstLotStringField(stock.fields, ['규격표시', '규격']);
-            const misuRaw = firstLotStringField(stock.fields, [
-              '미수',
-              '상세규격_표기',
-              '상세규격',
-            ]);
-            const unitPriceLine = formatUnitPricePerKg(stock.fields);
+            const misuRaw = firstLotStringField(stock.fields, ['미수', '상세규격_표기', '상세규격']);
             const rawStockKg = stock.fields['재고수량'];
             const stockKg = Number(Array.isArray(rawStockKg) ? rawStockKg[0] : rawStockKg) || 0;
-            const lotNo = String(stock.fields['LOT번호'] ?? '').trim() || '-';
+            const lotNo = String(stock.fields[LOT_FIELDS.lotNumber] ?? '').trim() || '-';
+            const salePriceRaw = stock.fields[LOT_FIELDS.salePrice];
+            const salePriceN = typeof salePriceRaw === 'number' ? salePriceRaw : Number(salePriceRaw);
 
             return (
-            <div
-              key={stock.id}
-              className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-1"
-            >
-              <div className="flex justify-between items-start gap-2">
-                <div className="flex gap-3 flex-wrap min-w-0">
-                  <p className="text-[14px] text-gray-700">
-                    <span className="font-bold">규격 :</span> {specRaw || '-'}
+              <div key={stock.id} className="py-3.5 border-b border-gray-100 last:border-0">
+                {/* 1줄: 품목명 + 총중량 */}
+                <div className="flex justify-between items-baseline gap-2">
+                  <p className="font-bold text-[16px] text-gray-900 truncate">
+                    {lotProductTitle(stock.fields)}
                   </p>
-                  <p className="text-[14px] text-gray-700">
-                    <span className="font-bold">미수 :</span> {misuRaw || '-'}
+                  <p className="shrink-0 text-[15px] font-bold text-blue-600">
+                    {stockKg.toLocaleString('ko-KR')} kg
                   </p>
                 </div>
-                <span className="shrink-0 text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                  {String(stock.fields['승인상태'] || '정상')}
-                </span>
+                {/* 2줄: LOT번호 */}
+                <p className="text-[12px] font-mono text-gray-400 mt-0.5">{lotNo}</p>
+                {/* 3줄: 규격/미수 + 판매원가 */}
+                <div className="flex justify-between items-baseline mt-0.5">
+                  <p className="text-[13px] text-gray-500">
+                    규격 {specRaw || '-'} / 미수 {misuRaw || '-'}
+                  </p>
+                  <p className="shrink-0 text-[13px] text-gray-600">
+                    {Number.isFinite(salePriceN) && salePriceN > 0
+                      ? `${salePriceN.toLocaleString('ko-KR')}원`
+                      : '—'}
+                  </p>
+                </div>
               </div>
-
-              <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">
-                {lotProductTitle(stock.fields)}
-              </h2>
-
-              <p className="text-[15px] font-bold font-mono text-blue-700 tracking-tight mb-4 break-all leading-snug">
-                {lotNo}
-              </p>
-
-              <div className="flex justify-between items-end gap-3 border-t pt-3 border-gray-50">
-                <p className="text-lg text-gray-900 leading-snug min-w-0">
-                  <span className="font-normal text-gray-800">단가 :</span>{' '}
-                  {unitPriceLine ? (
-                    <span className="font-bold text-gray-800">{unitPriceLine}</span>
-                  ) : (
-                    <span className="font-normal text-gray-500">—</span>
-                  )}
-                </p>
-                <p className="text-lg text-gray-900 leading-snug text-right shrink-0">
-                  <span className="font-bold text-gray-800">총중량 :</span>{' '}
-                  <span className="font-normal text-blue-600">
-                    {stockKg.toLocaleString('ko-KR')}
-                  </span>
-                  <span className="text-lg font-normal text-gray-500"> kg</span>
-                </p>
-              </div>
-            </div>
             );
           })
         ) : (
@@ -216,15 +171,14 @@ export default function StockStatusPage() {
               <h2 className="text-xl font-bold">상세 필터</h2>
               <button onClick={() => setIsFilterOpen(false)}><XMarkIcon className="w-6 h-6" /></button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* 필터 항목들 */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-700">품명 검색</label>
                 <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="품목명 입력" 
+                  <input
+                    type="text"
+                    placeholder="품목명 입력"
                     className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
                     value={filters.searchTerm}
                     onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
@@ -245,8 +199,8 @@ export default function StockStatusPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">규격</label>
-                  <input 
-                    type="text" placeholder="예: 11" 
+                  <input
+                    type="text" placeholder="예: 11"
                     className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
                     value={filters.spec}
                     onChange={(e) => setFilters({...filters, spec: e.target.value})}
@@ -254,8 +208,8 @@ export default function StockStatusPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700">미수</label>
-                  <input 
-                    type="text" placeholder="예: 42/44" 
+                  <input
+                    type="text" placeholder="예: 42/44"
                     className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
                     value={filters.count}
                     onChange={(e) => setFilters({...filters, count: e.target.value})}
