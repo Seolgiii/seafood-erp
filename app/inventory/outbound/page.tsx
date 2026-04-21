@@ -237,13 +237,13 @@ export default function OutboundRecordPage() {
                   placeholder={searchMode === 'manual' ? '예: 0001' : '스캔 대기중...'}
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  className="flex-1 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center"
+                  className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center"
                 />
                 {searchMode === 'manual' && (
                   <button
                     type="submit"
                     disabled={isSearching}
-                    className="px-6 bg-gray-800 text-white rounded-2xl font-bold active:scale-95"
+                    className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold active:scale-95"
                   >
                     {isSearching ? '...' : '검색'}
                   </button>
