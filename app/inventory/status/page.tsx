@@ -131,7 +131,7 @@ export default function StockStatusPage() {
             const salePriceN = typeof salePriceRaw === 'number' ? salePriceRaw : Number(salePriceRaw);
 
             return (
-              <div key={stock.id} className="py-3.5 border-b border-gray-100 last:border-0">
+              <div key={stock.id} className="py-3.5 border-b border-gray-300 last:border-0">
                 {/* 1줄: 품목명 + 총중량 */}
                 <div className="flex justify-between items-baseline gap-2">
                   <p className="font-bold text-[16px] text-gray-900 truncate">
@@ -142,7 +142,7 @@ export default function StockStatusPage() {
                   </p>
                 </div>
                 {/* 2줄: LOT번호 */}
-                <p className="text-[12px] font-mono text-gray-400 mt-0.5">{lotNo}</p>
+                <p className="text-[12px] font-mono font-bold text-blue-500 mt-0.5">{lotNo}</p>
                 {/* 3줄: 규격/미수 + 판매원가 */}
                 <div className="flex justify-between items-baseline mt-0.5">
                   <p className="text-[13px] text-gray-500">
@@ -150,7 +150,7 @@ export default function StockStatusPage() {
                   </p>
                   <p className="shrink-0 text-[13px] text-gray-600">
                     {Number.isFinite(salePriceN) && salePriceN > 0
-                      ? `${salePriceN.toLocaleString('ko-KR')}원`
+                      ? `${Math.round(salePriceN).toLocaleString('ko-KR')}원`
                       : '—'}
                   </p>
                 </div>
