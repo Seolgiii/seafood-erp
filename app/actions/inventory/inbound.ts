@@ -120,16 +120,14 @@ async function getWorkerRecordIdByName(name: string): Promise<string | null> {
 }
 
 /**
- * 품목명으로 품목마스터 id + 품목코드 + 기존 LOT 링크 배열 확보.
+ * 품목명으로 품목마스터 id + 품목코드 + 품목구분 + 기존 LOT 링크 배열 확보.
  * 없으면 신규 품목마스터를 먼저 생성.
- *
- * 품목마스터는 물품의 기본 정보(품목명, 품목코드, 규격 등)를 관리하는 테이블입니다.
- * 처음 입고되는 물품이면 자동으로 품목마스터에 새 항목을 추가합니다.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function resolveProductMasterForInbound(formData: any): Promise<{
   masterId: string;
   productCode: string;
+  productCategory: string;
   lotIds: string[];
 } | null> {
   const name = String(formData?.["품목명"] ?? "").trim();
@@ -166,7 +164,8 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
       ? rawLots.filter((x): x is string => typeof x === "string" && isRecordId(x))
       : [];
     const productCode = String(existing.fields?.["품목코드"] ?? "").trim();
-    return { masterId: existing.id, productCode, lotIds };
+    const productCategory = String(existing.fields?.["품목 구분"] ?? "").trim();
+    return { masterId: existing.id, productCode, productCategory, lotIds };
   }
 
   // 기존 품목마스터가 없으면 신규 생성 (처음 입고되는 품목)
@@ -178,7 +177,7 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
       body: JSON.stringify({
         fields: {
           품목명: name,
-          품목구분: "미분류",
+          "품목 구분": "미분류",
           권장표기: formData?.["규격"],
           원산지: formData?.["원산지"],
         },
@@ -202,8 +201,9 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
     return null;
   }
   const productCode = String(created.fields?.["품목코드"] ?? "").trim();
+  const productCategory = String(created.fields?.["품목 구분"] ?? "").trim();
   console.log("[createInventoryRecord] 품목마스터 신규 생성:", { masterId: created.id, productCode });
-  return { masterId: created.id, productCode, lotIds: [] };
+  return { masterId: created.id, productCode, productCategory, lotIds: [] };
 }
 
 /**
@@ -276,6 +276,9 @@ export async function createInventoryRecord(formData: any) {
     const purchasePrice = Number(formData?.["수매가"]);
     const memo = String(formData?.["비고"] ?? "").trim();
 
+    const supplier = String(formData?.["매입처"] ?? "").trim();
+    const shipName = String(formData?.["선박명"] ?? "").trim();
+
     // ── 1. 입고 관리 생성 (LOT번호는 아직 비움) ──
     const inboundFields: Record<string, unknown> = {
       입고일: bizDate,
@@ -288,6 +291,8 @@ export async function createInventoryRecord(formData: any) {
       [INBOUND_WORKER_FIELD]: [workerRecordId],
       [INBOUND_PRODUCT_MASTER_FIELD]: [productMaster.masterId],
       승인상태: "승인 대기",
+      ...(supplier && { 매입처: supplier }),
+      ...(shipName && { 선박명: shipName }),
     };
     const inboundRes = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}`,
@@ -359,6 +364,8 @@ export async function createInventoryRecord(formData: any) {
       보관처: String(formData?.["보관처"] ?? "").trim(),
       입고일자: bizDate,
       "입고수량(BOX)": qty,
+      ...(productMaster.productCategory && { 품목구분: productMaster.productCategory }),
+      ...(supplier && { 매입처: supplier }),
     };
     if (Number.isFinite(purchasePrice) && purchasePrice > 0) {
       lotFields["수매가"] = purchasePrice;
@@ -471,6 +478,131 @@ export async function getStorageOptions(): Promise<string[]> {
     return (field.options?.choices ?? []).map((c: any) => String(c.name));
   } catch (e) {
     console.error("[getStorageOptions] 예외:", e);
+    return [];
+  }
+}
+
+/**
+ * 품목마스터 테이블에서 품목명 + 품목구분 목록을 반환한다.
+ * 품목명 드롭다운 및 선택 시 품목구분 자동 채우기에 사용.
+ */
+export async function getProductOptions(): Promise<{ id: string; name: string; category: string }[]> {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  if (!apiKey || !baseId) return [];
+
+  try {
+    const table = encodeURIComponent("품목마스터");
+    const fieldParams = ["품목명", "품목 구분"]
+      .map((f) => `fields[]=${encodeURIComponent(f)}`)
+      .join("&");
+    const allRecords: { id: string; name: string; category: string }[] = [];
+    let offset: string | undefined;
+
+    do {
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (offset) params.set("offset", offset);
+      const res = await fetch(
+        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 60 } }
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("[getProductOptions] 품목마스터 조회 실패:", { status: res.status, body });
+        break;
+      }
+      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      for (const rec of data.records ?? []) {
+        const name = String(rec.fields?.["품목명"] ?? "").trim();
+        if (name) {
+          allRecords.push({
+            id: rec.id,
+            name,
+            category: String(rec.fields?.["품목 구분"] ?? "").trim(),
+          });
+        }
+      }
+      offset = data.offset;
+    } while (offset);
+
+    return allRecords;
+  } catch (e) {
+    console.error("[getProductOptions] 예외:", e);
+    return [];
+  }
+}
+
+/**
+ * 매입처마스터 테이블에서 매입처명 목록을 반환한다.
+ * 테이블이 없거나 오류 시 빈 배열 반환.
+ */
+export async function getSupplierOptions(): Promise<string[]> {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  if (!apiKey || !baseId) return [];
+
+  // 1. 매입처마스터 테이블 우선 시도
+  try {
+    const table = encodeURIComponent("매입처마스터");
+    const fieldParams = `fields[]=${encodeURIComponent("매입처명")}`;
+    const allNames: string[] = [];
+    let offset: string | undefined;
+    let masterOk = true;
+
+    do {
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (offset) params.set("offset", offset);
+      const res = await fetch(
+        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 300 } }
+      );
+      if (!res.ok) {
+        console.warn("[getSupplierOptions] 매입처마스터 조회 실패:", res.status);
+        masterOk = false;
+        break;
+      }
+      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      for (const rec of data.records ?? []) {
+        const name = String(rec.fields?.["매입처명"] ?? "").trim();
+        if (name) allNames.push(name);
+      }
+      offset = data.offset;
+    } while (offset);
+
+    if (masterOk && allNames.length > 0) return allNames;
+  } catch (e) {
+    console.warn("[getSupplierOptions] 매입처마스터 예외:", e);
+  }
+
+  // 2. 폴백: 입고 관리 테이블의 매입처 필드에서 unique 값 수집
+  try {
+    const table = encodeURIComponent(process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리");
+    const fieldParams = `fields[]=${encodeURIComponent("매입처")}`;
+    const nameSet = new Set<string>();
+    let offset: string | undefined;
+
+    do {
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (offset) params.set("offset", offset);
+      const res = await fetch(
+        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 300 } }
+      );
+      if (!res.ok) {
+        console.error("[getSupplierOptions] 입고 관리 폴백 조회 실패:", res.status);
+        break;
+      }
+      const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
+      for (const rec of data.records ?? []) {
+        const name = String(rec.fields?.["매입처"] ?? "").trim();
+        if (name) nameSet.add(name);
+      }
+      offset = data.offset;
+    } while (offset);
+
+    return [...nameSet].sort();
+  } catch (e) {
+    console.error("[getSupplierOptions] 폴백 예외:", e);
     return [];
   }
 }

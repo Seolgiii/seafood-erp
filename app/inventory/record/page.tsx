@@ -2,28 +2,43 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createInventoryRecord, getMasterGuide, getStorageOptions } from "@/app/actions";
+import {
+  createInventoryRecord,
+  getStorageOptions,
+  getProductOptions,
+  getSupplierOptions,
+} from "@/app/actions";
 import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { readSession } from "@/lib/session";
 
 export default function InventoryRecordPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState("");
+  const [workerName, setWorkerName] = useState("");
+  const [buyerName, setBuyerName] = useState("");
 
   const [formData, setFormData] = useState({
     itemName: "",
+    itemCategory: "",
     spec: "",
     count: "",
     quantity: "",
     price: "",
     storage: "",
     origin: "국내산",
+    supplier: "",
+    shipName: "",
     remarks: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [guideMessage, setGuideMessage] = useState("");
   const [now, setNow] = useState<Date | null>(null);
+
+  // 품목명 드롭다운 상태
+  const [productOptions, setProductOptions] = useState<{ id: string; name: string; category: string }[]>([]);
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemOpen, setItemOpen] = useState(false);
+  const itemRef = useRef<HTMLDivElement>(null);
 
   // 보관처 드롭다운 상태
   const [storageOptions, setStorageOptions] = useState<string[]>([]);
@@ -31,10 +46,18 @@ export default function InventoryRecordPage() {
   const [storageOpen, setStorageOpen] = useState(false);
   const storageRef = useRef<HTMLDivElement>(null);
 
+  // 매입처 드롭다운 상태
+  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+  const [supplierQuery, setSupplierQuery] = useState("");
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const supplierRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const s = readSession();
     if (s) {
       setWorkerId(s.workerId);
+      setWorkerName(s.workerName);
+      setBuyerName(s.workerName);
     }
   }, []);
 
@@ -44,52 +67,32 @@ export default function InventoryRecordPage() {
   }, []);
 
   useEffect(() => {
+    getProductOptions().then(setProductOptions);
     getStorageOptions().then(setStorageOptions);
+    getSupplierOptions().then(setSupplierOptions);
   }, []);
 
   // 드롭다운 바깥 클릭 시 닫기
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (storageRef.current && !storageRef.current.contains(e.target as Node)) {
-        setStorageOpen(false);
-      }
+      if (itemRef.current && !itemRef.current.contains(e.target as Node)) setItemOpen(false);
+      if (storageRef.current && !storageRef.current.contains(e.target as Node)) setStorageOpen(false);
+      if (supplierRef.current && !supplierRef.current.contains(e.target as Node)) setSupplierOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filteredStorage = storageOptions.filter((opt) =>
-    opt.includes(storageQuery)
+  const filteredProducts = productOptions.filter((opt) =>
+    opt.name.includes(itemQuery)
   );
+  const filteredStorage = storageOptions.filter((opt) => opt.includes(storageQuery));
+  const filteredSuppliers = supplierOptions.filter((opt) => opt.includes(supplierQuery));
 
   const handleNumberChange = (field: string, value: string) => {
     const numericValue = value.replace(/\D/g, "");
     const commaValue = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     setFormData({ ...formData, [field]: commaValue });
-  };
-
-  const handleBlurItemName = async () => {
-    if (!formData.itemName.trim()) return;
-    setGuideMessage("정보 확인 중...");
-    try {
-      const result = await getMasterGuide(formData.itemName);
-      if (result.success && result.records && result.records.length > 0) {
-        const masterData = result.records[0].fields;
-        setGuideMessage(
-          `추천 규격: ${masterData["권장표기"] || "없음"} / 기본 원산지: ${masterData["원산지"] || "국내산"}`
-        );
-        if (!formData.origin || formData.origin === "국내산") {
-          setFormData((prev) => ({
-            ...prev,
-            origin: String(masterData["원산지"] || "국내산"),
-          }));
-        }
-      } else {
-        setGuideMessage("신규 품목입니다. 정보를 직접 입력해주세요.");
-      }
-    } catch {
-      setGuideMessage("마스터 정보를 불러올 수 없습니다.");
-    }
   };
 
   const handleSubmit = async () => {
@@ -107,6 +110,8 @@ export default function InventoryRecordPage() {
         수매가: Number(formData.price.replace(/,/g, "")),
         보관처: formData.storage,
         원산지: formData.origin,
+        매입처: formData.supplier,
+        선박명: formData.shipName,
         비고: formData.remarks,
         작업자: workerId,
       };
@@ -156,18 +161,48 @@ export default function InventoryRecordPage() {
       <main className="p-5 flex flex-col gap-5">
         <div className="bg-white p-6 rounded-[28px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-5">
 
+          {/* 품목명 — 품목마스터 검색 드롭다운 */}
           <div className="flex flex-col gap-2">
             <label className="text-[14px] font-bold text-gray-500 ml-1">품목명 (필수)</label>
-            <input
-              type="text"
-              value={formData.itemName}
-              onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-              onBlur={handleBlurItemName}
-              placeholder="예 : 점고등어"
-              className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-            />
-            {guideMessage && (
-              <p className="text-[#3182F6] text-[13px] font-bold ml-1">💡 {guideMessage}</p>
+            <div ref={itemRef} className="relative">
+              <input
+                type="text"
+                value={itemQuery}
+                onChange={(e) => {
+                  setItemQuery(e.target.value);
+                  setFormData({ ...formData, itemName: e.target.value, itemCategory: "" });
+                  setItemOpen(true);
+                }}
+                onFocus={() => setItemOpen(true)}
+                placeholder="품목명 검색 또는 직접 입력"
+                className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+              />
+              {itemOpen && filteredProducts.length > 0 && (
+                <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
+                  {filteredProducts.map((opt) => (
+                    <li
+                      key={opt.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setItemQuery(opt.name);
+                        setFormData({ ...formData, itemName: opt.name, itemCategory: opt.category });
+                        setItemOpen(false);
+                      }}
+                      className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between"
+                    >
+                      <span>{opt.name}</span>
+                      {opt.category && (
+                        <span className="text-[12px] font-medium text-gray-400">{opt.category}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {formData.itemCategory && (
+              <p className="text-[12px] font-bold text-[#3182F6] ml-1">
+                품목구분: {formData.itemCategory}
+              </p>
             )}
           </div>
 
@@ -219,7 +254,7 @@ export default function InventoryRecordPage() {
             </div>
           </div>
 
-          {/* 보관처 + 원산지 — 2열 그리드 */}
+          {/* 보관처 + 원산지 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <label className="text-[14px] font-bold text-gray-500 ml-1">보관처</label>
@@ -266,6 +301,68 @@ export default function InventoryRecordPage() {
                 className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
               />
             </div>
+          </div>
+
+          {/* 매입처 + 선박명 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-2">
+              <label className="text-[14px] font-bold text-gray-500 ml-1">매입처</label>
+              <div ref={supplierRef} className="relative">
+                <input
+                  type="text"
+                  value={supplierQuery}
+                  onChange={(e) => {
+                    setSupplierQuery(e.target.value);
+                    setFormData({ ...formData, supplier: e.target.value });
+                    setSupplierOpen(true);
+                  }}
+                  onFocus={() => setSupplierOpen(true)}
+                  placeholder="매입처 검색"
+                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+                {supplierOpen && filteredSuppliers.length > 0 && (
+                  <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
+                    {filteredSuppliers.map((opt) => (
+                      <li
+                        key={opt}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSupplierQuery(opt);
+                          setFormData({ ...formData, supplier: opt });
+                          setSupplierOpen(false);
+                        }}
+                        className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                      >
+                        {opt}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[14px] font-bold text-gray-500 ml-1">선박명</label>
+              <input
+                type="text"
+                value={formData.shipName}
+                onChange={(e) => setFormData({ ...formData, shipName: e.target.value })}
+                placeholder="선박명 입력"
+                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+              />
+            </div>
+          </div>
+
+          {/* 매입자 — 세션에서 자동 설정, 직접 수정 가능 */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[14px] font-bold text-gray-500 ml-1">매입자</label>
+            <input
+              type="text"
+              value={buyerName}
+              onChange={(e) => setBuyerName(e.target.value)}
+              placeholder="매입자 입력"
+              className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+            />
           </div>
 
           <div className="flex flex-col gap-2">
