@@ -164,7 +164,7 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
       ? rawLots.filter((x): x is string => typeof x === "string" && isRecordId(x))
       : [];
     const productCode = String(existing.fields?.["품목코드"] ?? "").trim();
-    const productCategory = String(existing.fields?.["품목 구분"] ?? "").trim();
+    const productCategory = String(existing.fields?.["품목구분"] ?? "").trim();
     return { masterId: existing.id, productCode, productCategory, lotIds };
   }
 
@@ -177,7 +177,7 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
       body: JSON.stringify({
         fields: {
           품목명: name,
-          "품목 구분": "미분류",
+          "품목구분": "미분류",
           권장표기: formData?.["규격"],
           원산지: formData?.["원산지"],
         },
@@ -201,7 +201,7 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
     return null;
   }
   const productCode = String(created.fields?.["품목코드"] ?? "").trim();
-  const productCategory = String(created.fields?.["품목 구분"] ?? "").trim();
+  const productCategory = String(created.fields?.["품목구분"] ?? "").trim();
   console.log("[createInventoryRecord] 품목마스터 신규 생성:", { masterId: created.id, productCode });
   return { masterId: created.id, productCode, productCategory, lotIds: [] };
 }
@@ -493,7 +493,7 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
 
   try {
     const table = encodeURIComponent("품목마스터");
-    const fieldParams = ["품목명", "품목 구분"]
+    const fieldParams = ["품목명", "품목구분"]
       .map((f) => `fields[]=${encodeURIComponent(f)}`)
       .join("&");
     const allRecords: { id: string; name: string; category: string }[] = [];
@@ -518,7 +518,7 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
           allRecords.push({
             id: rec.id,
             name,
-            category: String(rec.fields?.["품목 구분"] ?? "").trim(),
+            category: String(rec.fields?.["품목구분"] ?? "").trim(),
           });
         }
       }
@@ -543,7 +543,7 @@ export async function getSupplierOptions(): Promise<string[]> {
 
   // 1. 매입처마스터 테이블 우선 시도
   try {
-    const table = encodeURIComponent("매입처마스터");
+    const table = encodeURIComponent("매입처 마스터");
     const fieldParams = `fields[]=${encodeURIComponent("매입처명")}`;
     const allNames: string[] = [];
     let offset: string | undefined;

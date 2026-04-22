@@ -67,9 +67,20 @@ export default function InventoryRecordPage() {
   }, []);
 
   useEffect(() => {
-    getProductOptions().then(setProductOptions);
-    getStorageOptions().then(setStorageOptions);
-    getSupplierOptions().then(setSupplierOptions);
+    getProductOptions().then((data) => {
+      console.log("[품목옵션]", data.length, "건", data.slice(0, 3));
+      setProductOptions(data);
+    }).catch((e) => console.error("[품목옵션 오류]", e));
+
+    getStorageOptions().then((data) => {
+      console.log("[보관처옵션]", data);
+      setStorageOptions(data);
+    }).catch((e) => console.error("[보관처옵션 오류]", e));
+
+    getSupplierOptions().then((data) => {
+      console.log("[매입처옵션]", data.length, "건", data.slice(0, 3));
+      setSupplierOptions(data);
+    }).catch((e) => console.error("[매입처옵션 오류]", e));
   }, []);
 
   // 드롭다운 바깥 클릭 시 닫기
