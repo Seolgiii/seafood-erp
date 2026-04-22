@@ -47,9 +47,10 @@ export default function InventoryRecordPage() {
   const storageRef = useRef<HTMLDivElement>(null);
 
   // 매입처 드롭다운 상태
-  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
   const [supplierQuery, setSupplierQuery] = useState("");
   const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierId, setSupplierId] = useState("");
   const supplierRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +99,7 @@ export default function InventoryRecordPage() {
     opt.name.includes(itemQuery)
   );
   const filteredStorage = storageOptions.filter((opt) => opt.includes(storageQuery));
-  const filteredSuppliers = supplierOptions.filter((opt) => opt.includes(supplierQuery));
+  const filteredSuppliers = supplierOptions.filter((opt) => opt.name.includes(supplierQuery));
 
   const handleNumberChange = (field: string, value: string) => {
     const numericValue = value.replace(/\D/g, "");
@@ -122,6 +123,7 @@ export default function InventoryRecordPage() {
         보관처: formData.storage,
         원산지: formData.origin,
         매입처: formData.supplier,
+        매입처RecordId: supplierId,
         선박명: formData.shipName,
         비고: formData.remarks,
         작업자: workerId,
@@ -325,6 +327,7 @@ export default function InventoryRecordPage() {
                   onChange={(e) => {
                     setSupplierQuery(e.target.value);
                     setFormData({ ...formData, supplier: e.target.value });
+                    setSupplierId("");
                     setSupplierOpen(true);
                   }}
                   onFocus={() => setSupplierOpen(true)}
@@ -335,16 +338,17 @@ export default function InventoryRecordPage() {
                   <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
                     {filteredSuppliers.map((opt) => (
                       <li
-                        key={opt}
+                        key={opt.id || opt.name}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setSupplierQuery(opt);
-                          setFormData({ ...formData, supplier: opt });
+                          setSupplierQuery(opt.name);
+                          setFormData({ ...formData, supplier: opt.name });
+                          setSupplierId(opt.id);
                           setSupplierOpen(false);
                         }}
                         className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
                       >
-                        {opt}
+                        {opt.name}
                       </li>
                     ))}
                   </ul>

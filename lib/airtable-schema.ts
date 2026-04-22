@@ -8,6 +8,7 @@ export const AIRTABLE_TABLE = {
   lots: "LOT별 재고",
   txn: "입출고 내역",
   storageCostHistory: "보관처 비용 이력",
+  suppliers: "매입처 마스터",
 } as const;
 
 /** 작업자 테이블 필드 */

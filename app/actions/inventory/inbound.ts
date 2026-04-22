@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { revalidatePath } from "next/cache";
+import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -95,7 +96,6 @@ function inboundDateForAirtable(raw: unknown): string {
 
 /**
  * 작업자 이름으로 작업자 테이블을 검색하여 해당 작업자의 레코드 ID를 반환합니다.
- * 입고 신청 시 작업자를 Airtable 링크 필드로 연결하기 위해 필요합니다.
  */
 async function getWorkerRecordIdByName(name: string): Promise<string | null> {
   const trimmed = String(name ?? "").trim();
@@ -118,6 +118,7 @@ async function getWorkerRecordIdByName(name: string): Promise<string | null> {
   const id = data.records?.[0]?.id;
   return typeof id === "string" && isRecordId(id) ? id : null;
 }
+
 
 /**
  * 품목명으로 품목마스터 id + 품목코드 + 품목구분 + 기존 LOT 링크 배열 확보.
@@ -276,7 +277,7 @@ export async function createInventoryRecord(formData: any) {
     const purchasePrice = Number(formData?.["수매가"]);
     const memo = String(formData?.["비고"] ?? "").trim();
 
-    const supplier = String(formData?.["매입처"] ?? "").trim();
+    const supplierRecordId = String(formData?.["매입처RecordId"] ?? "").trim();
     const shipName = String(formData?.["선박명"] ?? "").trim();
 
     // ── 1. 입고 관리 생성 (LOT번호는 아직 비움) ──
@@ -289,9 +290,10 @@ export async function createInventoryRecord(formData: any) {
       보관처: String(formData?.["보관처"] ?? ""),
       원산지: String(formData?.["원산지"] ?? ""),
       [INBOUND_WORKER_FIELD]: [workerRecordId],
+      매입자: [workerRecordId],
       [INBOUND_PRODUCT_MASTER_FIELD]: [productMaster.masterId],
       승인상태: "승인 대기",
-      ...(supplier && { 매입처: supplier }),
+      ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
       ...(shipName && { 선박명: shipName }),
     };
     const inboundRes = await fetch(
@@ -365,7 +367,7 @@ export async function createInventoryRecord(formData: any) {
       입고일자: bizDate,
       "입고수량(BOX)": qty,
       ...(productMaster.productCategory && { 품목구분: productMaster.productCategory }),
-      ...(supplier && { 매입처: supplier }),
+      ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
     };
     if (Number.isFinite(purchasePrice) && purchasePrice > 0) {
       lotFields["수매가"] = purchasePrice;
@@ -489,30 +491,40 @@ export async function getStorageOptions(): Promise<string[]> {
 export async function getProductOptions(): Promise<{ id: string; name: string; category: string }[]> {
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) return [];
+  if (!apiKey || !baseId) {
+    console.error("[getProductOptions] API KEY 또는 BASE ID 미설정");
+    return [];
+  }
 
   try {
-    const table = encodeURIComponent("품목마스터");
+    const tableName = "품목마스터";
+    const table = encodeURIComponent(tableName);
     const fieldParams = ["품목명", "품목구분"]
       .map((f) => `fields[]=${encodeURIComponent(f)}`)
       .join("&");
     const allRecords: { id: string; name: string; category: string }[] = [];
     let offset: string | undefined;
+    let pageNum = 0;
+
+    console.log(`[getProductOptions] 쿼리 시작 — 테이블명: "${tableName}" (인코딩: "${table}")`);
 
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const res = await fetch(
-        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
-        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 60 } }
-      );
+      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
+      console.log(`[getProductOptions] 페이지 ${++pageNum} 요청: ${url}`);
+
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error("[getProductOptions] 품목마스터 조회 실패:", { status: res.status, body });
+        console.error("[getProductOptions] 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
-      for (const rec of data.records ?? []) {
+      const pageRecords = data.records ?? [];
+      console.log(`[getProductOptions] 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
+
+      for (const rec of pageRecords) {
         const name = String(rec.fields?.["품목명"] ?? "").trim();
         if (name) {
           allRecords.push({
@@ -525,6 +537,7 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
       offset = data.offset;
     } while (offset);
 
+    console.log(`[getProductOptions] 완료 — 총 ${allRecords.length}건`);
     return allRecords;
   } catch (e) {
     console.error("[getProductOptions] 예외:", e);
@@ -533,50 +546,66 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
 }
 
 /**
- * 매입처마스터 테이블에서 매입처명 목록을 반환한다.
+ * 매입처 마스터 테이블에서 매입처명 + record ID 목록을 반환한다.
  * 테이블이 없거나 오류 시 빈 배열 반환.
  */
-export async function getSupplierOptions(): Promise<string[]> {
+export async function getSupplierOptions(): Promise<{ id: string; name: string }[]> {
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) return [];
+  if (!apiKey || !baseId) {
+    console.error("[getSupplierOptions] API KEY 또는 BASE ID 미설정");
+    return [];
+  }
 
-  // 1. 매입처마스터 테이블 우선 시도
+  // 1. 매입처 마스터 테이블 우선 시도
+  const masterTableName = AIRTABLE_TABLE.suppliers;
+  console.log(`[getSupplierOptions] 쿼리 시작 — 테이블명: "${masterTableName}"`);
   try {
-    const table = encodeURIComponent("매입처 마스터");
+    const table = encodeURIComponent(masterTableName);
     const fieldParams = `fields[]=${encodeURIComponent("매입처명")}`;
-    const allNames: string[] = [];
+    const allRecords: { id: string; name: string }[] = [];
     let offset: string | undefined;
     let masterOk = true;
+    let pageNum = 0;
 
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const res = await fetch(
-        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
-        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 300 } }
-      );
+      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
+      console.log(`[getSupplierOptions] 매입처 마스터 페이지 ${++pageNum} 요청: ${url}`);
+
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
-        console.warn("[getSupplierOptions] 매입처마스터 조회 실패:", res.status);
+        const body = await res.text().catch(() => "");
+        console.warn("[getSupplierOptions] 매입처 마스터 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         masterOk = false;
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
-      for (const rec of data.records ?? []) {
+      const pageRecords = data.records ?? [];
+      console.log(`[getSupplierOptions] 매입처 마스터 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
+
+      for (const rec of pageRecords) {
         const name = String(rec.fields?.["매입처명"] ?? "").trim();
-        if (name) allNames.push(name);
+        if (name) allRecords.push({ id: rec.id, name });
       }
       offset = data.offset;
     } while (offset);
 
-    if (masterOk && allNames.length > 0) return allNames;
+    if (masterOk && allRecords.length > 0) {
+      console.log(`[getSupplierOptions] 완료 — 총 ${allRecords.length}건`);
+      return allRecords;
+    }
+    console.warn(`[getSupplierOptions] 매입처 마스터에서 0건 조회됨 — 폴백으로 전환`);
   } catch (e) {
-    console.warn("[getSupplierOptions] 매입처마스터 예외:", e);
+    console.warn("[getSupplierOptions] 매입처 마스터 예외:", e);
   }
 
-  // 2. 폴백: 입고 관리 테이블의 매입처 필드에서 unique 값 수집
+  // 2. 폴백: 입고 관리 테이블의 매입처 필드에서 unique 값 수집 (ID 없음)
+  const fallbackTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리";
+  console.log(`[getSupplierOptions] 폴백 — 테이블명: "${fallbackTableName}"`);
   try {
-    const table = encodeURIComponent(process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리");
+    const table = encodeURIComponent(fallbackTableName);
     const fieldParams = `fields[]=${encodeURIComponent("매입처")}`;
     const nameSet = new Set<string>();
     let offset: string | undefined;
@@ -584,12 +613,11 @@ export async function getSupplierOptions(): Promise<string[]> {
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
-      const res = await fetch(
-        `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`,
-        { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 300 } }
-      );
+      const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
-        console.error("[getSupplierOptions] 입고 관리 폴백 조회 실패:", res.status);
+        const body = await res.text().catch(() => "");
+        console.error("[getSupplierOptions] 폴백 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
@@ -600,7 +628,9 @@ export async function getSupplierOptions(): Promise<string[]> {
       offset = data.offset;
     } while (offset);
 
-    return [...nameSet].sort();
+    const results = [...nameSet].sort().map((name) => ({ id: "", name }));
+    console.log(`[getSupplierOptions] 폴백 완료 — 총 ${results.length}건`);
+    return results;
   } catch (e) {
     console.error("[getSupplierOptions] 폴백 예외:", e);
     return [];
