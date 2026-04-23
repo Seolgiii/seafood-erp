@@ -141,40 +141,55 @@ async function fetchProductName(productId: string): Promise<string> {
  * 저장된 PDF URL을 입고 관리 레코드의 '입고증URL' 필드에 기록합니다.
  */
 async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
-  const fields = await fetchRecord("입고 관리", recordId);
-  if (!fields) return;
+  console.log("[generateAndSaveInboundPdf] 시작:", recordId);
+  try {
+    const fields = await fetchRecord("입고 관리", recordId);
+    if (!fields) {
+      console.error("[generateAndSaveInboundPdf] 입고 관리 레코드 조회 실패:", recordId);
+      return;
+    }
 
-  // 작업자 및 품목 정보를 각 테이블에서 병렬 조회
-  const workerRecId = firstLinkId(fields["작업자"]);
-  const productRecId = firstLinkId(fields["품목마스터"] ?? fields["품목"]);
+    const workerRecId = firstLinkId(fields["작업자"]);
+    const productRecId = firstLinkId(fields["품목마스터"] ?? fields["품목"]);
+    console.log("[generateAndSaveInboundPdf] 연결 ID:", { workerRecId, productRecId });
 
-  const [requester, productName] = await Promise.all([
-    workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
-    productRecId ? fetchProductName(productRecId) : Promise.resolve(""),
-  ]);
+    const [requester, productName] = await Promise.all([
+      workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
+      productRecId ? fetchProductName(productRecId) : Promise.resolve(""),
+    ]);
+    console.log("[generateAndSaveInboundPdf] 이름 조회 완료:", { requester, productName });
 
-  // 입고증 PDF 생성 (A4 문서)
-  const pdfBuffer = await generateInboundPdf({
-    lotNumber: String(fields["LOT번호"] ?? ""),
-    productName,
-    spec: String(fields["규격"] ?? ""),
-    quantity: Number(fields["입고수량"] ?? 0),
-    storage: String(fields["보관처"] ?? ""),
-    origin: String(fields["원산지"] ?? ""),
-    purchasePrice: Number(fields["수매가"] ?? 0),
-    date: String(fields["입고일"] ?? ""),
-    requester,
-  });
+    const pdfData = {
+      lotNumber: String(fields["LOT번호"] ?? ""),
+      productName,
+      spec: String(fields["규격"] ?? ""),
+      quantity: Number(fields["입고수량"] ?? 0),
+      storage: String(fields["보관처"] ?? ""),
+      origin: String(fields["원산지"] ?? ""),
+      purchasePrice: Number(fields["수매가"] ?? 0),
+      date: String(fields["입고일"] ?? ""),
+      requester,
+    };
+    console.log("[generateAndSaveInboundPdf] PDF 데이터:", pdfData);
 
-  // PDF를 Vercel Blob(클라우드 파일 저장소)에 업로드하고 공개 URL 획득
-  const blob = await put(
-    `pdfs/inbound-${recordId}-${Date.now()}.pdf`,
-    pdfBuffer,
-    { access: "public", contentType: "application/pdf" },
-  );
-  // 생성된 PDF URL을 Airtable 레코드에 저장
-  await patchRecord("입고 관리", recordId, { "입고증URL": blob.url });
-  console.log("[generateAndSaveInboundPdf] PDF 저장 완료:", blob.url);
+    console.log("[generateAndSaveInboundPdf] renderToBuffer 시작...");
+    const pdfBuffer = await generateInboundPdf(pdfData);
+    console.log("[generateAndSaveInboundPdf] renderToBuffer 완료, 크기:", pdfBuffer.length);
+
+    console.log("[generateAndSaveInboundPdf] Blob 업로드 시작...");
+    const blob = await put(
+      `pdfs/inbound-${recordId}-${Date.now()}.pdf`,
+      pdfBuffer,
+      { access: "public", contentType: "application/pdf" },
+    );
+    console.log("[generateAndSaveInboundPdf] Blob 업로드 완료:", blob.url);
+
+    await patchRecord("입고 관리", recordId, { "입고증URL": blob.url });
+    console.log("[generateAndSaveInboundPdf] Airtable URL 저장 완료");
+  } catch (e) {
+    console.error("[generateAndSaveInboundPdf] 오류 발생:", e instanceof Error ? e.stack : e);
+    throw e;
+  }
 }
 
 /**
@@ -542,19 +557,20 @@ export async function updateApprovalStatus(
 
     console.log("[updateApprovalStatus] patch success");
 
-    // 승인 완료 시 PDF 자동 생성 및 Blob 저장 (실패해도 승인 결과에 영향 없음)
+    // 승인 완료 시 PDF 자동 생성 및 Blob 저장
+    // await를 사용해야 Vercel serverless 함수가 종료되기 전에 PDF 생성이 완료됨
     // .catch()로 오류를 잡아 PDF 생성 실패가 승인 처리 전체를 막지 않도록 함
     if (newStatus === "승인 완료") {
       if (type === "INBOUND") {
-        generateAndSaveInboundPdf(recordId).catch((e) =>
+        await generateAndSaveInboundPdf(recordId).catch((e) =>
           console.error("[updateApprovalStatus] 입고증 PDF 생성 실패:", e),
         );
       } else if (type === "OUTBOUND") {
-        generateAndSaveOutboundPdf(recordId).catch((e) =>
+        await generateAndSaveOutboundPdf(recordId).catch((e) =>
           console.error("[updateApprovalStatus] 출고증 PDF 생성 실패:", e),
         );
       } else if (type === "EXPENSE") {
-        generateAndSaveExpensePdf(recordId).catch((e) =>
+        await generateAndSaveExpensePdf(recordId).catch((e) =>
           console.error("[updateApprovalStatus] 지출결의서 PDF 생성 실패:", e),
         );
       }

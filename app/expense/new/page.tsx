@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeftIcon, PhotoIcon, CheckIcon } from '@heroicons/react/24/outline';
-import { createExpenseRecord, getApplicantInfo, uploadReceipt } from '@/app/actions';
+import { createExpenseRecord, getApplicantInfo } from '@/app/actions';
 import { fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
 
@@ -30,6 +30,7 @@ export default function NewExpensePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
@@ -67,18 +68,30 @@ export default function NewExpensePage() {
     loadSessionAndUserInfo();
   }, []);
 
-  // 이미지 업로드 핸들러
+  // 이미지 업로드 핸들러 — 서버 액션(1MB 제한)이 아닌 API route 직접 호출
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
     setIsUploading(true);
-    const uploadData = new FormData();
-    uploadData.append('file', e.target.files[0]);
-    
-    const result = await uploadReceipt(uploadData);
-    if (result.success) {
-      setFormData(prev => ({ ...prev, receiptUrl: result.url || '' }));
+    setUploadError('');
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      const res = await fetch('/api/upload-receipt', { method: 'POST', body: uploadData });
+      const result = await res.json();
+      if (result.url) {
+        setFormData(prev => ({ ...prev, receiptUrl: result.url }));
+      } else {
+        const msg = result.error || '업로드 실패';
+        console.error('[handleFileChange] 영수증 업로드 실패:', msg);
+        setUploadError(msg);
+      }
+    } catch (err) {
+      console.error('[handleFileChange] 영수증 업로드 오류:', err);
+      setUploadError('네트워크 오류로 업로드에 실패했습니다.');
+    } finally {
+      setIsUploading(false);
     }
-    setIsUploading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -172,7 +185,7 @@ export default function NewExpensePage() {
             <div>
               <label className="text-sm font-bold text-gray-600">영수증 첨부</label>
               <label className="mt-2 flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-all">
-                {isUploading ? <p className="animate-pulse">업로드 중...</p> : 
+                {isUploading ? <p className="animate-pulse">업로드 중...</p> :
                  formData.receiptUrl ? <p className="text-blue-600 font-bold">✅ 업로드 완료</p> :
                  <>
                   <PhotoIcon className="w-8 h-8 text-gray-400" />
@@ -181,6 +194,9 @@ export default function NewExpensePage() {
                 }
                 <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
               </label>
+              {uploadError && (
+                <p className="mt-1 text-xs font-bold text-red-600">{uploadError}</p>
+              )}
             </div>
           </div>
 

@@ -102,13 +102,18 @@ export async function createExpenseRecord(formData: any) {
   }
 }
 
-// 이미지 업로드
+// 이미지 업로드 (현재 페이지에서는 /api/upload-receipt 직접 호출 방식으로 대체됨)
 export async function uploadReceipt(formData: FormData) {
   const file = formData.get("file") as File;
+  if (!file) {
+    console.error("[uploadReceipt] file이 없습니다. 서버 액션 body 크기 제한(1MB)을 초과했을 수 있습니다.");
+    return { success: false, url: null };
+  }
   try {
     const blob = await put(`receipts/${Date.now()}-${file.name}`, file, { access: "public" });
     return { success: true, url: blob.url };
   } catch (error) {
+    console.error("[uploadReceipt] Blob 업로드 실패:", error);
     return { success: false, url: null };
   }
 }

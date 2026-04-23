@@ -18,15 +18,22 @@ import {
 } from "@react-pdf/renderer";
 import path from "path";
 
-// 한글이 PDF에 깨지지 않도록 나눔고딕 폰트를 등록합니다.
+const fontsDir = path.join(process.cwd(), "public", "fonts");
+
 Font.register({
-  family: "NanumGothic",
-  src: path.join(process.cwd(), "public", "fonts", "NanumGothic.ttf"),
+  family: "NotoSansKR",
+  fonts: [
+    { src: path.join(fontsDir, "NotoSansKR-Regular.otf"), fontWeight: "normal" },
+    { src: path.join(fontsDir, "NotoSansKR-Bold.otf"), fontWeight: "bold" },
+  ],
 });
+
+// 한글은 단어 중간에 줄바꿈하지 않도록 처리
+Font.registerHyphenationCallback((word) => [word]);
 
 // PDF 문서 전체에서 공통으로 사용하는 스타일 정의
 const s = StyleSheet.create({
-  page: { padding: 48, fontFamily: "NanumGothic", fontSize: 10, color: "#111" },
+  page: { padding: 48, fontFamily: "NotoSansKR", fontSize: 10, color: "#111" },
   title: {
     fontSize: 20,
     textAlign: "center",

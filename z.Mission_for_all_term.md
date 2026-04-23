@@ -39,3 +39,6 @@
 이 경우를 어떻게 처리할지가 결정의 핵심입니다.
 
 195-58
+
+비용 자도 입력
+node scripts/backfill-storage-costs.mjs
