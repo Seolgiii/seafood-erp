@@ -132,17 +132,70 @@ async function getStorageCost(storage, inboundDate) {
   return cost;
 }
 
+// ── 보관처 비용 이력 테이블 직접 조회 (냉장료 있는 행) ──────────────────────
+async function debugCostTable() {
+  const tbl = tableSegment(COST_TABLE);
+  const fields = ["보관처명", "냉장료", "입출고비", "노조비", "적용시작일", "적용종료일"];
+  const fieldsQs = fields.map((f) => `fields[]=${encodeURIComponent(f)}`).join("&");
+  const formula = encodeURIComponent(`{냉장료}!=0`);
+  const data = await airtableGet(`${tbl}?filterByFormula=${formula}&${fieldsQs}&pageSize=9`);
+  return data.records ?? [];
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("🔍 LOT별 재고 전체 조회 중...");
+  // ── 디버그 1: 보관처 비용 이력 테이블 — 냉장료 있는 행 직접 조회 ─────────
+  console.log("\n📋 [DEBUG] 보관처 비용 이력 테이블 직접 조회 (냉장료 값 있는 행, 최대 9건)");
+  try {
+    const costRows = await debugCostTable();
+    if (!costRows.length) {
+      console.log("   → 냉장료 값이 있는 행이 없습니다 (테이블이 비어있거나 필터 미적용)");
+    } else {
+      costRows.forEach((r, i) => {
+        const f = r.fields;
+        console.log(`   [${i + 1}] 보관처명="${f["보관처명"]}" | 냉장료=${f["냉장료"]} | 입출고비=${f["입출고비"]} | 노조비=${f["노조비"]} | 적용시작일=${f["적용시작일"]} ~ ${f["적용종료일"] ?? "현재"}`);
+      });
+    }
+  } catch (e) {
+    console.error("   → 조회 오류:", e.message);
+  }
+
+  console.log("\n🔍 LOT별 재고 전체 조회 중...");
   const all = await fetchAllLots();
   console.log(`   총 ${all.length}건 조회 완료`);
 
-  const toProcess = all.filter((r) => {
-    const f = r.fields;
-    return f["냉장료단가"] == null || f["입출고비"] == null || f["노조비"] == null;
-  });
-  console.log(`   비용 미입력 레코드: ${toProcess.length}건\n`);
+  const toProcess = all;
+  console.log(`   처리 대상 레코드: ${toProcess.length}건 (전체 — 기존 값도 덮어쓰기)`);
+
+  // ── 디버그 2: 첫 번째 LOT의 보관처+입고일자로 비용 이력 조회 원본 응답 ──
+  const firstWithStorage = toProcess.find((r) => r.fields["보관처"] && r.fields["입고일자"]);
+  if (firstWithStorage) {
+    const f = firstWithStorage.fields;
+    const storage = String(f["보관처"]).trim();
+    const inboundDate = String(f["입고일자"]).trim();
+    console.log(`\n📋 [DEBUG] 첫 번째 유효 LOT 비용 이력 조회`);
+    console.log(`   LOT번호: ${f["LOT번호"] ?? firstWithStorage.id}`);
+    console.log(`   보관처: "${storage}" | 입고일자: "${inboundDate}"`);
+    try {
+      const tbl = tableSegment(COST_TABLE);
+      const esc = storage.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const formula = `AND({보관처명}="${esc}",NOT(IS_AFTER({적용시작일},"${inboundDate}")),OR({적용종료일}="",NOT(IS_BEFORE({적용종료일},"${inboundDate}"))))`;
+      const fieldsQs = ["보관처명","적용시작일","적용종료일","냉장료","입출고비","노조비"]
+        .map((f) => `fields[]=${encodeURIComponent(f)}`).join("&");
+      const data = await airtableGet(`${tbl}?filterByFormula=${encodeURIComponent(formula)}&${fieldsQs}&pageSize=5`);
+      const rows = data.records ?? [];
+      console.log(`   → 조회 결과: ${rows.length}건`);
+      rows.forEach((r, i) => {
+        console.log(`     [${i+1}]`, JSON.stringify(r.fields));
+      });
+      if (!rows.length) console.log("   → 매칭 행 없음 (보관처명 불일치 또는 날짜 범위 밖)");
+    } catch (e) {
+      console.error("   → 조회 오류:", e.message);
+    }
+  } else {
+    console.log("\n📋 [DEBUG] 보관처+입고일자 모두 있는 LOT가 없습니다.");
+  }
+  console.log("");
 
   let skipped = 0, success = 0, failed = 0;
 
@@ -168,12 +221,12 @@ async function main() {
       }
 
       const patch = {};
-      if (f["냉장료단가"] == null && cost.refrigerationFee != null) patch["냉장료단가"] = cost.refrigerationFee;
-      if (f["입출고비"] == null && cost.inOutFee != null) patch["입출고비"] = cost.inOutFee;
-      if (f["노조비"] == null && cost.unionFee != null) patch["노조비"] = cost.unionFee;
+      if (cost.refrigerationFee != null) patch["냉장료단가"] = cost.refrigerationFee;
+      if (cost.inOutFee != null) patch["입출고비"] = cost.inOutFee;
+      if (cost.unionFee != null) patch["노조비"] = cost.unionFee;
 
       if (!Object.keys(patch).length) {
-        console.log(`  [${i + 1}/${toProcess.length}] ⏭️  ${lot} — 비용 이력 값이 모두 null`);
+        console.log(`  [${i + 1}/${toProcess.length}] ⏭️  ${lot} — 이력에 값 없음 (냉장료/입출고비/노조비 모두 null)`);
         skipped++;
         continue;
       }
