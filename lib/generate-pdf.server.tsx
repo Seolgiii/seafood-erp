@@ -17,20 +17,43 @@ import {
   Font,
   renderToBuffer,
 } from "@react-pdf/renderer";
+import path from "path";
+import fs from "fs";
 import QRCode from "qrcode";
-import notoRegular from "../public/fonts/NotoSansKR-Regular.otf";
-import notoBold from "../public/fonts/NotoSansKR-Bold.otf";
 
-// webpack asset/inline이 빌드 타임에 base64 data URI로 변환해 번들에 포함합니다.
-// 런타임 파일 시스템 접근이 없으므로 Vercel 서버리스에서 안정적으로 동작합니다.
-Font.register({
-  family: "NotoSansKR",
-  fonts: [
-    { src: notoRegular, fontWeight: "normal" },
-    { src: notoBold, fontWeight: "bold" },
-  ],
-});
-Font.registerHyphenationCallback((word) => [word]);
+function loadFontDataUri(filename: string): string {
+  const candidates = [
+    path.join(process.cwd(), "public", "fonts", filename),
+    path.join(__dirname, "..", "..", "..", "public", "fonts", filename),
+    path.join(__dirname, "public", "fonts", filename),
+  ];
+  for (const fontPath of candidates) {
+    try {
+      const buf = fs.readFileSync(fontPath);
+      return `data:font/otf;base64,${buf.toString("base64")}`;
+    } catch {
+      // 다음 후보 경로 시도
+    }
+  }
+  throw new Error(`[PDF] 폰트 파일을 찾을 수 없습니다: ${filename}`);
+}
+
+// PDF 생성 함수 최초 호출 시 1회만 등록합니다.
+// 모듈 최상단에서 실행하면 이 파일을 import하는 모든 서버 액션이
+// 폰트 파일 I/O를 시도해 500 에러를 유발하므로 반드시 lazy로 처리합니다.
+let fontRegistered = false;
+function ensureFontRegistered() {
+  if (fontRegistered) return;
+  Font.register({
+    family: "NotoSansKR",
+    fonts: [
+      { src: loadFontDataUri("NotoSansKR-Regular.otf"), fontWeight: "normal" },
+      { src: loadFontDataUri("NotoSansKR-Bold.otf"), fontWeight: "bold" },
+    ],
+  });
+  Font.registerHyphenationCallback((word) => [word]);
+  fontRegistered = true;
+}
 
 // PDF 문서 전체에서 공통으로 사용하는 스타일 정의
 const s = StyleSheet.create({
@@ -305,6 +328,7 @@ function ExpensePDF({ data }: { data: ExpensePdfData }) {
  * 반환된 Buffer는 Vercel Blob에 업로드됩니다.
  */
 export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> {
+  ensureFontRegistered();
   // LOT 번호 → QR 코드 PNG data URL 생성
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
@@ -325,6 +349,7 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
  * 출고증 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
  */
 export async function generateOutboundPdf(data: OutboundPdfData): Promise<Buffer> {
+  ensureFontRegistered();
   return renderToBuffer(<OutboundPDF data={data} />) as Promise<Buffer>;
 }
 
@@ -332,5 +357,6 @@ export async function generateOutboundPdf(data: OutboundPdfData): Promise<Buffer
  * 지출결의서 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
  */
 export async function generateExpensePdf(data: ExpensePdfData): Promise<Buffer> {
+  ensureFontRegistered();
   return renderToBuffer(<ExpensePDF data={data} />) as Promise<Buffer>;
 }
