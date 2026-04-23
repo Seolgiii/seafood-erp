@@ -18,15 +18,33 @@ import {
   renderToBuffer,
 } from "@react-pdf/renderer";
 import path from "path";
+import fs from "fs";
 import QRCode from "qrcode";
 
-const fontsDir = path.join(process.cwd(), "public", "fonts");
+// Vercel 서버리스에서 파일 경로 로딩이 실패하는 문제를 피하기 위해
+// fs.readFileSync로 Buffer를 읽어 base64 data URI로 등록합니다.
+function loadFontDataUri(filename: string): string {
+  const candidates = [
+    path.join(process.cwd(), "public", "fonts", filename),
+    path.join(__dirname, "..", "..", "..", "public", "fonts", filename),
+    path.join(__dirname, "public", "fonts", filename),
+  ];
+  for (const fontPath of candidates) {
+    try {
+      const buf = fs.readFileSync(fontPath);
+      return `data:font/otf;base64,${buf.toString("base64")}`;
+    } catch {
+      // 다음 후보 경로 시도
+    }
+  }
+  throw new Error(`[PDF] 폰트 파일을 찾을 수 없습니다: ${filename}`);
+}
 
 Font.register({
   family: "NotoSansKR",
   fonts: [
-    { src: path.join(fontsDir, "NotoSansKR-Regular.otf"), fontWeight: "normal" },
-    { src: path.join(fontsDir, "NotoSansKR-Bold.otf"), fontWeight: "bold" },
+    { src: loadFontDataUri("NotoSansKR-Regular.otf"), fontWeight: "normal" },
+    { src: loadFontDataUri("NotoSansKR-Bold.otf"), fontWeight: "bold" },
   ],
 });
 
