@@ -6,99 +6,244 @@ interface Props {
   onDetected: (code: string) => void;
 }
 
-const READER_ID = 'seaerp-barcode-reader';
-
 /**
- * html5-qrcode 기반 QR코드 스캐너.
- * 마운트 시 후면 카메라를 열고, QR 감지 시 onDetected를 호출한 뒤 카메라를 닫는다.
- * 언마운트 시 자동으로 카메라 스트림을 정리한다.
+ * QR 스캐너 컴포넌트 (브라우저 네이티브 API 우선)
+ *
+ * 감지 전략:
+ *   1. getUserMedia로 카메라 스트림 직접 획득 (<video> 렌더)
+ *   2. BarcodeDetector API가 있으면 사용 (Chrome 83+, Android Chrome)
+ *   3. 없으면 canvas 프레임 캡처 + html5-qrcode.scanFile 폴백 (iOS Safari, Firefox)
+ *
+ * iOS Safari 필수 조건: HTTPS + video[playsInline] + video[muted]
  */
 export default function BarcodeScanner({ onDetected }: Props) {
-  const [status, setStatus] = useState<'loading' | 'scanning' | 'error'>('loading');
-  const [errorMsg, setErrorMsg] = useState('');
-  // ref로 최신 콜백을 보관 — 클로저 문제 방지
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const doneRef = useRef(false);
   const onDetectedRef = useRef(onDetected);
   onDetectedRef.current = onDetected;
-  const doneRef = useRef(false); // 중복 감지 방지
+
+  const [status, setStatus] = useState<'loading' | 'scanning' | 'error'>('loading');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let scanner: any;
 
-    const start = async () => {
+    // 스트림·rAF 일괄 정리
+    const stopAll = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    // ── 후면 카메라 우선, 실패 시 아무 카메라 ──────────────────────────────────
+    const openCamera = async (): Promise<MediaStream> => {
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
-        if (cancelled) return;
+        return await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' }, // ideal = 없어도 실패 안 함
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      } catch {
+        // facingMode 제약 제거 후 재시도
+        return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+    };
 
-        scanner = new Html5Qrcode(READER_ID);
-        const containerW = document.getElementById(READER_ID)?.parentElement?.clientWidth ?? 320;
-        const boxSize = Math.min(Math.round(containerW * 0.80), 260);
-        const scanConfig = { fps: 12, qrbox: { width: boxSize, height: boxSize } };
-
-        const onSuccess = (text: string) => {
-          if (doneRef.current || cancelled) return;
-          doneRef.current = true;
-          scanner.stop().catch(() => {}).finally(() => {
-            if (!cancelled) onDetectedRef.current(text.trim());
-          });
-        };
-
-        // { facingMode: 'environment' } 는 iOS Safari에서 strict 제약으로 실패할 수 있습니다.
-        // ideal을 사용해 후면 카메라를 선호하되 없어도 동작하도록 합니다.
-        try {
-          await scanner.start(
-            { facingMode: { ideal: 'environment' } },
-            scanConfig,
-            onSuccess,
-            () => {},
-          );
-        } catch {
-          // 첫 번째 시도 실패 시 카메라 목록에서 후면 카메라를 직접 선택합니다.
-          if (cancelled) return;
-          const cameras = await Html5Qrcode.getCameras();
-          if (!cameras.length) throw new Error('카메라를 찾을 수 없습니다.');
-          // 레이블에 'back' 또는 'rear' 가 있으면 후면, 없으면 마지막 카메라
-          const back = cameras.find((c) => /back|rear|environment/i.test(c.label))
-            ?? cameras[cameras.length - 1];
-          await scanner.start(back.id, scanConfig, onSuccess, () => {});
-        }
-
-        if (!cancelled) setStatus('scanning');
+    const run = async () => {
+      // ── 1. 카메라 스트림 획득 ────────────────────────────────────────────────
+      let stream: MediaStream;
+      try {
+        stream = await openCamera();
       } catch (err: unknown) {
         if (cancelled) return;
         const msg = String(err instanceof Error ? err.message : err);
         setErrorMsg(
-          /permission|NotAllowed|denied/i.test(msg)
-            ? '카메라 권한을 허용해 주세요. (브라우저 주소창 옆 잠금 아이콘)'
-            : '카메라를 시작할 수 없습니다. 다시 시도해 주세요.',
+          /Permission|NotAllowed|denied/i.test(msg)
+            ? '카메라 권한을 허용해 주세요.\n브라우저 주소창 옆 잠금 아이콘 → 카메라 허용'
+            : '카메라를 시작할 수 없습니다.\n다시 시도해 주세요.',
         );
         setStatus('error');
-        console.error('[BarcodeScanner] 카메라 오류:', msg);
+        return;
+      }
+
+      if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+      streamRef.current = stream;
+
+      // ── 2. <video>에 스트림 연결 ─────────────────────────────────────────────
+      const video = videoRef.current;
+      if (!video) { stopAll(); return; }
+
+      video.srcObject = stream;
+      // iOS Safari: playsInline 없으면 강제 전체화면, muted 없으면 autoplay 차단
+      video.playsInline = true;
+      video.muted = true;
+      try { await video.play(); } catch { /* autoplay 차단 환경에서도 계속 진행 */ }
+
+      if (cancelled) return;
+      setStatus('scanning');
+
+      // ── 3. QR 감지 루프 ─────────────────────────────────────────────────────
+      const hasBarcodeDetector =
+        typeof window !== 'undefined' && 'BarcodeDetector' in window;
+
+      if (hasBarcodeDetector) {
+        await runBarcodeDetector(video, cancelled, stopAll);
+      } else {
+        await runCanvasFallback(video, cancelled, stopAll);
       }
     };
 
-    // Promise를 변수에 담아 unhandled rejection을 방지합니다.
-    const promise = start();
-    promise.catch((err) => {
-      if (!cancelled) console.error('[BarcodeScanner] 예상치 못한 오류:', err);
+    // ── BarcodeDetector 경로 (Chrome/Android) ──────────────────────────────────
+    const runBarcodeDetector = async (
+      video: HTMLVideoElement,
+      _cancelled: boolean,
+      stopAll: () => void,
+    ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+
+      const tick = async () => {
+        if (cancelled || doneRef.current) return;
+
+        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const codes: any[] = await detector.detect(video);
+            if (codes.length > 0 && !doneRef.current && !cancelled) {
+              doneRef.current = true;
+              stopAll();
+              onDetectedRef.current(String(codes[0].rawValue));
+              return;
+            }
+          } catch {
+            // QR 없는 프레임 — 정상
+          }
+        }
+
+        if (!cancelled && !doneRef.current) {
+          rafRef.current = requestAnimationFrame(() => { tick(); });
+        }
+      };
+
+      tick();
+    };
+
+    // ── canvas 폴백 경로 (iOS Safari, Firefox) ────────────────────────────────
+    const runCanvasFallback = async (
+      video: HTMLVideoElement,
+      _cancelled: boolean,
+      stopAll: () => void,
+    ) => {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      if (cancelled) return;
+
+      // html5-qrcode.scanFile 은 DOM 요소 ID가 필요 — hidden 컨테이너 재사용
+      const HIDDEN_ID = '__barcodescanner_hidden__';
+      if (!document.getElementById(HIDDEN_ID)) {
+        const el = document.createElement('div');
+        el.id = HIDDEN_ID;
+        el.setAttribute(
+          'style',
+          'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;',
+        );
+        document.body.appendChild(el);
+      }
+      // verbose:false → 콘솔 로그 억제
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const h5 = new Html5Qrcode(HIDDEN_ID, { verbose: false } as any);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      let busy = false;
+
+      const tick = async () => {
+        if (cancelled || doneRef.current) return;
+
+        if (
+          !busy &&
+          ctx &&
+          video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA &&
+          video.videoWidth > 0
+        ) {
+          busy = true;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+
+          try {
+            // canvas → Blob → File → html5-qrcode 디코드
+            const blob = await new Promise<Blob | null>((resolve) =>
+              canvas.toBlob(resolve, 'image/jpeg', 0.85),
+            );
+            if (blob && !doneRef.current && !cancelled) {
+              const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
+              const decoded = await h5.scanFile(file, /* showImage */ false);
+              if (!doneRef.current && !cancelled) {
+                doneRef.current = true;
+                busy = false;
+                stopAll();
+                onDetectedRef.current(decoded);
+                return; // rAF 재등록 없이 종료
+              }
+            }
+          } catch {
+            // QR 없는 프레임 — 계속 진행
+          }
+          busy = false;
+        }
+
+        if (!cancelled && !doneRef.current) {
+          rafRef.current = requestAnimationFrame(() => { tick(); });
+        }
+      };
+
+      tick();
+    };
+
+    run().catch((err) => {
+      if (!cancelled) {
+        console.error('[BarcodeScanner]', err);
+        setErrorMsg('카메라를 시작할 수 없습니다. 다시 시도해 주세요.');
+        setStatus('error');
+      }
     });
 
     return () => {
       cancelled = true;
-      doneRef.current = true;
-      if (scanner) scanner.stop().catch(() => {});
+      stopAll();
     };
   }, []);
 
   return (
     <div className="space-y-2">
-      {/* html5-qrcode가 이 div 안에 video 엘리먼트를 삽입한다 */}
       <div
         className="relative overflow-hidden rounded-2xl bg-black"
         style={{ minHeight: 220 }}
       >
-        <div id={READER_ID} className="w-full" />
+        {/*
+          iOS Safari 필수 속성:
+          - playsInline: 전체화면 강제 방지
+          - muted: autoplay 정책 통과
+          - autoPlay: 마운트 즉시 재생 (getUserMedia play() 호출과 함께 이중 보장)
+        */}
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className="w-full object-cover"
+          style={{ minHeight: 220, display: 'block' }}
+        />
 
         {status === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80">
@@ -109,7 +254,9 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
       {status === 'error' && (
         <div className="px-4 py-3 bg-red-50 rounded-2xl">
-          <p className="text-sm font-bold text-red-600 text-center">{errorMsg}</p>
+          <p className="text-sm font-bold text-red-600 text-center whitespace-pre-line">
+            {errorMsg}
+          </p>
         </div>
       )}
 
