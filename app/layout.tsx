@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import ServiceWorker from './components/ServiceWorker';
+import SessionGuard from './components/SessionGuard';
 
 export const metadata: Metadata = {
   title: 'SEAERP',
@@ -34,7 +35,7 @@ export default function RootLayout({
     <html lang="ko">
       <body className="bg-gray-50 text-gray-900 min-h-screen">
         <ServiceWorker />
-        {children}
+        <SessionGuard>{children}</SessionGuard>
       </body>
     </html>
   );

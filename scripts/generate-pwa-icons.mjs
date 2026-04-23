@@ -1,4 +1,5 @@
 // PWA 아이콘 생성 스크립트 (Node.js 내장 모듈만 사용)
+// 4x MSAA 안티앨리어싱으로 부드러운 곡선 구현
 import { writeFileSync, mkdirSync } from 'fs';
 import { deflateSync } from 'zlib';
 
@@ -31,15 +32,12 @@ function pngChunk(type, data) {
 /** RGBA PNG 생성. drawPixel(x, y, size) → [R, G, B, A] */
 function makePNG(size, drawPixel) {
   const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8;  // bit depth
-  ihdr[9] = 6;  // RGBA
-  // ihdr[10,11,12] = 0 (compression, filter, interlace)
+  ihdr[8] = 8; ihdr[9] = 6; // 8bpp RGBA
 
-  const raw = new Uint8Array(size * (1 + size * 4)); // filter + RGBA per row
+  const raw = new Uint8Array(size * (1 + size * 4));
   let pos = 0;
   for (let y = 0; y < size; y++) {
     raw[pos++] = 0; // filter None
@@ -50,38 +48,29 @@ function makePNG(size, drawPixel) {
   }
 
   const idat = deflateSync(Buffer.from(raw), { level: 9 });
-
-  return Buffer.concat([
-    sig,
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', idat),
-    pngChunk('IEND', Buffer.alloc(0)),
-  ]);
+  return Buffer.concat([sig, pngChunk('IHDR', ihdr), pngChunk('IDAT', idat), pngChunk('IEND', Buffer.alloc(0))]);
 }
 
-// ── 도형 헬퍼 ─────────────────────────────────────────────────────────────
-function inEllipse(x, y, cx, cy, rx, ry) {
-  return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+// ── 도형 헬퍼 (정규화 좌표 0-1) ──────────────────────────────────────────
+function inEllipse(nx, ny, cx, cy, rx, ry) {
+  return ((nx - cx) / rx) ** 2 + ((ny - cy) / ry) ** 2 <= 1;
 }
 
-function inCircle(x, y, cx, cy, r) {
-  return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+function inCircle(nx, ny, cx, cy, r) {
+  return (nx - cx) ** 2 + (ny - cy) ** 2 <= r * r;
 }
 
-function sign(px, py, ax, ay, bx, by) {
+function triSign(px, py, ax, ay, bx, by) {
   return (px - bx) * (ay - by) - (ax - bx) * (py - by);
 }
 
 function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
-  const d1 = sign(px, py, ax, ay, bx, by);
-  const d2 = sign(px, py, bx, by, cx, cy);
-  const d3 = sign(px, py, cx, cy, ax, ay);
-  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
-  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
-  return !(hasNeg && hasPos);
+  const d1 = triSign(px, py, ax, ay, bx, by);
+  const d2 = triSign(px, py, bx, by, cx, cy);
+  const d3 = triSign(px, py, cx, cy, ax, ay);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 }
 
-/** 둥근 모서리 안에 있는지 (normalized 0-1 좌표) */
 function inRoundedRect(nx, ny, r) {
   const dx = Math.max(0, Math.abs(nx - 0.5) - (0.5 - r));
   const dy = Math.max(0, Math.abs(ny - 0.5) - (0.5 - r));
@@ -89,51 +78,69 @@ function inRoundedRect(nx, ny, r) {
 }
 
 // ── 물고기 픽셀 렌더러 ────────────────────────────────────────────────────
-// 물고기 방향: 왼쪽을 바라봄 (꼬리=오른쪽)
-function drawFishIcon(x, y, size) {
-  const nx = x / size; // 정규화 좌표 0-1
-  const ny = y / size;
+// 물고기 방향: 왼쪽(입) → 오른쪽(꼬리)
+function drawFishPixel(nx, ny) {
+  const BG  = [0x31, 0x82, 0xF6, 255]; // #3182F6
+  const W   = [255, 255, 255, 255];
+  const NONE = [0, 0, 0, 0];
 
-  const BG_R = 0x31, BG_G = 0x82, BG_B = 0xF6; // #3182F6
-  const TRANSPARENT = [0, 0, 0, 0];
-  const BLUE = [BG_R, BG_G, BG_B, 255];
-  const WHITE = [255, 255, 255, 255];
+  if (!inRoundedRect(nx, ny, 0.18)) return NONE;
 
-  // 바깥 (둥근 모서리 밖) → 투명
-  if (!inRoundedRect(nx, ny, 0.18)) return TRANSPARENT;
+  // 몸통 타원: center(0.42, 0.50), rx=0.265, ry=0.175
+  const body = inEllipse(nx, ny, 0.42, 0.50, 0.265, 0.175);
 
-  // 물고기 몸통 타원
-  const bodyIn = inEllipse(nx, ny, 0.42, 0.50, 0.27, 0.175);
+  // 등지느러미: 몸통 위에 살짝 튀어나온 삼각형
+  const fin = inTriangle(nx, ny, 0.34, 0.326, 0.50, 0.182, 0.57, 0.326);
 
-  // 꼬리 (오른쪽 두 삼각형으로 구성된 V형)
-  const tailTopIn = inTriangle(nx, ny, 0.67, 0.44, 0.89, 0.17, 0.89, 0.50);
-  const tailBotIn = inTriangle(nx, ny, 0.67, 0.56, 0.89, 0.50, 0.89, 0.83);
+  // ── 꼬리 (caudal fin) ─────────────────────────────────────────────────
+  // 꼬리는 몸통 오른쪽(x≈0.62~0.90)에 위치
+  // 위쪽 지느러미 로브: 넓게 펼쳐진 사각형(두 삼각형)
+  const tailUpA = inTriangle(nx, ny, 0.63, 0.43, 0.67, 0.27, 0.91, 0.11);
+  const tailUpB = inTriangle(nx, ny, 0.63, 0.43, 0.91, 0.11, 0.91, 0.41);
+  // 아래쪽 지느러미 로브
+  const tailDnA = inTriangle(nx, ny, 0.63, 0.57, 0.67, 0.73, 0.91, 0.89);
+  const tailDnB = inTriangle(nx, ny, 0.63, 0.57, 0.91, 0.89, 0.91, 0.59);
 
-  // 꼬리 중앙 오목 부분 (V형 홈) → 파란색으로 다시 덮음
-  const tailNotchIn = inTriangle(nx, ny, 0.72, 0.50, 0.89, 0.33, 0.89, 0.67);
+  // V형 홈(notch): 꼬리 중앙을 파란색으로 도려냄 → 자연스러운 갈라진 꼬리
+  // 홈을 깊고 넓게 만들어 두 로브가 명확히 구분되도록
+  const notch = inTriangle(nx, ny, 0.66, 0.50, 0.91, 0.395, 0.91, 0.605);
 
-  // 등지느러미
-  const finIn = inTriangle(nx, ny, 0.34, 0.325, 0.50, 0.18, 0.56, 0.325);
+  // 눈: 흰 몸통 위에 파란 원
+  const eye = inCircle(nx, ny, 0.245, 0.468, 0.038);
 
-  // 눈 (흰 몸통 위에 파란 원)
-  const eyeIn = inCircle(nx, ny, 0.24, 0.467, 0.038);
+  const isTail = (tailUpA || tailUpB || tailDnA || tailDnB) && !notch;
+  const isWhite = body || isTail || fin;
 
-  const isWhite = (bodyIn || tailTopIn || tailBotIn || finIn) && !tailNotchIn;
+  if (eye && body) return BG;
+  if (isWhite) return W;
+  return BG;
+}
 
-  if (eyeIn && bodyIn) return BLUE;
-  if (isWhite) return WHITE;
-  return BLUE;
+// ── 4x MSAA 안티앨리어싱 래퍼 ────────────────────────────────────────────
+// 픽셀당 2×2 서브픽셀 샘플링으로 계단 현상 제거
+function drawFishIconAA(px, py, size) {
+  const OFFSETS = [0.25, 0.75];
+  let R = 0, G = 0, B = 0, A = 0;
+  for (const ox of OFFSETS) {
+    for (const oy of OFFSETS) {
+      const [r, g, b, a] = drawFishPixel((px + ox) / size, (py + oy) / size);
+      R += r; G += g; B += b; A += a;
+    }
+  }
+  return [R / 4, G / 4, B / 4, A / 4];
 }
 
 // ── 생성 ──────────────────────────────────────────────────────────────────
 mkdirSync('public/icons', { recursive: true });
 
-const sizes = [192, 512, 180]; // 180 = apple-touch-icon
-for (const size of sizes) {
-  const buf = makePNG(size, drawFishIcon);
-  const name = size === 180 ? 'apple-touch-icon' : `icon-${size}`;
-  writeFileSync(`public/icons/${name}.png`, buf);
-  console.log(`✓ public/icons/${name}.png  (${buf.length} bytes)`);
+for (const size of [192, 512]) {
+  const buf = makePNG(size, (x, y, s) => drawFishIconAA(x, y, s));
+  writeFileSync(`public/icons/icon-${size}.png`, buf);
+  console.log(`✓ public/icons/icon-${size}.png  (${buf.length} bytes)`);
 }
+
+const apple = makePNG(180, (x, y, s) => drawFishIconAA(x, y, s));
+writeFileSync('public/icons/apple-touch-icon.png', apple);
+console.log(`✓ public/icons/apple-touch-icon.png  (${apple.length} bytes)`);
 
 console.log('\n아이콘 생성 완료!');
