@@ -12,11 +12,13 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   Font,
   renderToBuffer,
 } from "@react-pdf/renderer";
 import path from "path";
+import QRCode from "qrcode";
 
 const fontsDir = path.join(process.cwd(), "public", "fonts");
 
@@ -80,10 +82,9 @@ export type InboundPdfData = {
 
 /**
  * 입고증 PDF 레이아웃 컴포넌트
- * 제목 "입 고 증"과 항목별 표를 그린 후 하단에 확인 문구를 출력합니다.
+ * 제목 "입 고 증"과 항목별 표를 그린 후 QR코드와 확인 문구를 출력합니다.
  */
-function InboundPDF({ data }: { data: InboundPdfData }) {
-  // [항목명, 값] 쌍 배열로 표 행 정의
+function InboundPDF({ data, qrDataUrl }: { data: InboundPdfData; qrDataUrl?: string }) {
   const rows: [string, string][] = [
     ["LOT 번호", data.lotNumber],
     ["품목명", data.productName],
@@ -117,6 +118,20 @@ function InboundPDF({ data }: { data: InboundPdfData }) {
             </View>
           ))}
         </View>
+
+        {/* QR코드: 현장 스캔용 */}
+        {qrDataUrl && (
+          <View style={{ marginTop: 28, alignItems: "center" }}>
+            <Image src={qrDataUrl} style={{ width: 100, height: 100 }} />
+            <Text style={{ marginTop: 6, fontSize: 9, color: "#555" }}>
+              LOT: {data.lotNumber}
+            </Text>
+            <Text style={{ marginTop: 2, fontSize: 8, color: "#999" }}>
+              QR코드를 스캔하면 LOT 번호를 바로 입력할 수 있습니다
+            </Text>
+          </View>
+        )}
+
         <Text style={s.footer}>위 내용으로 입고가 승인되었음을 확인합니다.</Text>
       </Page>
     </Document>
@@ -287,10 +302,24 @@ function ExpensePDF({ data }: { data: ExpensePdfData }) {
 
 /**
  * 입고증 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
+ * LOT 번호를 QR코드로 변환해 PDF 하단에 삽입합니다.
  * 반환된 Buffer는 Vercel Blob에 업로드됩니다.
  */
 export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> {
-  return renderToBuffer(<InboundPDF data={data} />) as Promise<Buffer>;
+  // LOT 번호 → QR 코드 PNG data URL 생성
+  let qrDataUrl: string | undefined;
+  if (data.lotNumber) {
+    try {
+      qrDataUrl = await QRCode.toDataURL(data.lotNumber, {
+        errorCorrectionLevel: "M",
+        width: 300,   // 고해상도로 생성해 인쇄 품질 확보
+        margin: 2,
+      });
+    } catch (e) {
+      console.warn("[generateInboundPdf] QR 코드 생성 실패 (PDF는 계속 생성):", e);
+    }
+  }
+  return renderToBuffer(<InboundPDF data={data} qrDataUrl={qrDataUrl} />) as Promise<Buffer>;
 }
 
 /**

@@ -279,7 +279,7 @@ export default function OutboundRecordPage() {
             }`}
           >
             <QrCodeIcon className="w-5 h-5" />
-            바코드 스캔
+            QR 스캔
             {/* PC에서는 "(PC 미지원)" 표시 */}
             {hasCamera === false && (
               <span className="text-[10px] font-normal text-gray-400">(카메라 없음)</span>

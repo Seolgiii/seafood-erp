@@ -9,8 +9,8 @@ interface Props {
 const READER_ID = 'seaerp-barcode-reader';
 
 /**
- * html5-qrcode 기반 바코드 스캐너.
- * 마운트 시 후면 카메라를 열고, 바코드 감지 시 onDetected를 호출한 뒤 카메라를 닫는다.
+ * html5-qrcode 기반 QR코드 스캐너.
+ * 마운트 시 후면 카메라를 열고, QR 감지 시 onDetected를 호출한 뒤 카메라를 닫는다.
  * 언마운트 시 자동으로 카메라 스트림을 정리한다.
  */
 export default function BarcodeScanner({ onDetected }: Props) {
@@ -34,17 +34,17 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
         scanner = new Html5Qrcode(READER_ID);
         const containerW = document.getElementById(READER_ID)?.parentElement?.clientWidth ?? 320;
-        const boxW = Math.min(Math.round(containerW * 0.82), 300);
+        // QR코드는 정사각형 — 컨테이너 너비의 80% 정사각형 박스
+        const boxSize = Math.min(Math.round(containerW * 0.80), 260);
 
         await scanner.start(
           { facingMode: 'environment' }, // 후면 카메라
           {
             fps: 12,
-            qrbox: { width: boxW, height: 120 }, // 바코드는 가로로 넓게
-            aspectRatio: 1.6,
+            qrbox: { width: boxSize, height: boxSize }, // QR은 정사각형
           },
           (text: string) => {
-            // 바코드 감지 성공
+            // QR 감지 성공
             if (doneRef.current || cancelled) return;
             doneRef.current = true;
             scanner
@@ -102,7 +102,7 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
       {status === 'scanning' && (
         <p className="text-center text-xs font-medium text-gray-400">
-          바코드를 스캔 박스 안에 맞춰주세요
+          QR코드를 카메라에 맞춰주세요
         </p>
       )}
     </div>
