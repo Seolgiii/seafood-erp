@@ -21,8 +21,6 @@ import path from "path";
 import fs from "fs";
 import QRCode from "qrcode";
 
-// Vercel 서버리스에서 파일 경로 로딩이 실패하는 문제를 피하기 위해
-// fs.readFileSync로 Buffer를 읽어 base64 data URI로 등록합니다.
 function loadFontDataUri(filename: string): string {
   const candidates = [
     path.join(process.cwd(), "public", "fonts", filename),
@@ -40,13 +38,21 @@ function loadFontDataUri(filename: string): string {
   throw new Error(`[PDF] 폰트 파일을 찾을 수 없습니다: ${filename}`);
 }
 
-Font.register({
-  family: "NotoSansKR",
-  fonts: [
-    { src: loadFontDataUri("NotoSansKR-Regular.otf"), fontWeight: "normal" },
-    { src: loadFontDataUri("NotoSansKR-Bold.otf"), fontWeight: "bold" },
-  ],
-});
+// 최초 PDF 생성 시점에 한 번만 폰트를 등록합니다.
+// 모듈 로드 시점에 실행하면 이 모듈을 import하는 모든 서버 액션에서
+// 폰트 파일 I/O가 발생해 500 에러를 유발합니다.
+let fontRegistered = false;
+function ensureFontRegistered() {
+  if (fontRegistered) return;
+  Font.register({
+    family: "NotoSansKR",
+    fonts: [
+      { src: loadFontDataUri("NotoSansKR-Regular.otf"), fontWeight: "normal" },
+      { src: loadFontDataUri("NotoSansKR-Bold.otf"), fontWeight: "bold" },
+    ],
+  });
+  fontRegistered = true;
+}
 
 // 한글은 단어 중간에 줄바꿈하지 않도록 처리
 Font.registerHyphenationCallback((word) => [word]);
@@ -324,6 +330,7 @@ function ExpensePDF({ data }: { data: ExpensePdfData }) {
  * 반환된 Buffer는 Vercel Blob에 업로드됩니다.
  */
 export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> {
+  ensureFontRegistered();
   // LOT 번호 → QR 코드 PNG data URL 생성
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
@@ -344,6 +351,7 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
  * 출고증 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
  */
 export async function generateOutboundPdf(data: OutboundPdfData): Promise<Buffer> {
+  ensureFontRegistered();
   return renderToBuffer(<OutboundPDF data={data} />) as Promise<Buffer>;
 }
 
@@ -351,5 +359,6 @@ export async function generateOutboundPdf(data: OutboundPdfData): Promise<Buffer
  * 지출결의서 PDF를 생성하여 Buffer(바이너리 데이터)로 반환합니다.
  */
 export async function generateExpensePdf(data: ExpensePdfData): Promise<Buffer> {
+  ensureFontRegistered();
   return renderToBuffer(<ExpensePDF data={data} />) as Promise<Buffer>;
 }
