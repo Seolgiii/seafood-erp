@@ -1,3 +1,6 @@
+# 폰트 base64 변환 파일 (prebuild 스크립트로 자동 생성)
+lib/fonts-base64.ts
+
 .env.local
 .env.loacl
 .env
