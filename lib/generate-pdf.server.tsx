@@ -308,9 +308,10 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
     try {
-      qrDataUrl = await QRCode.toDataURL(data.lotNumber, {
+      const qrContent = `https://seafood-erp.vercel.app/inventory/outbound?lot=${encodeURIComponent(data.lotNumber)}`;
+      qrDataUrl = await QRCode.toDataURL(qrContent, {
         errorCorrectionLevel: "M",
-        width: 300,   // 고해상도로 생성해 인쇄 품질 확보
+        width: 300,
         margin: 2,
       });
     } catch (e) {

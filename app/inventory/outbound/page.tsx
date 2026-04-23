@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
   ChevronLeftIcon,
@@ -42,6 +42,7 @@ function formatMisuDisplay(raw: unknown): string {
 
 export default function OutboundRecordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [now, setNow] = useState<Date | null>(null);
   const [workerId, setWorkerId] = useState('');
 
@@ -123,12 +124,32 @@ export default function OutboundRecordPage() {
     await doSearch(keyword);
   };
 
+  // ── URL ?lot= 파라미터 자동 검색 ─────────────────────────────────────────
+  // 입고증 QR코드를 스캔하면 ?lot=LOT번호 파라미터와 함께 이 페이지가 열립니다.
+  useEffect(() => {
+    const lot = searchParams.get('lot');
+    if (!lot) return;
+    setKeyword(lot);
+    doSearch(lot);
+  // searchParams가 바뀌면 재실행하지 않도록 마운트 시 1회만 실행
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── 바코드 감지 콜백 ─────────────────────────────────────────────────────
   const handleBarcodeDetected = useCallback(
-    async (code: string) => {
-      setScannerOpen(false);  // 카메라 닫기
-      setKeyword(code);       // 입력창에 결과 표시
-      await doSearch(code);   // 자동 검색
+    async (raw: string) => {
+      // QR코드에 URL이 담긴 경우 ?lot= 파라미터를 추출합니다.
+      let code = raw.trim();
+      try {
+        const url = new URL(code);
+        const lotParam = url.searchParams.get('lot');
+        if (lotParam) code = lotParam;
+      } catch {
+        // URL 형식이 아닌 경우 원본 값 그대로 사용
+      }
+      setScannerOpen(false);
+      setKeyword(code);
+      await doSearch(code);
     },
     [doSearch],
   );
