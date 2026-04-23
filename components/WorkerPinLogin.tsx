@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   isSessionExpired,
   readSession,
@@ -18,6 +18,7 @@ const nameButtonClass =
 
 export function WorkerPinLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
@@ -109,7 +110,8 @@ export function WorkerPinLogin() {
             role: data.worker.role ?? "WORKER",
             lastActivityAt: Date.now(),
           });
-          router.push("/");
+          const callbackUrl = searchParams.get("callbackUrl");
+          router.push(callbackUrl ? decodeURIComponent(callbackUrl) : "/");
         }
       } catch {
         setAuthError("연결에 실패했습니다");
@@ -119,7 +121,7 @@ export function WorkerPinLogin() {
         setSubmitting(false);
       }
     },
-    [router]
+    [router, searchParams]
   );
 
   const appendDigit = useCallback(

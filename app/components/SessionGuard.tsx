@@ -34,8 +34,13 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
     const session = readSession();
     if (!session || isSessionExpired(session)) {
       clearSession();
-      router.replace('/login');
-      return; // setReady(false) 유지 → 보호 콘텐츠 깜빡임 없음
+      // 현재 URL을 callbackUrl로 보존해 로그인 후 원래 페이지로 돌아올 수 있게 합니다.
+      const callbackUrl = window.location.pathname + window.location.search;
+      const target = callbackUrl === '/' || callbackUrl === ''
+        ? '/login'
+        : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+      router.replace(target);
+      return;
     }
 
     // 세션 갱신 후 콘텐츠 표시
@@ -48,7 +53,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       const s = readSession();
       if (!s || isSessionExpired(s)) {
         clearSession();
-        router.replace('/login');
+        router.replace('/login');  // 만료 시에는 홈으로 보내므로 callbackUrl 불필요
         return;
       }
 

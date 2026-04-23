@@ -28,29 +28,41 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
     const start = async () => {
       try {
-        // html5-qrcode는 브라우저 전용 → 동적 import (ssr:false 보장 후에도 명시적으로 lazy)
         const { Html5Qrcode } = await import('html5-qrcode');
         if (cancelled) return;
 
         scanner = new Html5Qrcode(READER_ID);
         const containerW = document.getElementById(READER_ID)?.parentElement?.clientWidth ?? 320;
         const boxSize = Math.min(Math.round(containerW * 0.80), 260);
+        const scanConfig = { fps: 12, qrbox: { width: boxSize, height: boxSize } };
 
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 12, qrbox: { width: boxSize, height: boxSize } },
-          (text: string) => {
-            if (doneRef.current || cancelled) return;
-            doneRef.current = true;
-            scanner
-              .stop()
-              .catch(() => {})
-              .finally(() => {
-                if (!cancelled) onDetectedRef.current(text.trim());
-              });
-          },
-          () => {},
-        );
+        const onSuccess = (text: string) => {
+          if (doneRef.current || cancelled) return;
+          doneRef.current = true;
+          scanner.stop().catch(() => {}).finally(() => {
+            if (!cancelled) onDetectedRef.current(text.trim());
+          });
+        };
+
+        // { facingMode: 'environment' } 는 iOS Safari에서 strict 제약으로 실패할 수 있습니다.
+        // ideal을 사용해 후면 카메라를 선호하되 없어도 동작하도록 합니다.
+        try {
+          await scanner.start(
+            { facingMode: { ideal: 'environment' } },
+            scanConfig,
+            onSuccess,
+            () => {},
+          );
+        } catch {
+          // 첫 번째 시도 실패 시 카메라 목록에서 후면 카메라를 직접 선택합니다.
+          if (cancelled) return;
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras.length) throw new Error('카메라를 찾을 수 없습니다.');
+          // 레이블에 'back' 또는 'rear' 가 있으면 후면, 없으면 마지막 카메라
+          const back = cameras.find((c) => /back|rear|environment/i.test(c.label))
+            ?? cameras[cameras.length - 1];
+          await scanner.start(back.id, scanConfig, onSuccess, () => {});
+        }
 
         if (!cancelled) setStatus('scanning');
       } catch (err: unknown) {
