@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import {
   ChevronLeftIcon,
   MagnifyingGlassIcon,
@@ -11,6 +12,12 @@ import {
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
+
+// html5-qrcode는 브라우저 전용 → SSR 없이 동적 로드
+const BarcodeScanner = dynamic(
+  () => import('@/app/components/BarcodeScanner'),
+  { ssr: false },
+);
 
 type CartItem = {
   cartId: string;
@@ -26,7 +33,6 @@ type CartItem = {
   salePrice: number | undefined;
 };
 
-/** 미수 필드 표기: 비어 있으면 '—', 값이 이미 '미'로 끝나면 그대로, 아니면 끝에 ' 미'만 붙임 */
 function formatMisuDisplay(raw: unknown): string {
   const s = String(raw ?? '').trim();
   if (!s) return '—';
@@ -40,6 +46,11 @@ export default function OutboundRecordPage() {
   const [workerId, setWorkerId] = useState('');
 
   const [searchMode, setSearchMode] = useState<'manual' | 'barcode'>('manual');
+  // 카메라 뷰파인더 표시 여부 (바코드 스캔 성공 후 닫힘)
+  const [scannerOpen, setScannerOpen] = useState(false);
+  // null = 아직 감지 중, true/false = 결과
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
+
   const [keyword, setKeyword] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -55,11 +66,10 @@ export default function OutboundRecordPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // ── 초기화 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const s = readSession();
-    if (s) {
-      setWorkerId(s.workerId);
-    }
+    if (s) setWorkerId(s.workerId);
   }, []);
 
   useEffect(() => {
@@ -67,20 +77,75 @@ export default function OutboundRecordPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // 카메라 지원 여부 감지 (모바일: true, PC: false)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      setHasCamera(false);
+      return;
+    }
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => setHasCamera(devices.some((d) => d.kind === 'videoinput')))
+      .catch(() => setHasCamera(false));
+  }, []);
+
   useEffect(() => {
     if (!selectedLot || hasLoggedSelectedLotRef.current) return;
     const rawStock = selectedLot?.fields?.['재고수량'];
     console.group('[outbound diagnostic] selectedLot snapshot');
     console.log('selectedLot:', selectedLot);
-    console.log('selectedLot.fields:', selectedLot?.fields);
-    console.log("fields['재고수량']:", rawStock);
-    console.log('typeof stock:', typeof rawStock);
-    console.log('Array.isArray(stock):', Array.isArray(rawStock));
-    console.log('Number(stock):', Number(rawStock));
-    console.log('UI display stock source:', selectedLot?.fields?.['재고수량'] ?? 0);
+    console.log("fields['재고수량']:", rawStock, '→ Number:', Number(rawStock));
     console.groupEnd();
     hasLoggedSelectedLotRef.current = true;
   }, [selectedLot]);
+
+  // ── 검색 공통 로직 ────────────────────────────────────────────────────────
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) return;
+    setIsSearching(true);
+    setSelectedLot(null);
+    hasLoggedSelectedLotRef.current = false;
+    const result = await searchLotByKeyword(q);
+    if (result.success) {
+      if (result.records.length === 0) alert('일치하는 재고가 없습니다.');
+      setSearchResults(result.records);
+      // 결과가 1건이면 자동 선택 (바코드 스캔 시 즉시 입력 화면으로)
+      if (result.records.length === 1) setSelectedLot(result.records[0]);
+    } else {
+      alert(`검색 실패: ${result.error}`);
+    }
+    setIsSearching(false);
+  }, []);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!keyword.trim()) return alert('검색어를 입력해주세요.');
+    await doSearch(keyword);
+  };
+
+  // ── 바코드 감지 콜백 ─────────────────────────────────────────────────────
+  const handleBarcodeDetected = useCallback(
+    async (code: string) => {
+      setScannerOpen(false);  // 카메라 닫기
+      setKeyword(code);       // 입력창에 결과 표시
+      await doSearch(code);   // 자동 검색
+    },
+    [doSearch],
+  );
+
+  // ── 탭 전환 ──────────────────────────────────────────────────────────────
+  const switchToManual = () => {
+    setSearchMode('manual');
+    setScannerOpen(false);
+    resetForm();
+  };
+
+  const switchToBarcode = () => {
+    setSearchMode('barcode');
+    resetForm();
+    // 카메라가 있으면 즉시 스캐너 열기
+    if (hasCamera) setScannerOpen(true);
+  };
 
   const resetForm = () => {
     setSelectedLot(null);
@@ -92,27 +157,7 @@ export default function OutboundRecordPage() {
     hasLoggedSelectedLotRef.current = false;
   };
 
-  // 1. LOT 검색
-  const handleSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!keyword.trim()) return alert('검색어를 입력해주세요.');
-    setIsSearching(true);
-    setSelectedLot(null);
-    hasLoggedSelectedLotRef.current = false;
-    const result = await searchLotByKeyword(keyword);
-    if (result.success) {
-      if (result.records.length === 0) alert('일치하는 재고가 없습니다.');
-      setSearchResults(result.records);
-      if (searchMode === 'barcode' && result.records.length === 1) {
-        setSelectedLot(result.records[0]);
-      }
-    } else {
-      alert(`검색 실패: ${result.error}`);
-    }
-    setIsSearching(false);
-  };
-
-  // 2. 장바구니에 추가
+  // ── 장바구니 추가 ─────────────────────────────────────────────────────────
   const handleAddToCart = () => {
     if (!selectedLot) return;
     const qty = fromGroupedIntegerInput(quantity).value;
@@ -138,9 +183,11 @@ export default function OutboundRecordPage() {
     ]);
 
     resetForm();
+    // 바코드 모드면 스캐너 다시 열기
+    if (searchMode === 'barcode' && hasCamera) setScannerOpen(true);
   };
 
-  // 3. 장바구니 전체 출고 신청
+  // ── 출고 신청 ─────────────────────────────────────────────────────────────
   const handleSubmitAll = async () => {
     if (cart.length === 0) return alert('출고할 항목이 없습니다.');
     setIsSubmitting(true);
@@ -162,7 +209,7 @@ export default function OutboundRecordPage() {
       if (!result.success) {
         setIsSubmitting(false);
         return alert(
-          `출고 실패 (${item.lotNumber}): ${result.error}\n\n전체 신청이 취소되었습니다.`
+          `출고 실패 (${item.lotNumber}): ${result.error}\n\n전체 신청이 취소되었습니다.`,
         );
       }
     }
@@ -174,6 +221,7 @@ export default function OutboundRecordPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-32">
+      {/* 헤더 */}
       <header className="bg-white px-4 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-2">
           <button
@@ -183,9 +231,7 @@ export default function OutboundRecordPage() {
             <ChevronLeftIcon className="w-6 h-6 text-gray-800" />
           </button>
           <div className="flex items-baseline gap-2">
-            <h1 className="text-[18px] font-black tracking-tight text-[#FF3B30]">
-              물품 출고
-            </h1>
+            <h1 className="text-[18px] font-black tracking-tight text-[#FF3B30]">물품 출고</h1>
             <span className="text-[13px] font-medium text-gray-500 whitespace-nowrap">
               어떤 물건이 출고되나요?
             </span>
@@ -193,66 +239,152 @@ export default function OutboundRecordPage() {
         </div>
         <div className="text-right leading-tight">
           <p className="text-[11px] text-gray-500 font-medium">
-            {now ? now.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : ""}
+            {now
+              ? now.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              : ''}
           </p>
           <p className="text-[14px] font-bold text-gray-900">
-            {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : ""}
+            {now
+              ? now.toLocaleTimeString('ko-KR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })
+              : ''}
           </p>
         </div>
       </header>
 
       <div className="p-4 space-y-4">
-        {/* 검색 모드 탭 */}
+        {/* ── 검색 모드 탭 ──────────────────────────────────────────────── */}
         <div className="flex bg-gray-200 p-1 rounded-2xl">
           <button
-            onClick={() => { setSearchMode('manual'); resetForm(); }}
+            onClick={switchToManual}
             className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
               searchMode === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
-            <MagnifyingGlassIcon className="w-5 h-5" /> 4자리 검색
+            <MagnifyingGlassIcon className="w-5 h-5" />
+            직접 검색
           </button>
           <button
-            onClick={() => { setSearchMode('barcode'); resetForm(); }}
+            onClick={switchToBarcode}
             className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
               searchMode === 'barcode' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
-            <QrCodeIcon className="w-5 h-5" /> 바코드 스캔
+            <QrCodeIcon className="w-5 h-5" />
+            바코드 스캔
+            {/* PC에서는 "(PC 미지원)" 표시 */}
+            {hasCamera === false && (
+              <span className="text-[10px] font-normal text-gray-400">(카메라 없음)</span>
+            )}
           </button>
         </div>
 
-        {/* 검색 + 선택 + 수량 입력 카드 */}
+        {/* ── 검색 · 선택 카드 ──────────────────────────────────────────── */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
-          {/* LOT 번호 검색 입력 */}
-          {!selectedLot && (
+
+          {/* ── 직접 검색 모드 ─────────────────────────────────────────── */}
+          {searchMode === 'manual' && !selectedLot && (
             <form onSubmit={handleSearch} className="space-y-3">
               <label className="text-sm font-bold text-gray-400 ml-1">
-                {searchMode === 'manual' ? 'LOT 번호 뒷 4자리 입력' : '바코드 리더기로 스캔하세요'}
+                LOT 번호 검색 (뒷 4자리 또는 전체)
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  autoFocus={searchMode === 'barcode'}
-                  placeholder={searchMode === 'manual' ? '예: 0001' : '스캔 대기중...'}
+                  autoFocus
+                  placeholder="예: 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center"
                 />
-                {searchMode === 'manual' && (
-                  <button
-                    type="submit"
-                    disabled={isSearching}
-                    className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold active:scale-95"
-                  >
-                    {isSearching ? '...' : '검색'}
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold active:scale-95 transition-all"
+                >
+                  {isSearching ? '...' : '검색'}
+                </button>
               </div>
             </form>
           )}
 
-          {/* 검색 결과 리스트 */}
+          {/* ── 바코드 스캔 모드 ───────────────────────────────────────── */}
+          {searchMode === 'barcode' && !selectedLot && (
+            <div className="space-y-3">
+              {/* PC: 카메라 없음 안내 */}
+              {hasCamera === false && (
+                <div className="px-4 py-5 bg-gray-50 rounded-2xl text-center space-y-1">
+                  <p className="text-2xl">📵</p>
+                  <p className="text-sm font-bold text-gray-600">
+                    이 기기에서는 카메라를 사용할 수 없습니다.
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    모바일에서 접속하거나 아래 입력창에 직접 입력하세요.
+                  </p>
+                </div>
+              )}
+
+              {/* 카메라 뷰파인더 (모바일 & scannerOpen) */}
+              {hasCamera && scannerOpen && (
+                <BarcodeScanner onDetected={handleBarcodeDetected} />
+              )}
+
+              {/* 스캔 완료 후 / 카메라 대기 중 → 다시 스캔 버튼 */}
+              {hasCamera && !scannerOpen && !isSearching && (
+                <button
+                  onClick={() => {
+                    setKeyword('');
+                    setSearchResults([]);
+                    setScannerOpen(true);
+                  }}
+                  className="w-full py-4 rounded-2xl bg-blue-600 text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <QrCodeIcon className="w-5 h-5" />
+                  다시 스캔하기
+                </button>
+              )}
+
+              {/* 검색 중 스피너 */}
+              {isSearching && (
+                <div className="py-4 text-center">
+                  <p className="text-sm font-bold text-gray-500 animate-pulse">검색 중...</p>
+                </div>
+              )}
+
+              {/* 스캔 결과 or 직접 입력 fallback */}
+              <form onSubmit={handleSearch} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={scannerOpen ? '스캔 대기중...' : '스캔 결과 또는 직접 입력'}
+                  value={keyword}
+                  readOnly={scannerOpen}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className={`flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center transition-opacity ${
+                    scannerOpen ? 'opacity-40 cursor-not-allowed' : ''
+                  }`}
+                />
+                {!scannerOpen && (
+                  <button
+                    type="submit"
+                    disabled={isSearching || !keyword.trim()}
+                    className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold disabled:opacity-40 active:scale-95 transition-all"
+                  >
+                    검색
+                  </button>
+                )}
+              </form>
+            </div>
+          )}
+
+          {/* ── 검색 결과 리스트 ─────────────────────────────────────────── */}
           {!selectedLot && searchResults.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-bold text-gray-400 ml-1">
@@ -285,7 +417,7 @@ export default function OutboundRecordPage() {
             </div>
           )}
 
-          {/* LOT 선택 후: 수량/판매처/금액 입력 */}
+          {/* ── LOT 선택 후: 수량 · 판매처 · 금액 입력 ──────────────────── */}
           {selectedLot && (
             <div className="space-y-5">
               <div className="flex items-start justify-between">
@@ -298,17 +430,14 @@ export default function OutboundRecordPage() {
                     <span className="text-base text-gray-500 font-normal">
                       (규격 {selectedLot.fields['규격']}kg /{' '}
                       {formatMisuDisplay(
-                        selectedLot.fields['미수'] ?? selectedLot.fields['상세규격_표기']
+                        selectedLot.fields['미수'] ?? selectedLot.fields['상세규격_표기'],
                       )}
                       )
                     </span>
                   </p>
                   <p className="text-xs text-gray-400 mt-1">{selectedLot.fields['LOT번호']}</p>
                 </div>
-                <button
-                  onClick={resetForm}
-                  className="text-xs text-gray-400 underline p-2"
-                >
+                <button onClick={resetForm} className="text-xs text-gray-400 underline p-2">
                   다시 검색
                 </button>
               </div>
@@ -327,6 +456,7 @@ export default function OutboundRecordPage() {
                     inputMode="numeric"
                     placeholder="예: 100"
                     value={quantity}
+                    autoFocus
                     onChange={(e) => {
                       const { display } = fromGroupedIntegerInput(e.target.value);
                       setQuantity(display);
@@ -380,7 +510,7 @@ export default function OutboundRecordPage() {
           )}
         </div>
 
-        {/* 장바구니 리스트 */}
+        {/* ── 장바구니 리스트 ──────────────────────────────────────────────── */}
         {cart.length > 0 && (
           <div className="space-y-3">
             <p className="text-xs font-bold text-gray-400 ml-1">
@@ -433,7 +563,7 @@ export default function OutboundRecordPage() {
         )}
       </div>
 
-      {/* 출고 신청 버튼 (장바구니 1건 이상일 때만) */}
+      {/* ── 출고 신청 버튼 (장바구니 1건 이상) ─────────────────────────────── */}
       {cart.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50 border-t border-gray-100">
           <button
@@ -443,9 +573,7 @@ export default function OutboundRecordPage() {
               isSubmitting ? 'bg-red-300 cursor-not-allowed' : 'bg-red-600 active:scale-95'
             }`}
           >
-            {isSubmitting
-              ? '신청 중...'
-              : `출고 신청 (${cart.length}건)`}
+            {isSubmitting ? '신청 중...' : `출고 신청 (${cart.length}건)`}
           </button>
         </div>
       )}
