@@ -13,10 +13,10 @@ import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
 
-// html5-qrcode는 브라우저 전용 → SSR 없이 동적 로드
+// html5-qrcode는 window/document에 접근하므로 SSR에서 완전히 제외합니다.
 const BarcodeScanner = dynamic(
   () => import('@/app/components/BarcodeScanner'),
-  { ssr: false },
+  { ssr: false, loading: () => null },
 );
 
 type CartItem = {

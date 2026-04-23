@@ -26,25 +26,20 @@ export default function BarcodeScanner({ onDetected }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let scanner: any;
 
-    (async () => {
+    const start = async () => {
       try {
-        // html5-qrcode는 브라우저 전용 → 동적 import
+        // html5-qrcode는 브라우저 전용 → 동적 import (ssr:false 보장 후에도 명시적으로 lazy)
         const { Html5Qrcode } = await import('html5-qrcode');
         if (cancelled) return;
 
         scanner = new Html5Qrcode(READER_ID);
         const containerW = document.getElementById(READER_ID)?.parentElement?.clientWidth ?? 320;
-        // QR코드는 정사각형 — 컨테이너 너비의 80% 정사각형 박스
         const boxSize = Math.min(Math.round(containerW * 0.80), 260);
 
         await scanner.start(
-          { facingMode: 'environment' }, // 후면 카메라
-          {
-            fps: 12,
-            qrbox: { width: boxSize, height: boxSize }, // QR은 정사각형
-          },
+          { facingMode: 'environment' },
+          { fps: 12, qrbox: { width: boxSize, height: boxSize } },
           (text: string) => {
-            // QR 감지 성공
             if (doneRef.current || cancelled) return;
             doneRef.current = true;
             scanner
@@ -54,7 +49,7 @@ export default function BarcodeScanner({ onDetected }: Props) {
                 if (!cancelled) onDetectedRef.current(text.trim());
               });
           },
-          () => {} // 프레임별 디코드 실패 — 무시
+          () => {},
         );
 
         if (!cancelled) setStatus('scanning');
@@ -69,14 +64,20 @@ export default function BarcodeScanner({ onDetected }: Props) {
         setStatus('error');
         console.error('[BarcodeScanner] 카메라 오류:', msg);
       }
-    })();
+    };
+
+    // Promise를 변수에 담아 unhandled rejection을 방지합니다.
+    const promise = start();
+    promise.catch((err) => {
+      if (!cancelled) console.error('[BarcodeScanner] 예상치 못한 오류:', err);
+    });
 
     return () => {
       cancelled = true;
       doneRef.current = true;
       if (scanner) scanner.stop().catch(() => {});
     };
-  }, []); // 마운트/언마운트로만 제어
+  }, []);
 
   return (
     <div className="space-y-2">
