@@ -24,16 +24,19 @@ export default function WorkerDashboard() {
     router.replace("/login");
   };
 
-  const allMenuItems = [
+  const heroItems = [
     { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", icon: "📥", iconBg: "#3182F6", path: "/inventory/record" },
     { id: "outbound", title: "물품 출고", desc: "바코드 즉시 출고", icon: "📤", iconBg: "#FF3B30", path: "/inventory/outbound" },
+  ];
+
+  const allSecondaryItems = [
     { id: "status", title: "재고 조회", desc: "실시간 현장 재고", icon: "🔍", iconBg: "#8B95A1", path: "/inventory/status" },
     { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", icon: "💳", iconBg: "#00D082", path: "/expense/new" },
     { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", icon: "📋", iconBg: "#FF8C00", path: "/my-requests" },
     { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", icon: "⚙️", iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
   ];
 
-  const menuItems = allMenuItems.filter(
+  const secondaryItems = allSecondaryItems.filter(
     (item) => !item.adminOnly || role === "ADMIN" || role === "MASTER"
   );
 
@@ -62,26 +65,45 @@ export default function WorkerDashboard() {
           </h1>
         </section>
 
-        {/* 2단 그리드 메뉴 (grid-cols-2) */}
+        {/* Hero 카드 — 입고·출고 (대형) */}
         <div className="grid grid-cols-2 gap-4">
-          {menuItems.map((item) => (
+          {heroItems.map((item) => (
             <button
               key={item.id}
               onClick={() => router.push(item.path)}
-              className="bg-white p-5 rounded-[24px] flex flex-col items-start gap-4 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100"
+              className="bg-white p-5 rounded-[24px] flex flex-col items-start gap-4 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100 min-h-[180px]"
             >
-              {/* 아이콘 크기 및 둥글기 조절 */}
               <div
-                className="w-12 h-12 rounded-[18px] flex items-center justify-center text-2xl shadow-inner"
+                className="w-14 h-14 rounded-[20px] flex items-center justify-center text-3xl shadow-inner"
                 style={{ backgroundColor: item.iconBg }}
               >
                 {item.icon}
               </div>
-              
-              {/* 텍스트 영역 상하 배치 */}
-              <div className="mt-1">
-                <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title}</h2>
+              <div className="mt-auto">
+                <h2 className="text-[18px] font-black text-gray-900 tracking-tight">{item.title}</h2>
                 <p className="text-[13px] text-gray-400 font-medium mt-1 tracking-tight break-keep">{item.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Secondary 카드 — 보조 메뉴 (compact 가로형) */}
+        <div className="grid grid-cols-2 gap-3">
+          {secondaryItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => router.push(item.path)}
+              className="bg-white p-4 rounded-[20px] flex items-center gap-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] active:scale-[0.97] transition-transform text-left"
+            >
+              <div
+                className="w-10 h-10 rounded-[14px] flex items-center justify-center text-xl shadow-inner shrink-0"
+                style={{ backgroundColor: item.iconBg }}
+              >
+                {item.icon}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-bold text-gray-900 tracking-tight truncate">{item.title}</h2>
+                <p className="text-[11px] text-gray-400 font-medium tracking-tight truncate">{item.desc}</p>
               </div>
             </button>
           ))}
