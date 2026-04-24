@@ -53,6 +53,9 @@ export default function InventoryRecordPage() {
   const [supplierId, setSupplierId] = useState("");
   const supplierRef = useRef<HTMLDivElement>(null);
 
+  // 품목구분 "사료" = 수입산. 이외는 국내산으로 자동 처리.
+  const isImport = formData.itemCategory === "사료";
+
   useEffect(() => {
     const s = readSession();
     if (s) {
@@ -107,9 +110,27 @@ export default function InventoryRecordPage() {
     setFormData({ ...formData, [field]: commaValue });
   };
 
+  // 품목 선택 시 원산지·선박명 자동 조정
+  const selectProduct = (opt: { name: string; category: string }) => {
+    const imported = opt.category === "사료";
+    setItemQuery(opt.name);
+    setFormData((prev) => ({
+      ...prev,
+      itemName: opt.name,
+      itemCategory: opt.category,
+      origin: imported ? "수입산" : "국내산",
+      shipName: imported ? "" : prev.shipName,
+    }));
+    setItemOpen(false);
+  };
+
   const handleSubmit = async () => {
     if (!formData.itemName.trim()) return alert("품목명을 입력해주세요.");
     if (!formData.quantity.trim()) return alert("입고 수량을 입력해주세요.");
+
+    const finalOrigin = isImport
+      ? (formData.origin.trim() || "수입산")
+      : "국내산";
 
     setIsSubmitting(true);
     try {
@@ -121,10 +142,10 @@ export default function InventoryRecordPage() {
         "입고수량(BOX)": Number(formData.quantity.replace(/,/g, "")),
         수매가: Number(formData.price.replace(/,/g, "")),
         보관처: formData.storage,
-        원산지: formData.origin,
+        원산지: finalOrigin,
         매입처: formData.supplier,
         매입처RecordId: supplierId,
-        선박명: formData.shipName,
+        선박명: isImport ? "" : formData.shipName,
         비고: formData.remarks,
         작업자: workerId,
       };
@@ -172,223 +193,247 @@ export default function InventoryRecordPage() {
       </header>
 
       <main className="p-5 flex flex-col gap-5">
-        <div className="bg-white p-6 rounded-[28px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-5">
+        <div className="bg-white p-6 rounded-[28px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-6">
 
-          {/* 품목명 — 품목마스터 검색 드롭다운 */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[14px] font-bold text-gray-500 ml-1">품목명 (필수)</label>
-            <div ref={itemRef} className="relative">
-              <input
-                type="text"
-                value={itemQuery}
-                onChange={(e) => {
-                  setItemQuery(e.target.value);
-                  setFormData({ ...formData, itemName: e.target.value, itemCategory: "" });
-                  setItemOpen(true);
-                }}
-                onFocus={() => setItemOpen(true)}
-                placeholder="품목명 검색 또는 직접 입력"
-                className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-              />
-              {itemOpen && filteredProducts.length > 0 && (
-                <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
-                  {filteredProducts.map((opt) => (
-                    <li
-                      key={opt.id}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        setItemQuery(opt.name);
-                        setFormData({ ...formData, itemName: opt.name, itemCategory: opt.category });
-                        setItemOpen(false);
-                      }}
-                      className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between"
-                    >
-                      <span>{opt.name}</span>
-                      {opt.category && (
-                        <span className="text-[12px] font-medium text-gray-400">{opt.category}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+          {/* ① 무엇을 */}
+          <section className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-[14px] font-bold text-gray-500 ml-1">품목명 (필수)</label>
+              <div ref={itemRef} className="relative">
+                <input
+                  type="text"
+                  value={itemQuery}
+                  onChange={(e) => {
+                    setItemQuery(e.target.value);
+                    setFormData({ ...formData, itemName: e.target.value, itemCategory: "" });
+                    setItemOpen(true);
+                  }}
+                  onFocus={() => setItemOpen(true)}
+                  placeholder="품목명 검색 또는 직접 입력"
+                  className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+                {itemOpen && filteredProducts.length > 0 && (
+                  <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
+                    {filteredProducts.map((opt) => (
+                      <li
+                        key={opt.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectProduct(opt);
+                        }}
+                        className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between"
+                      >
+                        <span>{opt.name}</span>
+                        {opt.category && (
+                          <span className="text-[12px] font-medium text-gray-400">{opt.category}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {formData.itemCategory && (
+                <div className="flex items-center gap-2 ml-1">
+                  <span className="text-[12px] font-bold text-[#3182F6]">
+                    품목구분: {formData.itemCategory}
+                  </span>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      isImport
+                        ? "bg-orange-100 text-orange-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {isImport ? "수입산" : "국내산"}
+                  </span>
+                </div>
               )}
             </div>
-            {formData.itemCategory && (
-              <p className="text-[12px] font-bold text-[#3182F6] ml-1">
-                품목구분: {formData.itemCategory}
-              </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">규격</label>
+                <input
+                  type="text"
+                  value={formData.spec}
+                  onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
+                  placeholder="예 : 10"
+                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">미수</label>
+                <input
+                  type="text"
+                  value={formData.count}
+                  onChange={(e) => setFormData({ ...formData, count: e.target.value })}
+                  placeholder="예 : 42/44미"
+                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
+            </div>
+          </section>
+
+          <hr className="border-gray-100" />
+
+          {/* ② 얼마나 */}
+          <section className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-[#3182F6] ml-1">수량 (BOX)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.quantity}
+                  onChange={(e) => handleNumberChange("quantity", e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-blue-50 text-[#3182F6] text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">수매가 (원)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.price}
+                  onChange={(e) => handleNumberChange("price", e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
+            </div>
+          </section>
+
+          <hr className="border-gray-100" />
+
+          {/* ③ 어디서 → 어디로 */}
+          <section className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">매입처 (출발)</label>
+                <div ref={supplierRef} className="relative">
+                  <input
+                    type="text"
+                    value={supplierQuery}
+                    onChange={(e) => {
+                      setSupplierQuery(e.target.value);
+                      setFormData({ ...formData, supplier: e.target.value });
+                      setSupplierId("");
+                      setSupplierOpen(true);
+                    }}
+                    onFocus={() => setSupplierOpen(true)}
+                    placeholder="매입처 검색"
+                    className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  />
+                  {supplierOpen && filteredSuppliers.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
+                      {filteredSuppliers.map((opt) => (
+                        <li
+                          key={opt.id || opt.name}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSupplierQuery(opt.name);
+                            setFormData({ ...formData, supplier: opt.name });
+                            setSupplierId(opt.id);
+                            setSupplierOpen(false);
+                          }}
+                          className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                        >
+                          {opt.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">보관처 (도착)</label>
+                <div ref={storageRef} className="relative">
+                  <input
+                    type="text"
+                    value={storageQuery}
+                    onChange={(e) => {
+                      setStorageQuery(e.target.value);
+                      setFormData({ ...formData, storage: e.target.value });
+                      setStorageOpen(true);
+                    }}
+                    onFocus={() => setStorageOpen(true)}
+                    placeholder="보관처 입력"
+                    className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  />
+                  {storageOpen && filteredStorage.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
+                      {filteredStorage.map((opt) => (
+                        <li
+                          key={opt}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setStorageQuery(opt);
+                            setFormData({ ...formData, storage: opt });
+                            setStorageOpen(false);
+                          }}
+                          className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                        >
+                          {opt}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {isImport ? (
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">원산지 (수입산)</label>
+                <input
+                  type="text"
+                  value={formData.origin}
+                  onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                  placeholder="예 : 수입산, 러시아, 노르웨이"
+                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] font-bold text-gray-500 ml-1">선박명 (선택)</label>
+                <input
+                  type="text"
+                  value={formData.shipName}
+                  onChange={(e) => setFormData({ ...formData, shipName: e.target.value })}
+                  placeholder="선박명 입력 (없으면 비워두세요)"
+                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                />
+              </div>
             )}
-          </div>
+          </section>
 
-          <div className="grid grid-cols-2 gap-3">
+          <hr className="border-gray-100" />
+
+          {/* ④ 누가 · 메모 */}
+          <section className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">규격</label>
+              <label className="text-[14px] font-bold text-gray-500 ml-1">매입자</label>
               <input
                 type="text"
-                value={formData.spec}
-                onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
-                placeholder="예 : 10"
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                placeholder="매입자 입력"
                 className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
               />
             </div>
+
             <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">미수</label>
-              <input
-                type="text"
-                value={formData.count}
-                onChange={(e) => setFormData({ ...formData, count: e.target.value })}
-                placeholder="예 : 42/44미"
-                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+              <label className="text-[14px] font-bold text-gray-500 ml-1">비고</label>
+              <textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                placeholder="특이사항을 입력하세요"
+                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-[#3182F6] ml-1">수량 (BOX)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.quantity}
-                onChange={(e) => handleNumberChange("quantity", e.target.value)}
-                placeholder="0"
-                className="w-full bg-blue-50 text-[#3182F6] text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">수매가 (원)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.price}
-                onChange={(e) => handleNumberChange("price", e.target.value)}
-                placeholder="0"
-                className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-              />
-            </div>
-          </div>
-
-          {/* 보관처 + 원산지 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">보관처</label>
-              <div ref={storageRef} className="relative">
-                <input
-                  type="text"
-                  value={storageQuery}
-                  onChange={(e) => {
-                    setStorageQuery(e.target.value);
-                    setFormData({ ...formData, storage: e.target.value });
-                    setStorageOpen(true);
-                  }}
-                  onFocus={() => setStorageOpen(true)}
-                  placeholder="보관처 입력"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-                />
-                {storageOpen && filteredStorage.length > 0 && (
-                  <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
-                    {filteredStorage.map((opt) => (
-                      <li
-                        key={opt}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setStorageQuery(opt);
-                          setFormData({ ...formData, storage: opt });
-                          setStorageOpen(false);
-                        }}
-                        className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
-                      >
-                        {opt}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">원산지</label>
-              <input
-                type="text"
-                value={formData.origin}
-                onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-              />
-            </div>
-          </div>
-
-          {/* 매입처 + 선박명 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">매입처</label>
-              <div ref={supplierRef} className="relative">
-                <input
-                  type="text"
-                  value={supplierQuery}
-                  onChange={(e) => {
-                    setSupplierQuery(e.target.value);
-                    setFormData({ ...formData, supplier: e.target.value });
-                    setSupplierId("");
-                    setSupplierOpen(true);
-                  }}
-                  onFocus={() => setSupplierOpen(true)}
-                  placeholder="매입처 검색"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-                />
-                {supplierOpen && filteredSuppliers.length > 0 && (
-                  <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
-                    {filteredSuppliers.map((opt) => (
-                      <li
-                        key={opt.id || opt.name}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setSupplierQuery(opt.name);
-                          setFormData({ ...formData, supplier: opt.name });
-                          setSupplierId(opt.id);
-                          setSupplierOpen(false);
-                        }}
-                        className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
-                      >
-                        {opt.name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-[14px] font-bold text-gray-500 ml-1">선박명</label>
-              <input
-                type="text"
-                value={formData.shipName}
-                onChange={(e) => setFormData({ ...formData, shipName: e.target.value })}
-                placeholder="선박명 입력"
-                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-              />
-            </div>
-          </div>
-
-          {/* 매입자 — 세션에서 자동 설정, 직접 수정 가능 */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[14px] font-bold text-gray-500 ml-1">매입자</label>
-            <input
-              type="text"
-              value={buyerName}
-              onChange={(e) => setBuyerName(e.target.value)}
-              placeholder="매입자 입력"
-              className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-[14px] font-bold text-gray-500 ml-1">비고</label>
-            <textarea
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-              placeholder="특이사항을 입력하세요"
-              className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]"
-            />
-          </div>
+          </section>
         </div>
 
         <button
