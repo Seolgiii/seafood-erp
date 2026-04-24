@@ -54,13 +54,13 @@ export default function WorkerDashboard() {
       
       {/* 상단 헤더 */}
       <header className="bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
+        <h1 className="text-[20px] font-black text-[#3182F6] tracking-tight">SEAERP</h1>
         <button
           onClick={handleLogout}
           className="bg-[#FF4545] text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-transform text-sm"
         >
           로그아웃
         </button>
-
       </header>
 
       {/* 메인 콘텐츠 영역 */}
