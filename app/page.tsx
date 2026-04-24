@@ -80,77 +80,73 @@ export default function WorkerDashboard() {
           </h1>
         </section>
 
-        {/* Hero 카드 — 입고·출고 (대형, 오늘 KPI 표시) */}
-        <div className="grid grid-cols-2 gap-4">
-          {heroItems.map((item) => {
-            const kpiValue =
-              item.id === "inbound"
-                ? stats?.todayInbound
-                : item.id === "outbound"
-                ? stats?.todayOutbound
-                : undefined;
-            return (
-              <button
-                key={item.id}
-                onClick={() => router.push(item.path)}
-                className="bg-white p-5 rounded-[24px] flex flex-col shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100 min-h-[180px]"
+        {/* KPI 스트립 — 오늘의 요약 */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "오늘 입고", value: stats?.todayInbound, highlight: false },
+            { label: "오늘 출고", value: stats?.todayOutbound, highlight: false },
+            { label: "결재 대기", value: stats?.pendingApprovals, highlight: (stats?.pendingApprovals ?? 0) > 0 },
+          ].map((kpi) => (
+            <div
+              key={kpi.label}
+              className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)]"
+            >
+              <div className="text-[11px] font-bold text-gray-400 tracking-tight whitespace-nowrap">
+                {kpi.label}
+              </div>
+              <div
+                className={`text-[22px] font-black leading-tight mt-1 ${
+                  kpi.highlight ? "text-[#FF3B30]" : "text-gray-900"
+                }`}
               >
-                <div className="flex items-start justify-between w-full">
-                  <div
-                    className="w-14 h-14 rounded-[20px] flex items-center justify-center shadow-inner"
-                    style={{ backgroundColor: item.iconBg }}
-                  >
-                    <item.Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="text-right leading-none">
-                    <div className="text-[11px] font-bold text-gray-400 tracking-tight mb-1.5">오늘</div>
-                    <div className="text-[22px] font-black text-gray-900">
-                      {stats === null ? "-" : `${kpiValue ?? 0}건`}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-auto pt-4">
-                  <h2 className="text-[18px] font-black text-gray-900 tracking-tight">{item.title}</h2>
-                  <p className="text-[13px] text-gray-400 font-medium mt-1 tracking-tight break-keep">{item.desc}</p>
-                </div>
-              </button>
-            );
-          })}
+                {stats === null ? "-" : `${kpi.value ?? 0}건`}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Secondary 카드 — 보조 메뉴 (compact 가로형, 결재 대기 뱃지) */}
-        <div className="grid grid-cols-2 gap-3">
-          {secondaryItems.map((item) => {
-            const isAdmin = role === "ADMIN" || role === "MASTER";
-            const pendingBadgeId = isAdmin ? "admin-system" : "my-requests";
-            const showPendingBadge =
-              stats !== null &&
-              item.id === pendingBadgeId &&
-              stats.pendingApprovals > 0;
-            return (
-              <button
-                key={item.id}
-                onClick={() => router.push(item.path)}
-                className="bg-white p-4 rounded-[20px] flex items-center gap-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] active:scale-[0.97] transition-transform text-left"
+        {/* Hero 카드 — 입고·출고 (대형) */}
+        <div className="grid grid-cols-2 gap-4">
+          {heroItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => router.push(item.path)}
+              className="bg-white p-5 rounded-[24px] flex flex-col items-start gap-4 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100 min-h-[180px]"
+            >
+              <div
+                className="w-14 h-14 rounded-[20px] flex items-center justify-center shadow-inner"
+                style={{ backgroundColor: item.iconBg }}
               >
-                <div
-                  className="w-10 h-10 rounded-[14px] flex items-center justify-center shadow-inner shrink-0"
-                  style={{ backgroundColor: item.iconBg }}
-                >
-                  <item.Icon className="w-5 h-5 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-[14px] font-bold text-gray-900 tracking-tight truncate">{item.title}</h2>
-                  <p className="text-[11px] text-gray-400 font-medium tracking-tight truncate">{item.desc}</p>
-                </div>
-                {showPendingBadge && (
-                  <span className="shrink-0 bg-[#FF3B30] text-white text-[11px] font-black min-w-[22px] h-[22px] flex items-center justify-center rounded-full px-1.5">
-                    {stats.pendingApprovals}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+                <item.Icon className="w-8 h-8 text-white" />
+              </div>
+              <div className="mt-auto">
+                <h2 className="text-[18px] font-black text-gray-900 tracking-tight">{item.title}</h2>
+                <p className="text-[13px] text-gray-400 font-medium mt-1 tracking-tight break-keep">{item.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Secondary 카드 — 보조 메뉴 (compact 가로형) */}
+        <div className="grid grid-cols-2 gap-3">
+          {secondaryItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => router.push(item.path)}
+              className="bg-white p-4 rounded-[20px] flex items-center gap-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] active:scale-[0.97] transition-transform text-left"
+            >
+              <div
+                className="w-10 h-10 rounded-[14px] flex items-center justify-center shadow-inner shrink-0"
+                style={{ backgroundColor: item.iconBg }}
+              >
+                <item.Icon className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-bold text-gray-900 tracking-tight truncate">{item.title}</h2>
+                <p className="text-[11px] text-gray-400 font-medium tracking-tight truncate">{item.desc}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </main>
 
