@@ -5,6 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import PageHeader from "@/components/PageHeader";
+import BottomTabBar from "@/components/BottomTabBar";
+
+type AdminTabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
+
+const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
+  { key: "ALL", label: "전체" },
+  { key: "LOGISTICS", label: "입출고" },
+  { key: "EXPENSE", label: "지출결의" },
+  { key: "DONE", label: "완료" },
+];
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
 import type { RequestItem } from "@/app/actions/my-requests";
@@ -37,7 +47,7 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [role, setRole] = useState<string | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<"ALL" | "EXPENSE" | "LOGISTICS" | "DONE">("ALL");
+  const [activeTab, setActiveTab] = useState<AdminTabKey>("ALL");
   const [items, setItems] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uiOverrides, setUiOverrides] = useState<Record<string, "PROCESSING" | "COMPLETED" | "REJECTED">>({});
@@ -326,7 +336,13 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10" style={{ fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'" }}>
+    <div
+      className="min-h-screen bg-[#F2F4F6] flex flex-col"
+      style={{
+        fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'",
+        paddingBottom: "calc(56px + env(safe-area-inset-bottom))",
+      }}
+    >
       <PageHeader
         title="결재 수신함"
         onBack={() => router.push("/")}
@@ -336,25 +352,6 @@ export default function AdminDashboardPage() {
           </div>
         }
       />
-
-      <nav className="bg-white flex border-b border-gray-100">
-        {[
-          { key: "ALL", label: "전체" },
-          { key: "EXPENSE", label: "지출결의" },
-          { key: "LOGISTICS", label: "입/출고" },
-          { key: "DONE", label: "완료" },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as typeof activeTab)}
-            className={`flex-1 py-4 text-center font-bold text-[16px] transition-colors border-b-[3px] ${
-              activeTab === tab.key ? "border-[#191F28] text-[#191F28]" : "border-transparent text-gray-400"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
 
       {/* 건수 요약 */}
       {!isLoading && (
@@ -398,6 +395,13 @@ export default function AdminDashboardPage() {
           requesterName={selectedItem.requester}
         />
       )}
+
+      {/* 하단 탭바 */}
+      <BottomTabBar<AdminTabKey>
+        tabs={ADMIN_TABS}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+      />
     </div>
   );
 }

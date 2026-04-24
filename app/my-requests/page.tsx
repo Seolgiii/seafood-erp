@@ -6,13 +6,14 @@ import { getMyRequests, cancelMyRequest } from "@/app/actions/my-requests";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession } from "@/lib/session";
 import PageHeader from "@/components/PageHeader";
+import BottomTabBar from "@/components/BottomTabBar";
 
-type TabKey = "ALL" | "EXPENSE" | "LOGISTICS" | "DONE";
+type TabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "ALL", label: "전체" },
+  { key: "LOGISTICS", label: "입출고" },
   { key: "EXPENSE", label: "지출결의" },
-  { key: "LOGISTICS", label: "입/출고" },
   { key: "DONE", label: "완료" },
 ];
 
@@ -216,26 +217,12 @@ export default function MyRequestsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10">
+    <div
+      className="min-h-screen bg-[#F2F4F6] flex flex-col"
+      style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom))" }}
+    >
       {/* 상단 헤더 */}
       <PageHeader title="신청 내역" />
-
-      {/* 탭 네비게이션 */}
-      <nav className="bg-white flex border-b border-gray-100">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-4 text-center font-bold text-[16px] transition-colors border-b-[3px] ${
-              activeTab === tab.key
-                ? "border-[#191F28] text-[#191F28]"
-                : "border-transparent text-gray-400"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
 
       {/* 건수 요약 */}
       {!isLoading && (
@@ -274,6 +261,13 @@ export default function MyRequestsPage() {
           filtered.map((item) => <RequestCard key={item.id} item={item} />)
         )}
       </main>
+
+      {/* 하단 탭바 */}
+      <BottomTabBar<TabKey>
+        tabs={TABS}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+      />
     </div>
   );
 }
