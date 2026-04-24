@@ -12,7 +12,7 @@ type AdminTabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
   { key: "ALL", label: "전체" },
   { key: "LOGISTICS", label: "입출고" },
-  { key: "EXPENSE", label: "지출결의" },
+  { key: "EXPENSE", label: "지출" },
   { key: "DONE", label: "완료" },
 ];
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";

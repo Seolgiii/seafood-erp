@@ -13,7 +13,7 @@ type TabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "ALL", label: "전체" },
   { key: "LOGISTICS", label: "입출고" },
-  { key: "EXPENSE", label: "지출결의" },
+  { key: "EXPENSE", label: "지출" },
   { key: "DONE", label: "완료" },
 ];
 
