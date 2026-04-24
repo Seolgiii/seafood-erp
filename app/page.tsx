@@ -74,7 +74,7 @@ export default function WorkerDashboard() {
       <main className="flex-1 p-5 flex flex-col gap-4">
         {/* 환영 메시지 */}
         <section className="py-0">
-          <h1 className="text-[20.8px] font-bold text-gray-900 leading-snug tracking-tight">
+          <h1 className="text-[20.8px] font-bold text-gray-900 leading-snug tracking-tight text-right">
             안녕하세요, {workerName || "..."} 님<br />
             <span className="text-blue-600">오늘의 작업</span>을 선택하세요.
           </h1>
@@ -89,7 +89,7 @@ export default function WorkerDashboard() {
           ].map((kpi) => (
             <div
               key={kpi.label}
-              className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)]"
+              className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] text-center"
             >
               <div className="text-[11px] font-bold text-gray-400 tracking-tight whitespace-nowrap">
                 {kpi.label}
@@ -105,13 +105,13 @@ export default function WorkerDashboard() {
           ))}
         </div>
 
-        {/* Hero 카드 — 입고·출고 (대형) */}
+        {/* Hero 카드 — 입고·출고 (대형, 중앙 정렬) */}
         <div className="grid grid-cols-2 gap-4">
           {heroItems.map((item) => (
             <button
               key={item.id}
               onClick={() => router.push(item.path)}
-              className="bg-white p-5 rounded-[24px] flex flex-col items-start gap-4 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100 min-h-[180px]"
+              className="bg-white p-5 rounded-[24px] flex flex-col items-center justify-center gap-2 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-center border border-transparent active:border-blue-100 min-h-[180px]"
             >
               <div
                 className="w-14 h-14 rounded-[20px] flex items-center justify-center shadow-inner"
@@ -119,7 +119,7 @@ export default function WorkerDashboard() {
               >
                 <item.Icon className="w-8 h-8 text-white" />
               </div>
-              <div className="mt-auto">
+              <div>
                 <h2 className="text-[18px] font-black text-gray-900 tracking-tight">{item.title}</h2>
                 <p className="text-[13px] text-gray-400 font-medium mt-1 tracking-tight break-keep">{item.desc}</p>
               </div>
