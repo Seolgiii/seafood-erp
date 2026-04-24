@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeftIcon } from '@heroicons/react/24/outline';
+import PageHeader from '@/components/PageHeader';
 import { createInventoryRecord, getMasterGuide } from '@/app/actions';
 import {
   getSeoulTodaySlash,
@@ -128,15 +128,13 @@ export default function InventoryRecordPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-10">
-      <div className="bg-white border-b px-4 py-4 flex items-center sticky top-0 z-10 shadow-sm">
-        <button type="button" onClick={() => router.push('/')} className="p-2 -ml-2 active:scale-95">
-          <ChevronLeftIcon className="w-6 h-6 text-gray-600" />
-        </button>
-        <div className="ml-2">
-          <h1 className="text-xl font-black text-gray-800">원물 입고 등록</h1>
+      <PageHeader
+        title="원물 입고 등록"
+        onBack={() => router.push('/')}
+        rightSlot={
           <p className="text-[10px] text-blue-500 font-bold">담당자: {workerName || "..."}</p>
-        </div>
-      </div>
+        }
+      />
 
       <div className="p-4">
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
@@ -151,7 +149,7 @@ export default function InventoryRecordPage() {
                 onChange={(e) => setBizDateInput(e.target.value)}
                 onBlur={handleDateBlur}
                 autoComplete="off"
-                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold"
+                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold"
                 required
               />
             </div>
@@ -164,7 +162,7 @@ export default function InventoryRecordPage() {
                 value={formData.productName}
                 onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
                 onBlur={handleProductNameBlur}
-                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold"
+                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold"
                 required
               />
             </div>
@@ -176,7 +174,7 @@ export default function InventoryRecordPage() {
                 value={formData.origin}
                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                 placeholder="예: 국내산, 러시아, 노르웨이"
-                className="w-full p-5 bg-blue-50 border-2 border-blue-100 rounded-2xl text-lg font-bold text-blue-700 focus:ring-2 focus:ring-blue-500"
+                className="w-full p-5 bg-blue-50 border-2 border-blue-100 rounded-2xl text-base font-bold text-blue-700 focus:ring-2 focus:ring-blue-500"
                 required
               />
               <p className="text-[10px] text-gray-400 ml-2">기본값 &apos;국내산&apos;입니다. 필요 시 직접 수정하세요.</p>
@@ -194,7 +192,7 @@ export default function InventoryRecordPage() {
                     const { display } = fromGroupedQtyInputAllowDecimal(e.target.value);
                     setFormData({ ...formData, spec: display });
                   }}
-                  className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold"
+                  className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold"
                   required
                 />
               </div>
@@ -209,7 +207,7 @@ export default function InventoryRecordPage() {
                     const { display } = fromGroupedIntegerInput(e.target.value);
                     setFormData({ ...formData, quantity: display });
                   }}
-                  className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold text-blue-600"
+                  className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold text-blue-600"
                   required
                 />
               </div>
@@ -226,7 +224,7 @@ export default function InventoryRecordPage() {
                   const { display } = fromGroupedIntegerInput(e.target.value);
                   setFormData({ ...formData, totalPrice: display });
                 }}
-                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold text-red-500"
+                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold text-red-500"
                 required
               />
             </div>
@@ -238,7 +236,7 @@ export default function InventoryRecordPage() {
                 placeholder={placeholder}
                 value={formData.count}
                 onChange={(e) => setFormData({ ...formData, count: e.target.value })}
-                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-lg font-bold"
+                className="w-full p-5 bg-gray-50 border-none rounded-2xl text-base font-bold"
               />
             </div>
 

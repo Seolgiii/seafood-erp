@@ -8,8 +8,8 @@ import {
   getProductOptions,
   getSupplierOptions,
 } from "@/app/actions";
-import { ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { readSession } from "@/lib/session";
+import PageHeader from "@/components/PageHeader";
 
 export default function InventoryRecordPage() {
   const router = useRouter();
@@ -165,32 +165,22 @@ export default function InventoryRecordPage() {
 
   return (
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10 font-['Spoqa_Han_Sans_Neo']">
-      <header className="bg-white px-4 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push("/")}
-            className="p-2 -ml-2 active:scale-95 transition-transform"
-          >
-            <ChevronLeftIcon className="w-6 h-6 text-gray-800" />
-          </button>
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-[18px] font-black tracking-tight text-[#3182F6]">
-              물품 입고
-            </h1>
-            <span className="text-[13px] font-medium text-gray-500 whitespace-nowrap">
-              어떤 물건이 들어왔나요?
-            </span>
+      <PageHeader
+        title="물품 입고"
+        subtitle="어떤 물건이 들어왔나요?"
+        onBack={() => router.push("/")}
+        titleClassName="text-[#3182F6] font-black"
+        rightSlot={
+          <div className="text-right leading-tight">
+            <p className="text-[10px] text-gray-500 font-medium">
+              {now ? now.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : ""}
+            </p>
+            <p className="text-[12px] font-bold text-gray-900">
+              {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""}
+            </p>
           </div>
-        </div>
-        <div className="text-right leading-tight">
-          <p className="text-[11px] text-gray-500 font-medium">
-            {now ? now.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : ""}
-          </p>
-          <p className="text-[14px] font-bold text-gray-900">
-            {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : ""}
-          </p>
-        </div>
-      </header>
+        }
+      />
 
       <main className="p-5 flex flex-col gap-5">
         <div className="bg-white p-6 rounded-[28px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-6">
@@ -210,7 +200,7 @@ export default function InventoryRecordPage() {
                   }}
                   onFocus={() => setItemOpen(true)}
                   placeholder="품목명 검색 또는 직접 입력"
-                  className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
                 {itemOpen && filteredProducts.length > 0 && (
                   <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
@@ -221,7 +211,7 @@ export default function InventoryRecordPage() {
                           e.preventDefault();
                           selectProduct(opt);
                         }}
-                        className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between"
+                        className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl flex items-center justify-between"
                       >
                         <span>{opt.name}</span>
                         {opt.category && (
@@ -258,7 +248,7 @@ export default function InventoryRecordPage() {
                   value={formData.spec}
                   onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
                   placeholder="예 : 10"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -268,7 +258,7 @@ export default function InventoryRecordPage() {
                   value={formData.count}
                   onChange={(e) => setFormData({ ...formData, count: e.target.value })}
                   placeholder="예 : 42/44미"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
             </div>
@@ -287,7 +277,7 @@ export default function InventoryRecordPage() {
                   value={formData.quantity}
                   onChange={(e) => handleNumberChange("quantity", e.target.value)}
                   placeholder="0"
-                  className="w-full bg-blue-50 text-[#3182F6] text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-blue-50 text-[#3182F6] text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
               <div className="flex flex-col gap-2">
@@ -298,7 +288,7 @@ export default function InventoryRecordPage() {
                   value={formData.price}
                   onChange={(e) => handleNumberChange("price", e.target.value)}
                   placeholder="0"
-                  className="w-full bg-gray-100 text-gray-900 text-[18px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
             </div>
@@ -323,7 +313,7 @@ export default function InventoryRecordPage() {
                     }}
                     onFocus={() => setSupplierOpen(true)}
                     placeholder="매입처 검색"
-                    className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                    className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                   />
                   {supplierOpen && filteredSuppliers.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
@@ -337,7 +327,7 @@ export default function InventoryRecordPage() {
                             setSupplierId(opt.id);
                             setSupplierOpen(false);
                           }}
-                          className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                          className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
                         >
                           {opt.name}
                         </li>
@@ -360,7 +350,7 @@ export default function InventoryRecordPage() {
                     }}
                     onFocus={() => setStorageOpen(true)}
                     placeholder="보관처 입력"
-                    className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                    className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                   />
                   {storageOpen && filteredStorage.length > 0 && (
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
@@ -373,7 +363,7 @@ export default function InventoryRecordPage() {
                             setFormData({ ...formData, storage: opt });
                             setStorageOpen(false);
                           }}
-                          className="px-4 py-3 text-[15px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
+                          className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
                         >
                           {opt}
                         </li>
@@ -392,7 +382,7 @@ export default function InventoryRecordPage() {
                   value={formData.origin}
                   onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                   placeholder="예 : 수입산, 러시아, 노르웨이"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
             ) : (
@@ -403,7 +393,7 @@ export default function InventoryRecordPage() {
                   value={formData.shipName}
                   onChange={(e) => setFormData({ ...formData, shipName: e.target.value })}
                   placeholder="선박명 입력 (없으면 비워두세요)"
-                  className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
                 />
               </div>
             )}
@@ -420,7 +410,7 @@ export default function InventoryRecordPage() {
                 value={buyerName}
                 onChange={(e) => setBuyerName(e.target.value)}
                 placeholder="매입자 입력"
-                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all"
               />
             </div>
 
@@ -430,7 +420,7 @@ export default function InventoryRecordPage() {
                 value={formData.remarks}
                 onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 placeholder="특이사항을 입력하세요"
-                className="w-full bg-gray-100 text-gray-900 text-[16px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]"
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]"
               />
             </div>
           </section>

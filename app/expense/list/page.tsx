@@ -1,9 +1,8 @@
 import React from 'react';
-import Link from 'next/link';
-import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { Receipt } from "lucide-react";
 import { PDFButton } from '@/components/PDFButton';
 import { ApprovalButtons } from '@/components/ApprovalButtons';
+import PageHeader from '@/components/PageHeader';
 import { isoDateToSlashDisplay } from '@/lib/inbound-date-input';
 
 async function getExpenses() {
@@ -35,16 +34,10 @@ export default async function ExpenseListPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen pb-20">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
-        <div className="px-4 py-4 flex items-center">
-          <Link href="/" className="p-2 -ml-2 shrink-0" aria-label="홈으로 돌아가기">
-            <ChevronLeftIcon className="w-6 h-6 text-gray-600" />
-          </Link>
-          <h1 className="text-xl font-black flex items-center gap-2 text-gray-900 ml-2">
-            <Receipt className="text-blue-600 shrink-0" size={26} /> 지출 내역 관리
-          </h1>
-        </div>
-      </header>
+      <PageHeader
+        title="지출 내역 관리"
+        rightSlot={<Receipt className="text-blue-600 shrink-0" size={20} />}
+      />
 
       <div className="max-w-md mx-auto p-4 space-y-4">
         {expenses.length === 0 ? (

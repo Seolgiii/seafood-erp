@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeftIcon, ShieldExclamationIcon } from "@heroicons/react/24/outline";
+import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
+import PageHeader from "@/components/PageHeader";
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
 import type { RequestItem } from "@/app/actions/my-requests";
@@ -216,7 +217,7 @@ export default function AdminDashboardPage() {
 
         {isExpense ? (
           <>
-            <h2 className="text-[19px] font-bold text-gray-900 tracking-tight min-w-0">
+            <h2 className="text-[17px] font-bold text-gray-900 tracking-tight min-w-0">
               건명 : {item.title || "-"}
             </h2>
             <div className="flex justify-between items-center gap-3 min-w-0">
@@ -243,7 +244,7 @@ export default function AdminDashboardPage() {
                 <span className="font-bold">미수 :</span> {item.misu || "-"}
               </p>
             </div>
-            <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
+            <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
             <div className="flex justify-between items-center gap-3 min-w-0">
               {item.lotNumber ? (
                 <p className="text-[15px] font-bold font-mono text-blue-700 tracking-tight break-all leading-snug min-w-0 flex-1">
@@ -268,13 +269,13 @@ export default function AdminDashboardPage() {
           <div className={`flex gap-3 ${isExpense ? "mt-1.5" : "mt-0.5"}`}>
             <button
               onClick={() => handleOpenReject(item)}
-              className="flex-1 bg-gray-100 text-gray-600 font-bold text-[16px] py-4 rounded-[16px] active:scale-95 transition-transform"
+              className="flex-1 bg-gray-100 text-gray-600 font-bold text-[15px] py-4 rounded-[16px] active:scale-95 transition-transform"
             >
               반려
             </button>
             <button
               onClick={() => handleApprove(item)}
-              className="flex-[2] bg-[#191F28] text-white font-bold text-[16px] py-4 rounded-[16px] active:scale-95 transition-transform"
+              className="flex-[2] bg-[#191F28] text-white font-bold text-[15px] py-4 rounded-[16px] active:scale-95 transition-transform"
             >
               승인
             </button>
@@ -326,17 +327,15 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10" style={{ fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'" }}>
-      <header className="bg-white px-4 py-4 flex items-center justify-between sticky top-0 z-10 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
-        <div className="flex items-center">
-          <Link href="/" className="p-2 -ml-2 shrink-0" aria-label="홈으로 돌아가기">
-            <ChevronLeftIcon className="w-6 h-6 text-gray-600" />
-          </Link>
-          <h1 className="text-[20px] font-bold text-gray-900 tracking-tight ml-2">결재 수신함</h1>
-        </div>
-        <div className="text-[13px] font-bold text-white bg-[#191F28] px-3 py-1.5 rounded-lg shadow-sm">
-          관리자 시스템
-        </div>
-      </header>
+      <PageHeader
+        title="결재 수신함"
+        onBack={() => router.push("/")}
+        rightSlot={
+          <div className="text-[11px] font-bold text-white bg-[#191F28] px-2.5 py-1 rounded-lg shadow-sm">
+            관리자 시스템
+          </div>
+        }
+      />
 
       <nav className="bg-white flex border-b border-gray-100">
         {[

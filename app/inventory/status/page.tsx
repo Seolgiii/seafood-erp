@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ChevronLeftIcon,
   FunnelIcon,
   XMarkIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import PageHeader from '@/components/PageHeader';
 import { LOT_FIELDS } from '@/lib/airtable-schema';
 import {
   formatLotSpecDisplayLine,
@@ -31,6 +31,7 @@ function lotProductTitle(fields: Record<string, unknown>): string {
 }
 
 export default function StockStatusPage() {
+  const router = useRouter();
   const [stocks, setStocks] = useState<LotStockRecord[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<LotStockRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,18 +104,18 @@ export default function StockStatusPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-10 relative" style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}>
       {/* 상단 헤더 */}
-      <div className="bg-white border-b px-4 py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center">
-          <Link href="/" className="p-2 -ml-2"><ChevronLeftIcon className="w-6 h-6 text-gray-600" /></Link>
-          <h1 className="text-lg font-bold text-gray-800 ml-2">실시간 재고 현황</h1>
-        </div>
-        <button
-          onClick={() => setIsFilterOpen(true)}
-          className="p-2 bg-blue-50 rounded-xl text-blue-600 active:scale-95 transition-all"
-        >
-          <FunnelIcon className="w-6 h-6" />
-        </button>
-      </div>
+      <PageHeader
+        title="실시간 재고 현황"
+        onBack={() => router.push('/')}
+        rightSlot={
+          <button
+            onClick={() => setIsFilterOpen(true)}
+            className="p-1.5 bg-blue-50 rounded-xl text-blue-600 active:scale-95 transition-all"
+          >
+            <FunnelIcon className="w-5 h-5" />
+          </button>
+        }
+      />
 
       {/* 재고 리스트 */}
       <div className="bg-white mt-2 px-4">
@@ -134,10 +135,10 @@ export default function StockStatusPage() {
               <div key={stock.id} className="py-3.5 border-b border-gray-300 last:border-0">
                 {/* 1줄: 품목명 + 총중량 */}
                 <div className="flex justify-between items-baseline gap-2">
-                  <p className="font-bold text-[16px] text-gray-900 truncate">
+                  <p className="font-bold text-[15px] text-gray-900 truncate">
                     {lotProductTitle(stock.fields)}
                   </p>
-                  <p className="shrink-0 text-[15px] font-bold text-blue-600">
+                  <p className="shrink-0 text-[14px] font-bold text-blue-600">
                     {stockKg.toLocaleString('ko-KR')} kg
                   </p>
                 </div>

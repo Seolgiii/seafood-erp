@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  ChevronLeftIcon,
   MagnifyingGlassIcon,
   QrCodeIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
+import PageHeader from '@/components/PageHeader';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
@@ -243,43 +243,22 @@ export default function OutboundRecordPage() {
   return (
     <main className="min-h-screen bg-gray-50 pb-32">
       {/* 헤더 */}
-      <header className="bg-white px-4 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push('/')}
-            className="p-2 -ml-2 active:scale-95 transition-transform"
-          >
-            <ChevronLeftIcon className="w-6 h-6 text-gray-800" />
-          </button>
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-[18px] font-black tracking-tight text-[#FF3B30]">물품 출고</h1>
-            <span className="text-[13px] font-medium text-gray-500 whitespace-nowrap">
-              어떤 물건이 출고되나요?
-            </span>
+      <PageHeader
+        title="물품 출고"
+        subtitle="어떤 물건이 출고되나요?"
+        onBack={() => router.push('/')}
+        titleClassName="text-[#FF3B30] font-black"
+        rightSlot={
+          <div className="text-right leading-tight">
+            <p className="text-[10px] text-gray-500 font-medium">
+              {now ? now.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : ''}
+            </p>
+            <p className="text-[12px] font-bold text-gray-900">
+              {now ? now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+            </p>
           </div>
-        </div>
-        <div className="text-right leading-tight">
-          <p className="text-[11px] text-gray-500 font-medium">
-            {now
-              ? now.toLocaleDateString('ko-KR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-              : ''}
-          </p>
-          <p className="text-[14px] font-bold text-gray-900">
-            {now
-              ? now.toLocaleTimeString('ko-KR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false,
-                })
-              : ''}
-          </p>
-        </div>
-      </header>
+        }
+      />
 
       <div className="p-4 space-y-4">
         {/* ── 검색 모드 탭 ──────────────────────────────────────────────── */}
@@ -324,7 +303,7 @@ export default function OutboundRecordPage() {
                   placeholder="예: 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center"
+                  className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-lg font-black text-center"
                 />
                 <button
                   type="submit"
@@ -388,7 +367,7 @@ export default function OutboundRecordPage() {
                   value={keyword}
                   readOnly={scannerOpen}
                   onChange={(e) => setKeyword(e.target.value)}
-                  className={`flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-xl font-black text-center transition-opacity ${
+                  className={`flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-lg font-black text-center transition-opacity ${
                     scannerOpen ? 'opacity-40 cursor-not-allowed' : ''
                   }`}
                 />
@@ -466,7 +445,7 @@ export default function OutboundRecordPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-400 ml-1">현재 남은 재고</label>
-                  <div className="w-full p-4 bg-gray-50 rounded-2xl text-base font-bold text-blue-600 text-left">
+                  <div className="w-full p-4 bg-gray-50 rounded-2xl text-[15px] font-bold text-blue-600 text-left">
                     {formatIntKo(Math.trunc(Number(selectedLot.fields['재고수량'] ?? 0)))}
                   </div>
                 </div>
@@ -482,14 +461,14 @@ export default function OutboundRecordPage() {
                       const { display } = fromGroupedIntegerInput(e.target.value);
                       setQuantity(display);
                     }}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-base font-bold text-red-600 focus:ring-2 focus:ring-red-500 text-left"
+                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-red-600 focus:ring-2 focus:ring-red-500 text-left"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-gray-400 ml-1">보관처</label>
-                <div className="w-full p-4 bg-gray-50 rounded-2xl text-base font-bold text-gray-700 text-left">
+                <div className="w-full p-4 bg-gray-50 rounded-2xl text-[15px] font-bold text-gray-700 text-left">
                   {String(selectedLot.fields['보관처'] ?? '').trim() || '—'}
                 </div>
               </div>
@@ -502,7 +481,7 @@ export default function OutboundRecordPage() {
                     placeholder="직접입력"
                     value={seller}
                     onChange={(e) => setSeller(e.target.value)}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-base font-bold text-gray-800 text-left"
+                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-gray-800 text-left"
                   />
                 </div>
                 <div className="space-y-2">
@@ -516,7 +495,7 @@ export default function OutboundRecordPage() {
                       const { display } = fromGroupedIntegerInput(e.target.value);
                       setSalePrice(display);
                     }}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-base font-bold text-gray-800 text-left"
+                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-gray-800 text-left"
                   />
                 </div>
               </div>

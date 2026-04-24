@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getMyRequests, cancelMyRequest } from "@/app/actions/my-requests";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession } from "@/lib/session";
+import PageHeader from "@/components/PageHeader";
 
 type TabKey = "ALL" | "EXPENSE" | "LOGISTICS" | "DONE";
 
@@ -125,7 +126,7 @@ export default function MyRequestsPage() {
         </p>
       </div>
 
-      <h2 className="text-[19px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
+      <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
 
       <div className="flex justify-between items-center gap-3 min-w-0">
         {item.lotNumber ? (
@@ -136,8 +137,8 @@ export default function MyRequestsPage() {
           <p className="text-[15px] font-mono text-gray-300 tracking-tight min-w-0 flex-1 leading-snug">LOT 미부여</p>
         )}
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-          <span className="text-[17.6px] font-bold text-gray-800">{qtyLabel(item)} :</span>
-          <span className="text-[17.6px] font-bold text-blue-600">{item.amountOrQuantity} BOX</span>
+          <span className="text-[15.6px] font-bold text-gray-800">{qtyLabel(item)} :</span>
+          <span className="text-[15.6px] font-bold text-blue-600">{item.amountOrQuantity} BOX</span>
         </div>
       </div>
 
@@ -173,7 +174,7 @@ export default function MyRequestsPage() {
           </span>
         </div>
 
-        <h2 className="text-[19px] font-bold text-gray-900 tracking-tight min-w-0">
+        <h2 className="text-[17px] font-bold text-gray-900 tracking-tight min-w-0">
           건명 : {item.title || "-"}
         </h2>
 
@@ -184,8 +185,8 @@ export default function MyRequestsPage() {
             <div className="min-w-0 flex-1" />
           )}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-            <span className="text-[17.6px] font-bold text-gray-800">금액 :</span>
-            <span className="text-[17.6px] font-bold text-[#191F28]">{item.amountOrQuantity}</span>
+            <span className="text-[15.6px] font-bold text-gray-800">금액 :</span>
+            <span className="text-[15.6px] font-bold text-[#191F28]">{item.amountOrQuantity}</span>
           </div>
         </div>
 
@@ -217,17 +218,7 @@ export default function MyRequestsPage() {
   return (
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10">
       {/* 상단 헤더 */}
-      <header className="bg-white px-5 py-4 flex items-center gap-3 sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
-        <button
-          onClick={() => router.back()}
-          className="w-10 h-10 flex items-center justify-center rounded-xl active:bg-gray-100 transition-colors -ml-2"
-        >
-          <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-            <path d="M15 19l-7-7 7-7" stroke="#191F28" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <h1 className="text-[20px] font-bold text-gray-900 tracking-tight">신청 내역</h1>
-      </header>
+      <PageHeader title="신청 내역" />
 
       {/* 탭 네비게이션 */}
       <nav className="bg-white flex border-b border-gray-100">

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeftIcon, PhotoIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, CheckIcon } from '@heroicons/react/24/outline';
+import PageHeader from '@/components/PageHeader';
 import { createExpenseRecord, getApplicantInfo } from '@/app/actions';
 import { fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
@@ -118,20 +119,20 @@ export default function NewExpensePage() {
 
   return (
     <main className="min-h-screen bg-[#F2F4F6] pb-10 font-['Spoqa_Han_Sans_Neo']">
-      <div className="bg-white border-b px-4 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center">
-          <button onClick={() => router.push('/')} className="p-2"><ChevronLeftIcon className="w-6 h-6" /></button>
-          <h1 className="text-xl font-bold ml-2">지출 결의서 작성</h1>
-        </div>
-        <div className="text-right leading-tight">
-          <p className="text-[11px] text-gray-500 font-medium">
-            {now ? now.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : ""}
-          </p>
-          <p className="text-[14px] font-bold text-gray-900">
-            {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : ""}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="지출 결의서 작성"
+        onBack={() => router.push('/')}
+        rightSlot={
+          <div className="text-right leading-tight">
+            <p className="text-[10px] text-gray-500 font-medium">
+              {now ? now.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : ""}
+            </p>
+            <p className="text-[12px] font-bold text-gray-900">
+              {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""}
+            </p>
+          </div>
+        }
+      />
 
       <div className="p-4 space-y-4">
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-[2rem] shadow-sm space-y-6">
