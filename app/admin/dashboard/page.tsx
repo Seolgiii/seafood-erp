@@ -340,7 +340,7 @@ export default function AdminDashboardPage() {
       className="min-h-screen bg-[#F2F4F6] flex flex-col"
       style={{
         fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'",
-        paddingBottom: "calc(56px + env(safe-area-inset-bottom))",
+        paddingBottom: "calc(88px + env(safe-area-inset-bottom))",
       }}
     >
       <PageHeader

@@ -219,7 +219,7 @@ export default function MyRequestsPage() {
   return (
     <div
       className="min-h-screen bg-[#F2F4F6] flex flex-col"
-      style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom))" }}
+      style={{ paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
     >
       {/* 상단 헤더 */}
       <PageHeader title="신청 내역" />

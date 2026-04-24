@@ -12,13 +12,13 @@ type BottomTabBarProps<K extends string> = {
 };
 
 /**
- * 토스 스타일 하단 탭바.
- * 선택된 탭은 파란 pill(#3B82F6) 배경 + 흰 글자로 강조되며,
- * activeKey 변화 시 pill이 탭 사이를 슬라이드 이동(CSS transition).
+ * 토스 스타일 floating 하단 탭바.
+ * 화면 바닥에서 떠있는 "섬"처럼 좌우·하단 16px margin + rounded-full + box-shadow.
+ * 선택된 탭은 파란 pill(#3B82F6)이 탭 영역으로 슬라이드 이동(CSS transition).
  * framer-motion 등 외부 애니메이션 라이브러리 미사용.
  *
- * 본문 컨테이너는 하단 탭바 높이만큼 padding-bottom이 필요하다:
- *   style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom))" }}
+ * 본문 컨테이너는 탭바 높이(≈52px) + 하단 margin(16px) + 여유 공간만큼 padding-bottom 필요:
+ *   style={{ paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
  */
 export default function BottomTabBar<K extends string>({
   tabs,
@@ -33,8 +33,8 @@ export default function BottomTabBar<K extends string>({
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed left-4 right-4 z-30 bg-white rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
+      style={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
       aria-label="하단 탭"
     >
       <div className="relative flex items-center p-1.5">
