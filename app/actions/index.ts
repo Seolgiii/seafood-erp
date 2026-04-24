@@ -7,3 +7,4 @@ export * from "./inventory/outbound";
 export * from "./admin/admin";
 export * from "./expense/expense";
 export * from "./my-requests";
+export * from "./dashboard";
