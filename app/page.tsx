@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowDownOnSquareIcon,
+  ArrowUpOnSquareIcon,
+  CubeIcon,
+  BanknotesIcon,
+  ClipboardDocumentListIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/solid";
 import { clearSession, readSession } from "@/lib/session";
 
 export default function WorkerDashboard() {
@@ -25,15 +33,15 @@ export default function WorkerDashboard() {
   };
 
   const heroItems = [
-    { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", icon: "📥", iconBg: "#3182F6", path: "/inventory/record" },
-    { id: "outbound", title: "물품 출고", desc: "바코드 즉시 출고", icon: "📤", iconBg: "#FF3B30", path: "/inventory/outbound" },
+    { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", Icon: ArrowDownOnSquareIcon, iconBg: "#3182F6", path: "/inventory/record" },
+    { id: "outbound", title: "물품 출고", desc: "바코드 즉시 출고", Icon: ArrowUpOnSquareIcon, iconBg: "#FF3B30", path: "/inventory/outbound" },
   ];
 
   const allSecondaryItems = [
-    { id: "status", title: "재고 조회", desc: "실시간 현장 재고", icon: "🔍", iconBg: "#8B95A1", path: "/inventory/status" },
-    { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", icon: "💳", iconBg: "#00D082", path: "/expense/new" },
-    { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", icon: "📋", iconBg: "#FF8C00", path: "/my-requests" },
-    { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", icon: "⚙️", iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
+    { id: "status", title: "재고 조회", desc: "실시간 현장 재고", Icon: CubeIcon, iconBg: "#8B95A1", path: "/inventory/status" },
+    { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", Icon: BanknotesIcon, iconBg: "#00D082", path: "/expense/new" },
+    { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", Icon: ClipboardDocumentListIcon, iconBg: "#FF8C00", path: "/my-requests" },
+    { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", Icon: ShieldCheckIcon, iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
   ];
 
   const secondaryItems = allSecondaryItems.filter(
@@ -74,10 +82,10 @@ export default function WorkerDashboard() {
               className="bg-white p-5 rounded-[24px] flex flex-col items-start gap-4 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-left border border-transparent active:border-blue-100 min-h-[180px]"
             >
               <div
-                className="w-14 h-14 rounded-[20px] flex items-center justify-center text-3xl shadow-inner"
+                className="w-14 h-14 rounded-[20px] flex items-center justify-center shadow-inner"
                 style={{ backgroundColor: item.iconBg }}
               >
-                {item.icon}
+                <item.Icon className="w-8 h-8 text-white" />
               </div>
               <div className="mt-auto">
                 <h2 className="text-[18px] font-black text-gray-900 tracking-tight">{item.title}</h2>
@@ -96,10 +104,10 @@ export default function WorkerDashboard() {
               className="bg-white p-4 rounded-[20px] flex items-center gap-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] active:scale-[0.97] transition-transform text-left"
             >
               <div
-                className="w-10 h-10 rounded-[14px] flex items-center justify-center text-xl shadow-inner shrink-0"
+                className="w-10 h-10 rounded-[14px] flex items-center justify-center shadow-inner shrink-0"
                 style={{ backgroundColor: item.iconBg }}
               >
-                {item.icon}
+                <item.Icon className="w-5 h-5 text-white" />
               </div>
               <div className="min-w-0">
                 <h2 className="text-[14px] font-bold text-gray-900 tracking-tight truncate">{item.title}</h2>
