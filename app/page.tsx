@@ -74,7 +74,7 @@ export default function WorkerDashboard() {
       <main className="flex-1 p-5 flex flex-col gap-4">
         {/* 환영 메시지 */}
         <section className="py-0">
-          <h1 className="text-[20.8px] font-bold text-gray-900 leading-snug tracking-tight text-right">
+          <h1 className="text-[20.8px] font-bold text-gray-900 leading-snug tracking-tight">
             안녕하세요, {workerName || "..."} 님<br />
             <span className="text-blue-600">오늘의 작업</span>을 선택하세요.
           </h1>
@@ -111,7 +111,7 @@ export default function WorkerDashboard() {
             <button
               key={item.id}
               onClick={() => router.push(item.path)}
-              className="bg-white p-5 rounded-[24px] flex flex-col items-center justify-center gap-2 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-center border border-transparent active:border-blue-100 min-h-[180px]"
+              className="bg-white p-5 rounded-[24px] flex flex-col items-center justify-center gap-2 shadow-[0_8px_24px_rgba(149,157,165,0.08)] active:scale-[0.96] transition-transform text-center border border-transparent active:border-blue-100 aspect-[4/3]"
             >
               <div
                 className="w-14 h-14 rounded-[20px] flex items-center justify-center shadow-inner"
