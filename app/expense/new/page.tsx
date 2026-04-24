@@ -163,18 +163,33 @@ export default function NewExpensePage() {
               <input type="text" placeholder="예 : 사용처 혹은 목적" value={formData.description} onChange={(e)=>setFormData({...formData, description:e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold" required />
             </div>
 
-            <div className="flex flex-row flex-wrap items-stretch gap-3">
-              <div className="w-1/2 shrink-0 min-w-0">
+            <div>
+              <div className="flex items-center justify-between">
                 <label className="text-sm font-bold text-gray-600">결제 금액</label>
-                <input type="text" value={formData.amount} onChange={(e)=>setFormData({...formData, amount: fromGroupedIntegerInput(e.target.value).display})} className="mt-1 w-full p-4 bg-gray-50 rounded-xl font-black text-blue-600" required />
+                <label className="flex cursor-pointer items-center gap-1.5 active:scale-95 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={formData.isCorpCard}
+                    onChange={(e) => setFormData({ ...formData, isCorpCard: e.target.checked })}
+                    className="hidden"
+                  />
+                  <div
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 ${
+                      formData.isCorpCard ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'
+                    }`}
+                  >
+                    {formData.isCorpCard && <CheckIcon className="h-3.5 w-3.5 text-white" />}
+                  </div>
+                  <span className="text-[13px] font-bold text-gray-700 whitespace-nowrap">법인카드</span>
+                </label>
               </div>
-              <label className="flex min-h-0 min-w-[10rem] flex-1 cursor-pointer items-center justify-center gap-3 active:scale-95 transition-all">
-                <input type="checkbox" checked={formData.isCorpCard} onChange={(e)=>setFormData({...formData, isCorpCard: e.target.checked})} className="hidden" />
-                <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${formData.isCorpCard ? 'border-blue-600 bg-blue-600' : 'border-gray-300 bg-white'}`}>
-                  {formData.isCorpCard && <CheckIcon className="h-4 w-4 text-white" />}
-                </div>
-                <span className="font-bold text-gray-700">법인카드 사용여부</span>
-              </label>
+              <input
+                type="text"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: fromGroupedIntegerInput(e.target.value).display })}
+                className="mt-1 w-full p-4 bg-gray-50 rounded-xl font-black text-blue-600"
+                required
+              />
             </div>
 
             <div>
