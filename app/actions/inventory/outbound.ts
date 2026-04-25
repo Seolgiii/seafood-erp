@@ -161,11 +161,12 @@ async function getInboundRemainingQty(
 }
 
 /**
- * [출고용] LOT 번호 또는 키워드로 재고 검색
+ * [출고용] LOT 일련번호 또는 품목명으로 재고 검색
  *
- * 출고 신청 화면에서 직원이 검색어를 입력하면 이 함수가 호출됩니다.
- * LOT번호, 품목명, 원산지 중 하나라도 검색어가 포함되면 결과에 포함됩니다.
- * 재고수량이 0인 항목은 이미 소진된 것이므로 결과에서 제외합니다.
+ * LOT번호 형식이 "YYMMDD-품목코드-규격-[미수-]일련번호"이므로
+ * 규격 등 중간 토큰의 우연 매칭을 막기 위해 LOT번호의 끝 일련번호(연속 숫자)에서만 substring 매칭합니다.
+ * 품목명은 일반 substring 매칭. 둘 중 하나라도 포함되면 결과에 들어옵니다.
+ * 재고수량이 0인 항목은 결과에서 제외합니다.
  */
 export async function searchLotByKeyword(keyword: string) {
   try {
@@ -174,9 +175,11 @@ export async function searchLotByKeyword(keyword: string) {
       return { success: false, records: [], error: "서버 환경 설정 오류" };
     }
     const tableName = encodeURIComponent("LOT별 재고");
-    // OR 조건: LOT번호, 품목명, 원산지 중 하나라도 키워드 포함 시 조회
+    // Airtable formula 문자열 안전화: 백슬래시·작은따옴표 이스케이프
+    const escaped = keyword.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const formula = `OR(FIND('${escaped}',REGEX_EXTRACT({LOT번호},'[0-9]+$')),FIND('${escaped}',{품목명}))`;
     const response = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=FIND('${keyword}', {LOT번호})`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tableName}?filterByFormula=${encodeURIComponent(formula)}`,
       {
         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
         next: { revalidate: 0 }

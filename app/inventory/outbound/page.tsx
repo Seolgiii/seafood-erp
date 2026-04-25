@@ -203,9 +203,17 @@ export default function OutboundRecordPage() {
       },
     ]);
 
-    resetForm();
-    // 바코드 모드면 스캐너 다시 열기
-    if (searchMode === 'barcode' && hasCamera) setScannerOpen(true);
+    if (searchMode === 'manual') {
+      // 직접 검색: 검색결과·키워드는 유지하고 입력값만 초기화 → 같은 리스트에서 다음 LOT 선택
+      setSelectedLot(null);
+      setQuantity('');
+      setSeller('');
+      setSalePrice('');
+      hasLoggedSelectedLotRef.current = false;
+    } else {
+      resetForm();
+      if (hasCamera) setScannerOpen(true);
+    }
   };
 
   // ── 출고 신청 ─────────────────────────────────────────────────────────────
@@ -294,13 +302,13 @@ export default function OutboundRecordPage() {
           {searchMode === 'manual' && !selectedLot && (
             <form onSubmit={handleSearch} className="space-y-3">
               <label className="text-sm font-bold text-gray-400 ml-1">
-                LOT 번호 검색 (뒷 4자리 또는 전체)
+                품목명 또는 LOT 번호
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   autoFocus
-                  placeholder="예: 0001"
+                  placeholder="예: 고등어, 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-lg font-black text-center"
