@@ -346,7 +346,7 @@ export async function getMyRequests(
   // 입고관리는 추가로 기존 재고 마이그레이션 데이터(비고="기존 재고") 제외
   const PENDING = `OR({승인상태} = "승인 대기", {승인상태} = "최종 승인 대기")`;
   const within2w = (field: string) => `IS_AFTER({${field}}, DATEADD(TODAY(), -14, 'days'))`;
-  const inboundFilter = `AND({비고} != "기존 재고", OR(${PENDING}, ${within2w("입고일")}))`;
+  const inboundFilter = `AND(NOT({비고} = "기존 재고"), OR(${PENDING}, ${within2w("입고일")}))`;
   const outboundFilter = `OR(${PENDING}, ${within2w("출고일")})`;
   const expenseFilter = `OR(${PENDING}, ${within2w("작성일")})`;
 
@@ -357,13 +357,35 @@ export async function getMyRequests(
     fetchAirtableRecords("지출결의", expenseFilter),
   ]);
 
+  // 코드 레벨 이중 필터: Airtable 쿼리 필터가 불안정한 경우 대비
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const isPending = (f: Record<string, unknown>) => {
+    const s = String(f["승인상태"] ?? "");
+    return s === "승인 대기" || s === "최종 승인 대기";
+  };
+  const filteredInbound = inboundRaw.filter((r) => {
+    if (String(r.fields["비고"] ?? "") === "기존 재고") return false;
+    if (isPending(r.fields)) return true;
+    return String(r.fields["입고일"] ?? "") >= cutoffStr;
+  });
+  const filteredOutbound = outboundRaw.filter((r) => {
+    if (isPending(r.fields)) return true;
+    return String(r.fields["출고일"] ?? "") >= cutoffStr;
+  });
+  const filteredExpense = expenseRaw.filter((r) => {
+    if (isPending(r.fields)) return true;
+    return String(r.fields["작성일"] ?? r.fields["지출일"] ?? "") >= cutoffStr;
+  });
+
   // ── 1단계: 링크 rec id 수집(룩업 문자열 제외, 필드명 후보만) ──
   // 뒤이어 이름 일괄 조회를 위해 먼저 모든 링크 ID를 수집
   const workerIds: string[] = [];
   const productIds: string[] = [];
   const lotIds: string[] = [];
 
-  for (const r of [...inboundRaw, ...outboundRaw]) {
+  for (const r of [...filteredInbound, ...filteredOutbound]) {
     const w = firstRecordIdFromFields(r.fields, WORKER_LINK_FIELD_CANDIDATES);
     if (w.id) workerIds.push(w.id);
     const p = firstRecordIdFromFields(r.fields, PRODUCT_LINK_FIELD_CANDIDATES);
@@ -372,7 +394,7 @@ export async function getMyRequests(
     if (lId) lotIds.push(lId);
   }
 
-  for (const r of expenseRaw) {
+  for (const r of filteredExpense) {
     const w = firstRecordIdFromFields(r.fields, APPLICANT_LINK_FIELD_CANDIDATES);
     if (w.id) workerIds.push(w.id);
   }
@@ -397,7 +419,7 @@ export async function getMyRequests(
   const items: RequestItem[] = [];
 
   // ── 입고 관리 레코드 처리 ──
-  for (const r of inboundRaw) {
+  for (const r of filteredInbound) {
     const f = r.fields;
 
     // 신청자(작업자) 링크 ID를 추출하고, 이름 맵에서 실제 이름을 조회
@@ -463,13 +485,13 @@ export async function getMyRequests(
   // 출고 레코드에서 품목명을 찾기 위한 보조 맵 구성
   // 출고 → 입고 링크 → 품목마스터 경로로 품목명을 추적할 때 사용
   const inboundProductMap: Record<string, string> = {};
-  for (const r of inboundRaw) {
+  for (const r of filteredInbound) {
     const p = firstRecordIdFromFields(r.fields, PRODUCT_LINK_FIELD_CANDIDATES);
     if (p.id) inboundProductMap[r.id] = p.id;
   }
 
   // ── 출고 관리 레코드 처리 ──
-  for (const r of outboundRaw) {
+  for (const r of filteredOutbound) {
     const f = r.fields;
 
     // 신청자(작업자) 링크 ID로 이름 조회
@@ -552,7 +574,7 @@ export async function getMyRequests(
   }
 
   // ── 지출결의 레코드 처리 ──
-  for (const r of expenseRaw) {
+  for (const r of filteredExpense) {
     const f = r.fields;
     // 지출결의는 '신청자' 필드가 작업자 링크
     const wLink = firstRecordIdFromFields(f, APPLICANT_LINK_FIELD_CANDIDATES);
