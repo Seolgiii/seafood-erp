@@ -64,24 +64,21 @@ export default function WorkerDashboard() {
       {/* 상단 헤더 */}
       <header className="bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
         <h1 className="text-[20px] font-black text-[#3182F6] tracking-tight">SEAERP</h1>
-        <button
-          onClick={handleLogout}
-          className="bg-[#FF4545] text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-transform text-sm"
-        >
-          로그아웃
-        </button>
+        <div className="flex items-center gap-2">
+          {workerName && (
+            <span className="text-[13px] font-bold text-gray-500">{workerName}</span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="bg-[#FF4545] text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-transform text-sm"
+          >
+            로그아웃
+          </button>
+        </div>
       </header>
 
       {/* 메인 콘텐츠 영역 */}
       <main className="flex-1 p-5 flex flex-col gap-4">
-        {/* 환영 메시지 */}
-        <section className="py-0">
-          <h1 className="text-[20.8px] font-bold text-gray-900 leading-snug tracking-tight">
-            안녕하세요, {workerName || "..."} 님<br />
-            <span className="text-blue-600">오늘의 작업</span>을 선택하세요.
-          </h1>
-        </section>
-
         {/* KPI 스트립 — 오늘의 요약 */}
         <div className="grid grid-cols-3 gap-2">
           {[
