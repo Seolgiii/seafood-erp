@@ -450,9 +450,8 @@ export async function getStorageOptions(): Promise<{ id: string; name: string }[
       return [];
     }
     const data = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data.records ?? [])
-      .map((r: any) => ({ id: r.id, name: String(r.fields?.["보관처명"] ?? "") }))
+      .map((r: { id: string; fields?: Record<string, unknown> }) => ({ id: r.id, name: String(r.fields?.["보관처명"] ?? "") }))
       .filter((o: { id: string; name: string }) => o.name);
   } catch (e) {
     console.error("[getStorageOptions] 예외:", e);
