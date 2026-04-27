@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#3182F6',
+  themeColor: '#F2F4F6',
 };
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-50 text-gray-900 min-h-screen">
+      <body className="bg-[#F2F4F6] text-gray-900 min-h-screen">
         <ServiceWorker />
         <SessionGuard>{children}</SessionGuard>
       </body>
