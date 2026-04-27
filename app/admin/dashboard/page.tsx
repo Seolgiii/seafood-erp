@@ -34,6 +34,7 @@ const TYPE_BADGE: Record<string, { bg: string; label: string }> = {
   INBOUND: { bg: "bg-[#3182F6]/10 text-[#3182F6]", label: "물품 입고" },
   OUTBOUND: { bg: "bg-[#5061FF]/10 text-[#5061FF]", label: "물품 출고" },
   EXPENSE: { bg: "bg-[#00D082]/10 text-[#00D082]", label: "지출 신청" },
+  TRANSFER: { bg: "bg-orange-100 text-orange-600", label: "재고 이동" },
 };
 
 function formatSubmittedAt(iso?: string): string | null {
@@ -95,7 +96,7 @@ export default function AdminDashboardPage() {
     if (!pending) return false;
     if (activeTab === "ALL") return true;
     if (activeTab === "EXPENSE") return item.type === "EXPENSE";
-    if (activeTab === "LOGISTICS") return item.type === "INBOUND" || item.type === "OUTBOUND";
+    if (activeTab === "LOGISTICS") return item.type === "INBOUND" || item.type === "OUTBOUND" || item.type === "TRANSFER";
     return true;
   });
 
@@ -178,6 +179,7 @@ export default function AdminDashboardPage() {
     const uiState = uiOverrides[item.id];
     const b = badge(item.type);
     const isExpense = item.type === "EXPENSE";
+    const isTransfer = item.type === "TRANSFER";
     const description = isExpense ? String(item.raw["적요"] ?? "") : "";
     const displayStatus =
       uiState === "COMPLETED" ? "승인 완료" :
@@ -246,19 +248,26 @@ export default function AdminDashboardPage() {
           </>
         ) : (
           <>
-            <div className="flex gap-3">
-              <p className="text-[14px] text-gray-700">
-                <span className="font-bold">규격 :</span> {item.spec || "-"}
+            {!isTransfer && (
+              <div className="flex gap-3">
+                <p className="text-[14px] text-gray-700">
+                  <span className="font-bold">규격 :</span> {item.spec || "-"}
+                </p>
+                <p className="text-[14px] text-gray-700">
+                  <span className="font-bold">미수 :</span> {item.misu || "-"}
+                </p>
+              </div>
+            )}
+            {isTransfer && (
+              <p className="text-[13px] text-gray-500">
+                <span className="font-bold">이동일 :</span> {item.date || "-"}
               </p>
-              <p className="text-[14px] text-gray-700">
-                <span className="font-bold">미수 :</span> {item.misu || "-"}
-              </p>
-            </div>
+            )}
             <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
             <div className="flex justify-between items-center gap-3 min-w-0">
               {item.lotNumber ? (
                 <p className="text-[15px] font-bold font-mono text-blue-700 tracking-tight break-all leading-snug min-w-0 flex-1">
-                  {item.lotNumber}
+                  {isTransfer ? `원본: ${item.lotNumber}` : item.lotNumber}
                 </p>
               ) : (
                 <p className="text-[15px] font-mono text-gray-300 tracking-tight min-w-0 flex-1 leading-snug">
@@ -267,7 +276,7 @@ export default function AdminDashboardPage() {
               )}
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                 <span className="text-[17.6px] font-bold text-gray-800">
-                  {item.type === "INBOUND" ? "입고 수량" : "출고 수량"} :
+                  {item.type === "INBOUND" ? "입고 수량" : item.type === "TRANSFER" ? "이동 수량" : "출고 수량"} :
                 </span>
                 <span className="text-[17.6px] font-bold text-blue-600">{item.amountOrQuantity} BOX</span>
               </div>

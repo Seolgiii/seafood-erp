@@ -31,6 +31,7 @@ const TYPE_BADGE: Record<string, { bg: string; label: string }> = {
   INBOUND: { bg: "bg-[#3182F6]/10 text-[#3182F6]", label: "물품 입고" },
   OUTBOUND: { bg: "bg-[#5061FF]/10 text-[#5061FF]", label: "물품 출고" },
   EXPENSE: { bg: "bg-[#00D082]/10 text-[#00D082]", label: "지출 신청" },
+  TRANSFER: { bg: "bg-orange-100 text-orange-600", label: "재고 이동" },
 };
 
 function formatSubmittedAt(iso?: string): string | null {
@@ -76,7 +77,7 @@ export default function MyRequestsPage() {
     if (!isPending) return false;
     if (activeTab === "ALL") return true;
     if (activeTab === "EXPENSE") return item.type === "EXPENSE";
-    if (activeTab === "LOGISTICS") return item.type === "INBOUND" || item.type === "OUTBOUND";
+    if (activeTab === "LOGISTICS") return item.type === "INBOUND" || item.type === "OUTBOUND" || item.type === "TRANSFER";
     return true;
   });
 
@@ -100,39 +101,57 @@ export default function MyRequestsPage() {
     setCancellingId(null);
   };
 
-  const isInbound = (t: string) => t === "INBOUND";
-  const qtyLabel = (item: RequestItem) =>
-    isInbound(item.type) ? "입고 수량" : "출고 수량";
-  const cancelLabel = (item: RequestItem) =>
-    isInbound(item.type) ? "입고 신청 취소" : "출고 신청 취소";
+  const qtyLabel = (item: RequestItem) => {
+    if (item.type === "INBOUND") return "입고 수량";
+    if (item.type === "TRANSFER") return "이동 수량";
+    return "출고 수량";
+  };
+  const cancelLabel = (item: RequestItem) => {
+    if (item.type === "INBOUND") return "입고 신청 취소";
+    if (item.type === "TRANSFER") return "이동 신청 취소";
+    return "출고 신청 취소";
+  };
 
-  // --- 입/출고 카드 (여백·타이포: 관리자 시스템 카드와 통일) ---
-  const LogisticsCard = ({ item }: { item: RequestItem }) => (
+  // --- 입/출고/이동 카드 (여백·타이포: 관리자 시스템 카드와 통일) ---
+  const LogisticsCard = ({ item }: { item: RequestItem }) => {
+    const isTransfer = item.type === "TRANSFER";
+    const badge = TYPE_BADGE[item.type] ?? { bg: "bg-gray-100 text-gray-700", label: "기타" };
+    return (
     <div className="bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-1">
       <div className="flex justify-between items-center gap-2">
-        <p className="text-[14px] text-gray-500 min-w-0">
-          <span className="font-bold">접수 시간 :</span> {formatSubmittedAt(item.createdTime) ?? "-"}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`shrink-0 text-[12px] font-bold px-2.5 py-1 rounded-md ${badge.bg}`}>{badge.label}</span>
+          <p className="text-[14px] text-gray-500 min-w-0">
+            <span className="font-bold">접수 :</span> {formatSubmittedAt(item.createdTime) ?? "-"}
+          </p>
+        </div>
         <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[item.status]}`}>
           {item.status}
         </span>
       </div>
 
-      <div className="flex gap-3">
-        <p className="text-[14px] text-gray-700">
-          <span className="font-bold">규격 :</span> {item.spec || "-"}
+      {!isTransfer && (
+        <div className="flex gap-3">
+          <p className="text-[14px] text-gray-700">
+            <span className="font-bold">규격 :</span> {item.spec || "-"}
+          </p>
+          <p className="text-[14px] text-gray-700">
+            <span className="font-bold">미수 :</span> {item.misu || "-"}
+          </p>
+        </div>
+      )}
+      {isTransfer && (
+        <p className="text-[13px] text-gray-500">
+          <span className="font-bold">이동일 :</span> {item.date || "-"}
         </p>
-        <p className="text-[14px] text-gray-700">
-          <span className="font-bold">미수 :</span> {item.misu || "-"}
-        </p>
-      </div>
+      )}
 
       <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{item.title || "-"}</h2>
 
       <div className="flex justify-between items-center gap-3 min-w-0">
         {item.lotNumber ? (
           <p className="text-[15px] font-bold font-mono text-blue-700 tracking-tight break-all leading-snug min-w-0 flex-1">
-            {item.lotNumber}
+            {isTransfer ? `원본: ${item.lotNumber}` : item.lotNumber}
           </p>
         ) : (
           <p className="text-[15px] font-mono text-gray-300 tracking-tight min-w-0 flex-1 leading-snug">LOT 미부여</p>
@@ -160,6 +179,7 @@ export default function MyRequestsPage() {
       )}
     </div>
   );
+  };
 
   // --- 지출결의 카드 (여백·레이아웃: 관리자 시스템 지출 카드와 통일) ---
   const ExpenseCard = ({ item }: { item: RequestItem }) => {

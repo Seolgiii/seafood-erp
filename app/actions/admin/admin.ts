@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { getMyRequests } from "../my-requests";
 import type { RequestItem } from "../my-requests";
+import { approveTransfer } from "../inventory/transfer";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { seoulDateString } from "@/lib/date";
 import {
@@ -30,11 +31,12 @@ const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 // 결재 대기 중인 상태값 목록 (이 상태인 건만 관리자 대시보드에 표시)
 const PENDING_STATUSES: string[] = ["승인 대기", "최종 승인 대기"];
 
-// 신청 유형(EXPENSE/INBOUND/OUTBOUND) → Airtable 테이블명 매핑
+// 신청 유형(EXPENSE/INBOUND/OUTBOUND/TRANSFER) → Airtable 테이블명 매핑
 const TABLE_MAP: Record<string, string> = {
   EXPENSE: "지출결의",
   INBOUND: "입고 관리",
   OUTBOUND: "출고 관리",
+  TRANSFER: "재고 이동",
 };
 
 /**
@@ -513,7 +515,7 @@ async function deductStockOnOutboundApproval(
  */
 export async function updateApprovalStatus(
   recordId: string,
-  type: "INBOUND" | "OUTBOUND" | "EXPENSE",
+  type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER",
   newStatus: string,
   rejectReason: string = "",
 ): Promise<{ success: boolean; message?: string }> {
@@ -541,6 +543,14 @@ export async function updateApprovalStatus(
     const deductResult = await deductStockOnOutboundApproval(recordId);
     if (!deductResult.success) {
       return { success: false, message: deductResult.message };
+    }
+  }
+
+  // 재고 이동 승인 시 새 LOT 생성 + 원본 재고 차감
+  if (type === "TRANSFER" && newStatus === "승인 완료") {
+    const transferResult = await approveTransfer(recordId);
+    if (!transferResult.success) {
+      return { success: false, message: transferResult.message };
     }
   }
 

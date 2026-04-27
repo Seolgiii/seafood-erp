@@ -42,7 +42,7 @@ function tableSegmentForUrl(tableName: string): string {
  */
 export type RequestItem = {
   id: string;
-  type: "INBOUND" | "OUTBOUND" | "EXPENSE"; // 신청 유형
+  type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER"; // 신청 유형
   title: string;                             // 표시 제목 (품목명 또는 건명)
   date: string;                              // 신청 날짜
   status: "승인 대기" | "승인 완료" | "반려" | "취소" | "최종 승인 대기";
@@ -349,12 +349,14 @@ export async function getMyRequests(
   const inboundFilter = `AND(NOT({비고} = "기존 재고"), OR(${PENDING}, ${within2w("입고일")}))`;
   const outboundFilter = `OR(${PENDING}, ${within2w("출고일")})`;
   const expenseFilter = `OR(${PENDING}, ${within2w("작성일")})`;
+  const transferFilter = `OR({승인상태} = "승인 대기", ${within2w("이동일")})`;
 
-  // 세 테이블을 동시에 조회 (순서대로 기다리지 않고 병렬 실행으로 속도 최적화)
-  const [inboundRaw, outboundRaw, expenseRaw] = await Promise.all([
+  // 네 테이블을 동시에 조회 (병렬 실행으로 속도 최적화)
+  const [inboundRaw, outboundRaw, expenseRaw, transferRaw] = await Promise.all([
     fetchAirtableRecords("입고 관리", inboundFilter),
     fetchAirtableRecords("출고 관리", outboundFilter),
     fetchAirtableRecords("지출결의", expenseFilter),
+    fetchAirtableRecords("재고 이동", transferFilter, "이동일"),
   ]);
 
   // 코드 레벨 이중 필터: Airtable 쿼리 필터가 불안정한 경우 대비
@@ -378,12 +380,17 @@ export async function getMyRequests(
     if (isPending(r.fields)) return true;
     return String(r.fields["작성일"] ?? r.fields["지출일"] ?? "") >= cutoffStr;
   });
+  const filteredTransfer = transferRaw.filter((r) => {
+    if (isPending(r.fields)) return true;
+    return String(r.fields["이동일"] ?? "") >= cutoffStr;
+  });
 
   // ── 1단계: 링크 rec id 수집(룩업 문자열 제외, 필드명 후보만) ──
   // 뒤이어 이름 일괄 조회를 위해 먼저 모든 링크 ID를 수집
   const workerIds: string[] = [];
   const productIds: string[] = [];
   const lotIds: string[] = [];
+  const transferLotIds: string[] = [];
 
   for (const r of [...filteredInbound, ...filteredOutbound]) {
     const w = firstRecordIdFromFields(r.fields, WORKER_LINK_FIELD_CANDIDATES);
@@ -399,12 +406,20 @@ export async function getMyRequests(
     if (w.id) workerIds.push(w.id);
   }
 
+  for (const r of filteredTransfer) {
+    const w = firstRecordIdFromFields(r.fields, WORKER_LINK_FIELD_CANDIDATES);
+    if (w.id) workerIds.push(w.id);
+    const tLotId = firstRecordId(r.fields["원본 LOT 번호"]);
+    if (tLotId) transferLotIds.push(tLotId);
+  }
+
   // ── 2단계: 배치 조회(작업자명·품목명·LOT) + 링크 id 단건 보강 ──
   // ID 목록으로 이름을 한꺼번에 조회 (10개씩 묶어서 처리)
-  const [workerMap, productMap, lotMap] = await Promise.all([
+  const [workerMap, productMap, lotMap, transferLotMap] = await Promise.all([
     batchResolveNames(workerTablePath, workerIds, WORKER_FIELDS.name),
     batchResolveNames(productTablePath, productIds, PRODUCT_FIELDS.name),
     batchResolveNames("입고 관리", lotIds, "LOT번호"),
+    batchResolveNames("LOT별 재고", transferLotIds, "LOT번호"),
   ]);
 
   // 배치 조회에서 빠진 항목은 개별 조회로 보완
@@ -615,7 +630,38 @@ export async function getMyRequests(
     });
   }
 
-  console.log("[getMyRequests] 최종 합계:", items.length, "건 (입고:", inboundRaw.length, "/ 출고:", outboundRaw.length, "/ 지출:", expenseRaw.length, ")");
+  // ── 재고 이동 레코드 처리 ──
+  for (const r of filteredTransfer) {
+    const f = r.fields;
+    const wLink = firstRecordIdFromFields(f, WORKER_LINK_FIELD_CANDIDATES);
+    const wId = wLink.id;
+    const requester = wId ? (workerMap[wId] ?? "") : "";
+    const passReq = passesRequesterFilter(requesterWorkerId, requesterName, wId, requester);
+    if (!passReq) continue;
+
+    const originalLotId = firstRecordId(f["원본 LOT 번호"]);
+    const lotNumber = originalLotId ? (transferLotMap[originalLotId] ?? "") : "";
+
+    const rawStatus = String(f["승인상태"] ?? "승인 대기").trim();
+    const status = normalizeStatus(rawStatus);
+    const 이동수량 = Number(f["이동수량"] ?? 0);
+
+    items.push({
+      id: r.id,
+      type: "TRANSFER",
+      title: "재고 이동",
+      date: String(f["이동일"] ?? "").slice(0, 10),
+      status,
+      amountOrQuantity: 이동수량 > 0 ? String(이동수량) : "-",
+      requester,
+      createdTime: r.createdTime,
+      rejectReason: String(f["반려사유"] ?? ""),
+      lotNumber,
+      raw: f,
+    });
+  }
+
+  console.log("[getMyRequests] 최종 합계:", items.length, "건 (입고:", inboundRaw.length, "/ 출고:", outboundRaw.length, "/ 지출:", expenseRaw.length, "/ 이동:", transferRaw.length, ")");
   // Airtable createdTime 기준 내림차순 정렬 (최신 신청 건이 위에 표시)
   items.sort((a, b) => sortTimestamp(b) - sortTimestamp(a));
   return items;
@@ -629,7 +675,7 @@ export async function getMyRequests(
  * 승인이 완료된 건은 취소할 수 없습니다(Airtable에서 상태를 바꾸면 되지만,
  * 이 함수는 단순히 상태를 "취소"로 업데이트할 뿐 추가 검증은 하지 않습니다).
  */
-export async function cancelMyRequest(recordId: string, type: "INBOUND" | "OUTBOUND" | "EXPENSE") {
+export async function cancelMyRequest(recordId: string, type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER") {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 설정이 누락되었습니다." };
   }
@@ -639,6 +685,7 @@ export async function cancelMyRequest(recordId: string, type: "INBOUND" | "OUTBO
     EXPENSE: "지출결의",
     INBOUND: "입고 관리",
     OUTBOUND: "출고 관리",
+    TRANSFER: "재고 이동",
   };
   const tableName = tableMap[type] ?? "입고 관리";
 

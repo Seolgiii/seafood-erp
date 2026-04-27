@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowDownOnSquareIcon,
   ArrowUpOnSquareIcon,
+  ArrowsRightLeftIcon,
   CubeIcon,
   BanknotesIcon,
   ClipboardDocumentListIcon,
@@ -45,9 +46,10 @@ export default function WorkerDashboard() {
   ];
 
   const allSecondaryItems = [
+    { id: "transfer", title: "재고 이동", desc: "보관처 간 이동 신청", Icon: ArrowsRightLeftIcon, iconBg: "#FF8C00", path: "/inventory/transfer" },
     { id: "status", title: "재고 조회", desc: "실시간 현장 재고", Icon: CubeIcon, iconBg: "#8B95A1", path: "/inventory/status" },
     { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", Icon: BanknotesIcon, iconBg: "#00D082", path: "/expense/new" },
-    { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", Icon: ClipboardDocumentListIcon, iconBg: "#FF8C00", path: "/my-requests" },
+    { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", Icon: ClipboardDocumentListIcon, iconBg: "#5061FF", path: "/my-requests" },
     { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", Icon: ShieldCheckIcon, iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
   ];
 

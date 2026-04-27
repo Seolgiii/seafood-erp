@@ -2,6 +2,7 @@
 export * from "./inventory/query";
 export * from "./inventory/inbound";
 export * from "./inventory/outbound";
+export * from "./inventory/transfer";
 
 // actions 폴더 바로 아래에 있는 파일들 연결
 export * from "./admin/admin";
