@@ -11,20 +11,18 @@ import {
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/solid";
-import { clearSession, readSession } from "@/lib/session";
+import { readSession } from "@/lib/session";
 import { getDashboardStats, type DashboardStats } from "@/app/actions/dashboard";
 
 export default function WorkerDashboard() {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
-  const [workerName, setWorkerName] = useState("");
   const [role, setRole] = useState<string | undefined>(undefined);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
     const session = readSession();
     if (!session) return;
-    setWorkerName(session.workerName);
     setRole(session.role);
 
     const isAdminRole = session.role === "ADMIN" || session.role === "MASTER";
@@ -33,12 +31,6 @@ export default function WorkerDashboard() {
       .then(setStats)
       .catch((e) => console.error("[dashboard] stats fetch 오류", e));
   }, []);
-
-  const handleLogout = () => {
-    if (!window.confirm("정말 로그아웃 하시겠습니까?")) return;
-    clearSession();
-    router.replace("/login");
-  };
 
   const heroItems = [
     { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", Icon: ArrowDownOnSquareIcon, iconBg: "#3182F6", path: "/inventory/record" },
@@ -62,19 +54,8 @@ export default function WorkerDashboard() {
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10" style={{ fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'" }}>
       
       {/* 상단 헤더 */}
-      <header className="bg-white px-5 py-4 flex justify-between items-center sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
+      <header className="px-5 pt-5 pb-1">
         <h1 className="text-[20px] font-black text-[#3182F6] tracking-tight">SEAERP</h1>
-        <div className="flex items-center gap-2">
-          {workerName && (
-            <span className="text-[13px] font-bold text-gray-500">{workerName}</span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="bg-[#FF4545] text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-transform text-sm"
-          >
-            로그아웃
-          </button>
-        </div>
       </header>
 
       {/* 메인 콘텐츠 영역 */}
