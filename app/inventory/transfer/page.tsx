@@ -132,19 +132,19 @@ export default function TransferPage() {
         <div className="bg-white p-6 rounded-[28px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-4">
           <h2 className="text-[15px] font-bold text-gray-700">① 이동할 LOT 선택</h2>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             <input
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="LOT 일련번호 또는 품목명 검색"
-              className="flex-1 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#FF8C00] transition-all"
+              className="flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#FF8C00] transition-all"
             />
             <button
               onClick={handleSearch}
               disabled={isSearching}
-              className="bg-[#FF8C00] text-white px-4 py-3 rounded-2xl active:scale-95 transition-transform disabled:opacity-50"
+              className="shrink-0 bg-[#FF8C00] text-white px-4 py-3 rounded-2xl active:scale-95 transition-transform disabled:opacity-50"
             >
               <MagnifyingGlassIcon className="w-5 h-5" />
             </button>
