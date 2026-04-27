@@ -226,10 +226,7 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
   return (
     <div className="space-y-2">
-      <div
-        className="relative overflow-hidden rounded-2xl bg-black"
-        style={{ minHeight: 220 }}
-      >
+      <div className="relative overflow-hidden rounded-2xl bg-black aspect-square">
         {/*
           iOS Safari 필수 속성:
           - playsInline: 전체화면 강제 방지
@@ -241,8 +238,8 @@ export default function BarcodeScanner({ onDetected }: Props) {
           playsInline
           muted
           autoPlay
-          className="w-full object-cover"
-          style={{ minHeight: 220, display: 'block' }}
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ display: 'block' }}
         />
 
         {status === 'loading' && (

@@ -136,6 +136,20 @@ async function fetchProductName(productId: string): Promise<string> {
   return String(data.fields?.["품목명"] ?? "");
 }
 
+/** 보관처 link 필드 값(record id 배열) → 보관처명 문자열 변환 */
+async function resolveStorageName(rawField: unknown): Promise<string> {
+  const id = Array.isArray(rawField) && rawField.length > 0 ? rawField[0] : null;
+  if (!id || typeof id !== "string" || !/^rec/.test(id)) return "";
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}/${id}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) return "";
+  const data = await res.json();
+  return String(data.fields?.["보관처명"] ?? "");
+}
+
 /**
  * 입고 승인 후 입고증 PDF를 생성하여 Vercel Blob 스토리지에 저장합니다.
  * 저장된 PDF URL을 입고 관리 레코드의 '입고증URL' 필드에 기록합니다.
@@ -164,7 +178,7 @@ async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
       productName,
       spec: String(fields["규격"] ?? ""),
       quantity: Number(fields["입고수량"] ?? 0),
-      storage: String(fields["보관처"] ?? ""),
+      storage: await resolveStorageName(fields["보관처"]),
       origin: String(fields["원산지"] ?? ""),
       purchasePrice: Number(fields["수매가"] ?? 0),
       date: String(fields["입고일"] ?? ""),
@@ -344,7 +358,7 @@ async function createLotOnInboundApproval(
   }
 
   // 입고일자 기준으로 보관처 비용 이력에서 냉장료단가·입출고비·노조비를 조회해 LOT에 저장
-  const storage = String(inboundFields["보관처"] ?? "").trim();
+  const storage = await resolveStorageName(inboundFields["보관처"]);
   const inboundDate = String(inboundFields["입고일"] ?? "").trim() || seoulDateString();
   if (storage) {
     try {

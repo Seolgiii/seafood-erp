@@ -52,11 +52,36 @@ const API = "https://api.airtable.com/v0";
 const LOT_TABLE = env.AIRTABLE_LOT_TABLE?.trim() || "LOT별 재고";
 const INBOUND_TABLE = env.AIRTABLE_INBOUND_TABLE?.trim() || "입고 관리";
 const LOT_TO_INBOUND_FIELD = env.AIRTABLE_LOT_TO_INBOUND_FIELD?.trim() || "입고관리링크";
+const STORAGE_MASTER_TABLE = "보관처 마스터";
+const STORAGE_NAME_FIELD = "보관처명";
 
 const HEADERS = {
   Authorization: `Bearer ${API_KEY}`,
   "Content-Type": "application/json",
 };
+
+// ── 보관처 마스터 fetch → 이름:id 맵 ─────────────────────────────────────────
+async function fetchStorageMasterMap() {
+  const map = {};
+  let offset;
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (offset) params.set("offset", offset);
+    const url = `${API}/${BASE_ID}/${encodeURIComponent(STORAGE_MASTER_TABLE)}?${params.toString()}`;
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`보관처 마스터 fetch 실패 ${res.status}: ${body}`);
+    }
+    const data = await res.json();
+    for (const rec of data.records ?? []) {
+      const name = rec.fields?.[STORAGE_NAME_FIELD];
+      if (name) map[name.trim()] = rec.id;
+    }
+    offset = data.offset;
+  } while (offset);
+  return map;
+}
 
 // ── LOT별 재고에서 입고관리링크 비어 있는 레코드 전부 fetch (pagination) ─────
 async function fetchTargetLots() {
@@ -82,7 +107,7 @@ async function fetchTargetLots() {
 }
 
 // ── 입고관리에 INSERT 할 fields 구성 ─────────────────────────────────────────
-function buildInboundFields(lot) {
+function buildInboundFields(lot, storageMasterMap) {
   const f = lot.fields ?? {};
   const stockQty = Number(
     Array.isArray(f["재고수량"]) ? f["재고수량"][0] : f["재고수량"],
@@ -94,12 +119,20 @@ function buildInboundFields(lot) {
     규격: String(f["규격"] ?? ""),
     미수: String(f["미수"] ?? ""),
     원산지: String(f["원산지"] ?? ""),
-    보관처: String(f["보관처"] ?? ""),
     입고수량: stockQty,
     잔여수량: stockQty,
     승인상태: "승인 완료",
     비고: "기존 재고",
   };
+
+  // 보관처 — 마스터 맵에서 record id 찾아 link로 연결
+  const storageName = String(f["보관처"] ?? "").trim();
+  const storageId = storageMasterMap[storageName];
+  if (storageId) {
+    fields["보관처"] = [storageId];
+  } else if (storageName) {
+    console.warn(`  [warn] 보관처 마스터에 없는 값: "${storageName}" (LOT=${f["LOT번호"]})`);
+  }
 
   // 매입처는 link 필드 — LOT별 재고에 link로 들어 있으면 record id 배열 그대로 복사
   const supplier = f["매입처"];
@@ -117,8 +150,8 @@ function buildInboundFields(lot) {
 }
 
 // ── INSERT + LOT별 재고 PATCH ────────────────────────────────────────────────
-async function migrateOne(lot) {
-  const fields = buildInboundFields(lot);
+async function migrateOne(lot, storageMasterMap) {
+  const fields = buildInboundFields(lot, storageMasterMap);
 
   // 1) 입고관리 INSERT
   const insertRes = await fetch(`${API}/${BASE_ID}/${encodeURIComponent(INBOUND_TABLE)}`, {
@@ -161,6 +194,10 @@ async function main() {
   console.log(`[migrate] 대상 테이블: ${LOT_TABLE} → ${INBOUND_TABLE}`);
   console.log(`[migrate] link 필드: ${LOT_TO_INBOUND_FIELD}\n`);
 
+  console.log("[migrate] 보관처 마스터 fetch 중...");
+  const storageMasterMap = await fetchStorageMasterMap();
+  console.log(`[migrate] 보관처 마스터: ${Object.keys(storageMasterMap).length}건 로드\n`);
+
   console.log("[migrate] LOT별 재고 fetch 중...");
   const lots = await fetchTargetLots();
   console.log(`[migrate] 입고관리링크 비어 있는 LOT: ${lots.length}건\n`);
@@ -174,7 +211,7 @@ async function main() {
     const preview = lots.slice(0, 3);
     console.log(`[migrate] === DRY RUN 미리보기 (${preview.length}/${lots.length}건) ===`);
     for (const lot of preview) {
-      const fields = buildInboundFields(lot);
+      const fields = buildInboundFields(lot, storageMasterMap);
       console.log(`\n--- LOT id=${lot.id}, 번호=${lot.fields?.["LOT번호"] ?? "(없음)"} ---`);
       console.log("입고관리에 INSERT 될 fields:");
       console.log(JSON.stringify(fields, null, 2));
@@ -191,7 +228,7 @@ async function main() {
   for (let i = 0; i < lots.length; i++) {
     const lot = lots[i];
     try {
-      const inboundId = await migrateOne(lot);
+      const inboundId = await migrateOne(lot, storageMasterMap);
       success++;
       if ((i + 1) % 10 === 0 || i === lots.length - 1) {
         console.log(

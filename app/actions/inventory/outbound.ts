@@ -121,7 +121,7 @@ async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | 
  */
 async function getInboundRemainingQty(
   inboundRecordId: string
-): Promise<{ currentQty: number; fieldKeys: string[]; storage: string } | null> {
+): Promise<{ currentQty: number; fieldKeys: string[]; storageId: string } | null> {
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}/${inboundRecordId}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
@@ -156,8 +156,10 @@ async function getInboundRemainingQty(
     return null;
   }
 
-  const storage = String(fields?.["보관처"] ?? "");
-  return { currentQty, fieldKeys, storage };
+  const rawStorage = fields?.["보관처"];
+  const storageId = Array.isArray(rawStorage) && rawStorage.length > 0 ? String(rawStorage[0]) : "";
+
+  return { currentQty, fieldKeys, storageId };
 }
 
 /**
@@ -206,6 +208,28 @@ export async function searchLotByKeyword(keyword: string) {
       const qty = Number(Array.isArray(raw) ? raw[0] : raw) || 0;
       return qty > 0;
     });
+
+    // 보관처 link → 이름 변환 (보관처 마스터 전체 fetch 1회, 5분 캐시)
+    const masterRes = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
+      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 300 } }
+    );
+    if (masterRes.ok) {
+      const masterData = await masterRes.json();
+      const storageNameMap = new Map<string, string>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const r of masterData.records ?? []) {
+        storageNameMap.set(r.id, String(r.fields?.["보관처명"] ?? ""));
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const record of records) {
+        const raw = record.fields?.["보관처"];
+        if (Array.isArray(raw) && raw.length > 0) {
+          record.fields["보관처"] = storageNameMap.get(raw[0]) ?? "";
+        }
+      }
+    }
+
     return { success: true, records };
   } catch (error) {
     console.error("🔴 출고 검색 에러:", error);
@@ -280,7 +304,7 @@ export async function createOutboundRecord(payload: any) {
         error: `입고 관리의 ${INBOUND_REMAINING_QTY_FIELD}를 확인할 수 없습니다.`,
       };
     }
-    const currentRemain = inboundRemain.currentQty;
+    const { currentQty: currentRemain, storageId } = inboundRemain;
     if (qty > currentRemain) {
       // 출고 요청 수량이 잔여 재고보다 많으면 신청 자체를 거부
       console.error("[createOutboundRecord] 잔여수량 부족(출고 관리 미생성):", {
@@ -307,7 +331,7 @@ export async function createOutboundRecord(payload: any) {
     if (payload?.spec) fields["규격"] = String(payload.spec);
     if (payload?.origin) fields["원산지"] = String(payload.origin);
     if (payload?.misu) fields["미수"] = String(payload.misu);
-    if (inboundRemain.storage) fields["보관처"] = inboundRemain.storage; // 입고 관리에서 보관처 자동 복사
+    if (storageId) fields["보관처"] = [storageId]; // 입고 관리에서 보관처 link 복사
     if (payload?.seller) fields["판매처"] = String(payload.seller);
     if (payload?.salePrice != null && payload.salePrice !== "") fields["판매가"] = Number(payload.salePrice);
 

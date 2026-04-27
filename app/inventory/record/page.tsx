@@ -41,9 +41,10 @@ export default function InventoryRecordPage() {
   const itemRef = useRef<HTMLDivElement>(null);
 
   // 보관처 드롭다운 상태
-  const [storageOptions, setStorageOptions] = useState<string[]>([]);
+  const [storageOptions, setStorageOptions] = useState<{ id: string; name: string }[]>([]);
   const [storageQuery, setStorageQuery] = useState("");
   const [storageOpen, setStorageOpen] = useState(false);
+  const [storageId, setStorageId] = useState("");
   const storageRef = useRef<HTMLDivElement>(null);
 
   // 매입처 드롭다운 상태
@@ -101,7 +102,7 @@ export default function InventoryRecordPage() {
   const filteredProducts = productOptions.filter((opt) =>
     opt.name.includes(itemQuery)
   );
-  const filteredStorage = storageOptions.filter((opt) => opt.includes(storageQuery));
+  const filteredStorage = storageOptions.filter((opt) => opt.name.includes(storageQuery));
   const filteredSuppliers = supplierOptions.filter((opt) => opt.name.includes(supplierQuery));
 
   const handleNumberChange = (field: string, value: string) => {
@@ -141,7 +142,7 @@ export default function InventoryRecordPage() {
         미수: formData.count,
         "입고수량(BOX)": Number(formData.quantity.replace(/,/g, "")),
         수매가: Number(formData.price.replace(/,/g, "")),
-        보관처: formData.storage,
+        storageRecordId: storageId,
         원산지: finalOrigin,
         매입처: formData.supplier,
         매입처RecordId: supplierId,
@@ -356,16 +357,17 @@ export default function InventoryRecordPage() {
                     <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-lg max-h-48 overflow-y-auto">
                       {filteredStorage.map((opt) => (
                         <li
-                          key={opt}
+                          key={opt.id}
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            setStorageQuery(opt);
-                            setFormData({ ...formData, storage: opt });
+                            setStorageQuery(opt.name);
+                            setStorageId(opt.id);
+                            setFormData({ ...formData, storage: opt.name });
                             setStorageOpen(false);
                           }}
                           className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 cursor-pointer first:rounded-t-2xl last:rounded-b-2xl"
                         >
-                          {opt}
+                          {opt.name}
                         </li>
                       ))}
                     </ul>

@@ -287,7 +287,6 @@ export async function createInventoryRecord(formData: any) {
       규격: spec,
       입고수량: qty,
       잔여수량: qty,       // 잔여수량 초기값 = 입고수량 (출고될 때마다 차감됨)
-      보관처: String(formData?.["보관처"] ?? ""),
       원산지: String(formData?.["원산지"] ?? ""),
       [INBOUND_WORKER_FIELD]: [workerRecordId],
       매입자: [workerRecordId],
@@ -295,6 +294,7 @@ export async function createInventoryRecord(formData: any) {
       승인상태: "승인 대기",
       ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
       ...(shipName && { 선박명: shipName }),
+      ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
     };
     const inboundRes = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${inboundTablePath()}`,
@@ -363,8 +363,8 @@ export async function createInventoryRecord(formData: any) {
       규격: spec,
       미수: misu,
       원산지: String(formData?.["원산지"] ?? "").trim(),
-      보관처: String(formData?.["보관처"] ?? "").trim(),
       입고일자: bizDate,
+      ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
       "입고수량(BOX)": qty,
       ...(productMaster.productCategory && { 품목구분: productMaster.productCategory }),
       ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
@@ -430,54 +430,30 @@ export async function createInventoryRecord(formData: any) {
 }
 
 /**
- * 입고 관리 테이블의 '보관처' Single Select 옵션 목록을 반환한다.
- * Airtable Metadata API 사용.
- *
- * 보관처 선택 드롭다운 메뉴에 표시할 목록을 Airtable에서 가져옵니다.
- * 창고, 냉동고 등 실제 보관 장소명이 반환됩니다.
+ * 보관처 마스터 테이블에서 보관처 목록을 반환합니다.
  */
-export async function getStorageOptions(): Promise<string[]> {
+export async function getStorageOptions(): Promise<{ id: string; name: string }[]> {
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   if (!apiKey || !baseId) return [];
 
   try {
-    // Airtable Metadata API로 테이블 구조(필드 목록) 조회
     const res = await fetch(
-      `https://api.airtable.com/v0/meta/bases/${baseId}/tables`,
+      `https://api.airtable.com/v0/${baseId}/${encodeURIComponent("보관처 마스터")}?fields[]=${encodeURIComponent("보관처명")}&pageSize=100`,
       {
         headers: { Authorization: `Bearer ${apiKey}` },
-        next: { revalidate: 300 }, // 5분 캐시 (자주 바뀌지 않으므로 캐싱 적용)
+        next: { revalidate: 300 },
       }
     );
     if (!res.ok) {
-      console.error("[getStorageOptions] Metadata API 실패:", res.status);
+      console.error("[getStorageOptions] 보관처 마스터 fetch 실패:", res.status);
       return [];
     }
     const data = await res.json();
-    const inboundTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리";
-
-    // tbl… ID 또는 이름으로 테이블 탐색
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const table = (data.tables as any[]).find(
-      (t) => t.id === inboundTableName || t.name === inboundTableName
-    );
-    if (!table) {
-      console.warn("[getStorageOptions] 입고 관리 테이블을 찾을 수 없음");
-      return [];
-    }
-
-    // '보관처' 필드가 SingleSelect 타입인지 확인
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const field = (table.fields as any[]).find((f) => f.name === "보관처");
-    if (!field || field.type !== "singleSelect") {
-      console.warn("[getStorageOptions] 보관처 singleSelect 필드를 찾을 수 없음");
-      return [];
-    }
-
-    // 선택 옵션 이름만 배열로 반환
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (field.options?.choices ?? []).map((c: any) => String(c.name));
+    return (data.records ?? [])
+      .map((r: any) => ({ id: r.id, name: String(r.fields?.["보관처명"] ?? "") }))
+      .filter((o: { id: string; name: string }) => o.name);
   } catch (e) {
     console.error("[getStorageOptions] 예외:", e);
     return [];
