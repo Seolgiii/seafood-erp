@@ -340,11 +340,21 @@ export async function getMyRequests(
   const workerTablePath = getWorkersTablePath();
   const productTablePath = getProductsTablePath();
 
+  // ── 조회 필터 ──
+  // 승인 대기/최종 승인 대기는 날짜 무관하게 항상 표시 (결재 필요)
+  // 그 외(승인 완료·반려·취소)는 최근 14일 이내만 표시
+  // 입고관리는 추가로 기존 재고 마이그레이션 데이터(비고="기존 재고") 제외
+  const PENDING = `OR({승인상태} = "승인 대기", {승인상태} = "최종 승인 대기")`;
+  const within2w = (field: string) => `IS_AFTER({${field}}, DATEADD(TODAY(), -14, 'days'))`;
+  const inboundFilter = `AND({비고} != "기존 재고", OR(${PENDING}, ${within2w("입고일")}))`;
+  const outboundFilter = `OR(${PENDING}, ${within2w("출고일")})`;
+  const expenseFilter = `OR(${PENDING}, ${within2w("작성일")})`;
+
   // 세 테이블을 동시에 조회 (순서대로 기다리지 않고 병렬 실행으로 속도 최적화)
   const [inboundRaw, outboundRaw, expenseRaw] = await Promise.all([
-    fetchAirtableRecords("입고 관리"),
-    fetchAirtableRecords("출고 관리"),
-    fetchAirtableRecords("지출결의"),
+    fetchAirtableRecords("입고 관리", inboundFilter),
+    fetchAirtableRecords("출고 관리", outboundFilter),
+    fetchAirtableRecords("지출결의", expenseFilter),
   ]);
 
   // ── 1단계: 링크 rec id 수집(룩업 문자열 제외, 필드명 후보만) ──
