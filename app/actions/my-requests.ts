@@ -346,7 +346,7 @@ export async function getMyRequests(
   // 입고관리는 추가로 기존 재고 마이그레이션 데이터(비고="기존 재고") 제외
   const PENDING = `OR({승인상태} = "승인 대기", {승인상태} = "최종 승인 대기")`;
   const within2w = (field: string) => `IS_AFTER({${field}}, DATEADD(TODAY(), -14, 'days'))`;
-  const inboundFilter = `AND(NOT({비고} = "기존 재고"), OR(${PENDING}, ${within2w("입고일")}))`;
+  const inboundFilter = `AND(NOT({비고} = "기존 재고"), NOT({비고} = "재고 이동"), OR(${PENDING}, ${within2w("입고일")}))`;
   const outboundFilter = `OR(${PENDING}, ${within2w("출고일")})`;
   const expenseFilter = `OR(${PENDING}, ${within2w("작성일")})`;
   const transferFilter = `OR({승인상태} = "승인 대기", ${within2w("이동일")})`;
@@ -368,7 +368,8 @@ export async function getMyRequests(
     return s === "승인 대기" || s === "최종 승인 대기";
   };
   const filteredInbound = inboundRaw.filter((r) => {
-    if (String(r.fields["비고"] ?? "") === "기존 재고") return false;
+    const 비고 = String(r.fields["비고"] ?? "");
+    if (비고 === "기존 재고" || 비고 === "재고 이동") return false;
     if (isPending(r.fields)) return true;
     return String(r.fields["입고일"] ?? "") >= cutoffStr;
   });
@@ -409,7 +410,7 @@ export async function getMyRequests(
   for (const r of filteredTransfer) {
     const w = firstRecordIdFromFields(r.fields, WORKER_LINK_FIELD_CANDIDATES);
     if (w.id) workerIds.push(w.id);
-    const tLotId = firstRecordId(r.fields["원본 LOT 번호"]);
+    const tLotId = firstRecordId(r.fields["원본 LOT번호"]);
     if (tLotId) transferLotIds.push(tLotId);
   }
 
@@ -639,7 +640,7 @@ export async function getMyRequests(
     const passReq = passesRequesterFilter(requesterWorkerId, requesterName, wId, requester);
     if (!passReq) continue;
 
-    const originalLotId = firstRecordId(f["원본 LOT 번호"]);
+    const originalLotId = firstRecordId(f["원본 LOT번호"]);
     const lotNumber = originalLotId ? (transferLotMap[originalLotId] ?? "") : "";
 
     const rawStatus = String(f["승인상태"] ?? "승인 대기").trim();

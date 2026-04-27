@@ -2,48 +2,45 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  isSessionExpired,
-  readSession,
-  writeSession,
-} from "@/lib/session";
+import { isSessionExpired, readSession, writeSession } from "@/lib/session";
 
 type Worker = { id: string; name: string };
 
-const padClass =
-  "flex min-h-[5.5rem] min-w-[5.5rem] items-center justify-center rounded-2xl border-2 border-slate-300 bg-white text-4xl font-semibold shadow-sm active:scale-[0.98] touch-manipulation hover:bg-slate-50 md:min-h-[6rem] md:min-w-[6rem] md:text-5xl";
+const AVATAR_COLORS = [
+  "#3182F6", "#FF3B30", "#FF8C00", "#00D082", "#5061FF",
+  "#8B95A1", "#FF6B6B", "#4ECDC4", "#A78BFA", "#F59E0B",
+];
 
-const nameButtonClass =
-  "flex w-full items-center justify-center rounded-2xl border border-blue-700 bg-blue-600 px-8 py-8 text-center text-[2.25rem] font-bold text-white shadow-md transition-transform duration-150 active:scale-[0.99] touch-manipulation hover:scale-105 hover:bg-blue-700 md:py-9 md:text-5xl";
+function avatarColor(index: number) {
+  return AVATAR_COLORS[index % AVATAR_COLORS.length];
+}
 
 export function WorkerPinLogin() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
 
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sheetMounted, setSheetMounted] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const [activeWorker, setActiveWorker] = useState<Worker | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const activeWorkerRef = useRef<Worker | null>(null);
+
   const [pin, setPin] = useState("");
+  const [errorFlash, setErrorFlash] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
 
-  useEffect(() => {
-    activeWorkerRef.current = activeWorker;
-  }, [activeWorker]);
-
-  useEffect(() => {
-    submittingRef.current = submitting;
-  }, [submitting]);
+  useEffect(() => { activeWorkerRef.current = activeWorker; }, [activeWorker]);
+  useEffect(() => { submittingRef.current = submitting; }, [submitting]);
 
   useEffect(() => {
     const s = readSession();
-    if (s && !isSessionExpired(s)) {
-      router.replace("/");
-    }
+    if (s && !isSessionExpired(s)) router.replace("/");
   }, [router]);
 
   useEffect(() => {
@@ -51,237 +48,250 @@ export function WorkerPinLogin() {
     (async () => {
       try {
         const res = await fetch("/api/workers");
-        const data = (await res.json()) as {
-          workers?: Worker[];
-          error?: string;
-        };
-        if (!res.ok) {
-          throw new Error(data.error ?? "목록을 불러오지 못했습니다");
-        }
-        if (!cancelled) {
-          setWorkers(data.workers ?? []);
-        }
+        const data = (await res.json()) as { workers?: Worker[]; error?: string };
+        if (!res.ok) throw new Error(data.error ?? "목록을 불러오지 못했습니다");
+        if (!cancelled) setWorkers(data.workers ?? []);
       } catch (e) {
-        if (!cancelled) {
-          setLoadError(e instanceof Error ? e.message : "네트워크 오류");
-        }
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "네트워크 오류");
       } finally {
         if (!cancelled) setLoadingList(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  const closePad = useCallback(() => {
-    submittingRef.current = false;
-    setPickerOpen(false);
-    setActiveWorker(null);
-    setPin("");
-    setAuthError(null);
-    setSubmitting(false);
-  }, []);
-
-  const submitPin = useCallback(
-    async (worker: Worker, code: string) => {
-      submittingRef.current = true;
-      setSubmitting(true);
+  const closeSheet = useCallback(() => {
+    setSheetVisible(false);
+    setTimeout(() => {
+      setSheetMounted(false);
+      setActiveWorker(null);
+      setPin("");
       setAuthError(null);
-      try {
-        const res = await fetch("/api/auth/pin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ workerId: worker.id, pin: code }),
-        });
-        const data = (await res.json()) as {
-          worker?: { id: string; name: string; role?: string };
-          error?: string;
-        };
-        if (!res.ok) {
-          setAuthError(data.error ?? "로그인 실패");
-          setPin("");
-          return;
-        }
-        if (data.worker) {
-          writeSession({
-            workerId: data.worker.id,
-            workerName: data.worker.name,
-            role: data.worker.role ?? "WORKER",
-            lastActivityAt: Date.now(),
-          });
-          const callbackUrl = searchParams.get("callbackUrl");
-          router.push(callbackUrl ? decodeURIComponent(callbackUrl) : "/");
-        }
-      } catch {
-        setAuthError("연결에 실패했습니다");
-        setPin("");
-      } finally {
-        submittingRef.current = false;
-        setSubmitting(false);
-      }
-    },
-    [router, searchParams]
-  );
+      setErrorFlash(false);
+      setSubmitting(false);
+      submittingRef.current = false;
+    }, 320);
+  }, []);
 
-  const appendDigit = useCallback(
-    (d: string) => {
-      setPin((p) => {
-        if (p.length >= 4 || submittingRef.current) return p;
-        const next = p + d;
-        setAuthError(null);
-        const w = activeWorkerRef.current;
-        if (next.length === 4 && w) {
-          void submitPin(w, next);
-        }
-        return next;
+  const triggerError = useCallback((msg: string) => {
+    setAuthError(msg);
+    setPin("");
+    setErrorFlash(true);
+    setTimeout(() => setErrorFlash(false), 480);
+  }, []);
+
+  const submitPin = useCallback(async (worker: Worker, code: string) => {
+    submittingRef.current = true;
+    setSubmitting(true);
+    setAuthError(null);
+    try {
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workerId: worker.id, pin: code }),
       });
-    },
-    [submitPin]
-  );
+      const data = (await res.json()) as {
+        worker?: { id: string; name: string; role?: string };
+        error?: string;
+      };
+      if (!res.ok) {
+        triggerError(data.error ?? "PIN이 올바르지 않습니다");
+        return;
+      }
+      if (data.worker) {
+        writeSession({
+          workerId: data.worker.id,
+          workerName: data.worker.name,
+          role: data.worker.role ?? "WORKER",
+          lastActivityAt: Date.now(),
+        });
+        const callbackUrl = searchParams.get("callbackUrl");
+        router.push(callbackUrl ? decodeURIComponent(callbackUrl) : "/");
+      }
+    } catch {
+      triggerError("연결에 실패했습니다");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  }, [router, searchParams, triggerError]);
 
-  const backspace = () => {
-    if (submitting) return;
+  const appendDigit = useCallback((d: string) => {
+    setPin((p) => {
+      if (p.length >= 4 || submittingRef.current) return p;
+      const next = p + d;
+      setAuthError(null);
+      const w = activeWorkerRef.current;
+      if (next.length === 4 && w) void submitPin(w, next);
+      return next;
+    });
+  }, [submitPin]);
+
+  const backspace = useCallback(() => {
+    if (submittingRef.current) return;
     setPin((p) => p.slice(0, -1));
     setAuthError(null);
-  };
+  }, []);
 
-  const openForWorker = (w: Worker) => {
+  const openForWorker = (w: Worker, index: number) => {
     setActiveWorker(w);
+    setActiveIndex(index);
     setPin("");
     setAuthError(null);
-    setPickerOpen(true);
+    setErrorFlash(false);
+    setSheetMounted(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSheetVisible(true));
+    });
+  };
+
+  const dotBg = (i: number) => {
+    if (errorFlash) return "#FF3B30";
+    if (i < pin.length) return "#191F28";
+    return "#E5E8EB";
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 md:py-14">
-      <section className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-lg md:p-10">
-        <div className="text-center">
-        <h1 className="text-5xl font-extrabold tracking-tight text-slate-900 md:text-6xl">
-          작업자 로그인
-        </h1>
-        <p className="mt-5 text-2xl leading-relaxed text-slate-600 md:text-3xl">
-          이름을 누른 뒤 PIN 4자리를 입력하세요
-        </p>
+    <main
+      className="flex min-h-screen flex-col bg-white"
+      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+    >
+      {/* 헤더 */}
+      <header className="px-6 pt-14 pb-6">
+        <h1 className="text-[26px] font-black text-[#191F28] tracking-tight">SEAERP</h1>
+        <p className="mt-1 text-[15px] font-medium text-gray-400">작업자를 선택하세요</p>
+      </header>
+
+      {/* 작업자 목록 */}
+      <div className="flex-1 px-2">
+        {loadingList && (
+          <div className="flex justify-center pt-24">
+            <div className="w-8 h-8 border-[3px] border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
+          </div>
+        )}
+        {loadError && (
+          <p className="text-center text-[15px] text-red-500 pt-24">{loadError}</p>
+        )}
+        {!loadingList && !loadError && (
+          <ul className="flex flex-col">
+            {workers.length === 0 ? (
+              <li className="text-center text-[15px] text-gray-400 pt-24">등록된 작업자가 없습니다</li>
+            ) : (
+              workers.map((w, i) => (
+                <li key={w.id}>
+                  <button
+                    type="button"
+                    onClick={() => openForWorker(w, i)}
+                    className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl active:bg-gray-50 transition-colors touch-manipulation"
+                  >
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[18px] font-black shrink-0"
+                      style={{ backgroundColor: avatarColor(i) }}
+                    >
+                      {w.name[0]}
+                    </div>
+                    <span className="text-[17px] font-bold text-[#191F28]">{w.name}</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
       </div>
 
-      {loadingList && (
-        <p className="mt-10 text-center text-3xl text-slate-500">불러오는 중…</p>
-      )}
-      {loadError && (
-        <p className="mx-auto mt-10 max-w-2xl text-center text-2xl text-red-600">
-          {loadError}
-        </p>
-      )}
+      {/* 바텀시트 */}
+      {sheetMounted && (
+        <>
+          {/* 딤드 배경 */}
+          <div
+            className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
+            style={{ opacity: sheetVisible ? 1 : 0 }}
+            onClick={closeSheet}
+          />
 
-      {!loadingList && !loadError && (
-        <ul className="mx-auto mt-10 flex w-full max-w-2xl flex-col items-center gap-5">
-          {workers.length === 0 ? (
-            <li className="text-2xl text-slate-500">등록된 작업자가 없습니다</li>
-          ) : (
-            workers.map((w) => (
-              <li key={w.id} className="w-full">
-                <button
-                  type="button"
-                  className={nameButtonClass}
-                  onClick={() => openForWorker(w)}
-                >
-                  {w.name}
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      )}
-      </section>
+          {/* 시트 본체 */}
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[28px] shadow-[0_-8px_40px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-out"
+            style={{ transform: sheetVisible ? "translateY(0)" : "translateY(100%)" }}
+          >
+            {/* 핸들 바 */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-[5px] rounded-full bg-gray-200" />
+            </div>
 
-      {pickerOpen && activeWorker && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="PIN 입력"
-        >
-          <div className="relative w-full max-w-lg rounded-3xl bg-slate-100 p-6 shadow-2xl md:p-10">
-            <button
-              type="button"
-              className="absolute right-4 top-4 rounded-xl px-4 py-3 text-2xl font-medium text-slate-600 hover:bg-slate-200 md:text-3xl"
-              onClick={closePad}
-            >
-              닫기
-            </button>
+            {/* 아바타 */}
+            <div className="flex justify-center pt-6 pb-1">
+              <div
+                className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black"
+                style={{ backgroundColor: avatarColor(activeIndex) }}
+              >
+                {activeWorker?.name[0]}
+              </div>
+            </div>
 
-            <h2 className="pr-20 text-3xl font-bold text-slate-900 md:text-4xl">
-              {activeWorker.name}
-            </h2>
-            <p className="mt-2 text-2xl text-slate-600 md:text-3xl">
-              4자리 PIN
-            </p>
-
-            <div
-              className="mt-6 flex h-16 items-center justify-center gap-4 text-5xl font-mono text-slate-900 md:h-20 md:text-6xl"
-              aria-live="polite"
-            >
+            {/* PIN 점 */}
+            <div className="flex justify-center gap-[18px] py-7">
               {[0, 1, 2, 3].map((i) => (
-                <span key={i}>{i < pin.length ? "●" : "○"}</span>
+                <div
+                  key={i}
+                  className="w-[13px] h-[13px] rounded-full transition-all duration-150"
+                  style={{ backgroundColor: dotBg(i) }}
+                />
               ))}
             </div>
 
-            {authError && (
-              <p className="mt-4 text-center text-2xl text-red-600 md:text-3xl">
-                {authError}
-              </p>
-            )}
-            {submitting && (
-              <p className="mt-4 text-center text-2xl text-slate-500">확인 중…</p>
-            )}
-
-            <div className="mt-8 grid grid-cols-3 gap-4 md:gap-5">
-              {(["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const).map(
-                (n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={padClass}
-                    disabled={submitting}
-                    onClick={() => appendDigit(n)}
-                  >
-                    {n}
-                  </button>
-                )
+            {/* 오류 메시지 (점 아래) */}
+            <div className="h-5 flex items-center justify-center -mt-3 mb-1">
+              {authError && (
+                <p className="text-[13px] font-bold text-red-500">{authError}</p>
               )}
+            </div>
+
+            {/* 키패드 */}
+            <div
+              className="grid grid-cols-3 px-6 pb-2"
+              style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
+            >
+              {(["1","2","3","4","5","6","7","8","9"] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => appendDigit(n)}
+                  className="flex items-center justify-center h-[68px] text-[26px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors disabled:opacity-30 touch-manipulation"
+                >
+                  {n}
+                </button>
+              ))}
+              {/* C — 전체 지우기 */}
               <button
                 type="button"
-                className={`${padClass} border-amber-400 bg-amber-50`}
                 disabled={submitting}
-                onClick={() => {
-                  setPin("");
-                  setAuthError(null);
-                }}
-                aria-label="전체 클리어"
+                onClick={() => { setPin(""); setAuthError(null); }}
+                className="flex items-center justify-center h-[68px] text-[15px] font-bold text-gray-400 rounded-2xl active:bg-gray-100 transition-colors touch-manipulation"
               >
                 C
               </button>
               <button
                 type="button"
-                className={padClass}
                 disabled={submitting}
                 onClick={() => appendDigit("0")}
+                className="flex items-center justify-center h-[68px] text-[26px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors disabled:opacity-30 touch-manipulation"
               >
                 0
               </button>
+              {/* 백스페이스 */}
               <button
                 type="button"
-                className={padClass}
                 disabled={submitting}
                 onClick={backspace}
-                aria-label="지우기"
+                className="flex items-center justify-center h-[68px] text-[22px] text-gray-500 rounded-2xl active:bg-gray-100 transition-colors touch-manipulation"
               >
                 ⌫
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </main>
   );

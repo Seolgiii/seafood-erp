@@ -76,6 +76,31 @@ async function createRecord(
   return await res.json();
 }
 
+async function createRecordOrThrow(
+  tableName: string,
+  fields: Record<string, unknown>,
+): Promise<{ id: string; fields: Record<string, unknown> }> {
+  const res = await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
+    let detail = `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(body);
+      detail = parsed.error?.message || parsed.message || parsed.error || detail;
+    } catch {}
+    throw new Error(`[${tableName}] ${detail}`);
+  }
+  return res.json();
+}
+
 async function getMaxLotSequence(): Promise<number> {
   let maxSeq = 0;
   let offset: string | undefined;
@@ -210,34 +235,41 @@ export async function createTransferRecord(payload: {
   if (!Number.isFinite(이동수량) || 이동수량 <= 0) return { success: false, message: "이동 수량을 올바르게 입력해주세요." };
   if (!isRecordId(이동후보관처RecordId)) return { success: false, message: "이동 후 보관처를 선택해주세요." };
   if (!이동일) return { success: false, message: "이동일을 입력해주세요." };
-  if (!isRecordId(workerId)) return { success: false, message: "로그인 정보를 확인해주세요." };
+  // workerId는 rec… 형식 레코드ID 또는 유효한 문자열 허용
+  if (!workerId) return { success: false, message: "로그인 정보를 확인해주세요." };
 
-  // 현재 재고 확인
-  const lotFields = await fetchRecord("LOT별 재고", lotRecordId);
-  if (!lotFields) return { success: false, message: "LOT별 재고 레코드를 찾을 수 없습니다." };
+  try {
+    // 현재 재고 확인
+    const lotFields = await fetchRecord("LOT별 재고", lotRecordId);
+    if (!lotFields) return { success: false, message: "LOT별 재고 레코드를 찾을 수 없습니다." };
 
-  const currentStock = num(lotFields["재고수량"]);
-  if (이동수량 > currentStock) {
-    return { success: false, message: `재고 부족 (현재 잔여: ${currentStock}박스)` };
+    const currentStock = num(lotFields["재고수량"]);
+    if (이동수량 > currentStock) {
+      return { success: false, message: `재고 부족 (현재 잔여: ${currentStock}박스)` };
+    }
+
+    const fields: Record<string, unknown> = {
+      "원본 LOT번호": [lotRecordId],
+      "이동수량": 이동수량,
+      "이동 후 보관처": [이동후보관처RecordId],
+      "이동일": 이동일,
+      "승인상태": "승인 대기",
+    };
+    if (isRecordId(workerId)) fields["작업자"] = [workerId];
+    const 이동전보관처Id = firstLink(lotFields["보관처"]);
+    if (이동전보관처Id) fields["이동 전 보관처"] = [이동전보관처Id];
+
+    const created = await createRecordOrThrow("재고 이동", fields);
+    console.log("[createTransferRecord] 생성 완료:", created.id);
+
+    revalidatePath("/my-requests");
+    revalidatePath("/admin/dashboard");
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+    console.error("[createTransferRecord] 실패:", msg);
+    return { success: false, message: msg };
   }
-
-  const fields: Record<string, unknown> = {
-    "원본 LOT 번호": [lotRecordId],
-    "이동수량": 이동수량,
-    "이동 후 보관처": [이동후보관처RecordId],
-    "이동일": 이동일,
-    "작업자": [workerId],
-    "승인상태": "승인 대기",
-  };
-  const 이동전보관처Id = firstLink(lotFields["보관처"]);
-  if (이동전보관처Id) fields["이동 전 보관처"] = [이동전보관처Id];
-
-  const created = await createRecord("재고 이동", fields);
-  if (!created) return { success: false, message: "재고 이동 신청 생성에 실패했습니다." };
-
-  revalidatePath("/my-requests");
-  revalidatePath("/admin/dashboard");
-  return { success: true };
 }
 
 /**
@@ -265,8 +297,8 @@ export async function approveTransfer(
   // 중복 승인 방지
   if (String(tfFields["승인상태"] ?? "") === "승인 완료") return { success: true };
 
-  const lotRecordId = firstLink(tfFields["원본 LOT 번호"]);
-  if (!lotRecordId) return { success: false, message: "원본 LOT 번호 링크가 없습니다." };
+  const lotRecordId = firstLink(tfFields["원본 LOT번호"]);
+  if (!lotRecordId) return { success: false, message: "원본 LOT번호 링크가 없습니다." };
 
   const 이동수량 = num(tfFields["이동수량"]);
   if (이동수량 <= 0) return { success: false, message: "이동수량이 올바르지 않습니다." };
@@ -360,7 +392,7 @@ export async function approveTransfer(
     "재고수량": 이동수량,
     "수매가": newPurchasePrice,
     "입고일자": 이동일,
-    "LOT번호(이동출처)": originalLotNumber,
+    "LOT번호(이동출처)": [lotRecordId],
   };
   if (newStorageId) lotInventoryFields["보관처"] = [newStorageId];
 

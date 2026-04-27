@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
@@ -52,6 +52,7 @@ export default function AdminDashboardPage() {
   const [items, setItems] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uiOverrides, setUiOverrides] = useState<Record<string, "PROCESSING" | "COMPLETED" | "REJECTED">>({});
+  const processingIds = useRef<Set<string>>(new Set());
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RequestItem | null>(null);
@@ -72,9 +73,10 @@ export default function AdminDashboardPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    setUiOverrides({});
     const data = await getMyRequests();
     setItems(data);
+    setUiOverrides({});
+    processingIds.current.clear();
     setIsLoading(false);
   };
 
@@ -91,6 +93,11 @@ export default function AdminDashboardPage() {
   };
 
   const filteredItems = items.filter((item) => {
+    const uiState = uiOverrides[item.id];
+    // 처리 결과(완료/반려)를 보여주는 항목은 DONE 탭이 아닌 경우에만 현재 탭에 유지
+    if (uiState === "COMPLETED" || uiState === "REJECTED") {
+      return activeTab !== "DONE";
+    }
     const pending = isItemPending(item);
     if (activeTab === "DONE") return !pending;
     if (!pending) return false;
@@ -104,13 +111,11 @@ export default function AdminDashboardPage() {
   const totalCompleted = items.length - totalPending;
 
   const handleApprove = async (item: RequestItem) => {
-    console.log("[handleApprove] entered", { id: item.id, type: item.type, status: item.status });
+    if (processingIds.current.has(item.id)) return;
 
-    if (!window.confirm("해당 건을 승인하시겠습니까?")) {
-      console.log("[handleApprove] confirm cancelled");
-      return;
-    }
+    if (!window.confirm("해당 건을 승인하시겠습니까?")) return;
 
+    processingIds.current.add(item.id);
     setUiOverrides((prev) => ({ ...prev, [item.id]: "PROCESSING" }));
 
     let nextStatus: string;
@@ -130,17 +135,15 @@ export default function AdminDashboardPage() {
       nextStatus = "승인 완료";
     }
 
-    console.log("[handleApprove] calling updateApprovalStatus", { id: item.id, type: item.type, nextStatus });
-
     try {
       const result = await updateApprovalStatus(item.id, item.type, nextStatus);
-      console.log("[handleApprove] result", result);
 
       if (result.success) {
         if (nextStatus === "최종 승인 대기") {
           loadData();
         } else {
           setUiOverrides((prev) => ({ ...prev, [item.id]: "COMPLETED" }));
+          setTimeout(() => loadData(), 1200);
         }
       } else {
         alert(result.message);

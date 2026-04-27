@@ -110,8 +110,10 @@ export default function TransferPage() {
       } else {
         alert(`신청 실패: ${result.message}`);
       }
-    } catch {
-      alert('처리 중 오류가 발생했습니다.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '처리 중 오류가 발생했습니다.';
+      console.error('[handleSubmit]', err);
+      alert(msg);
     } finally {
       setIsSubmitting(false);
     }
