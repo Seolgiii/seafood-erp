@@ -181,9 +181,8 @@ export default function StockStatusPage() {
       >
         <PageHeader title="재고 조회" onBack={() => router.push('/')} />
 
-        <div className="p-5 space-y-4">
-          <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_24px_rgba(149,157,165,0.08)] space-y-5">
-            <h2 className="text-[15px] font-bold text-gray-700">검색 조건</h2>
+        <div className="pt-3 px-5 pb-5 space-y-3">
+          <div className="bg-white rounded-[24px] p-5 shadow-[0_8px_24px_rgba(149,157,165,0.08)] space-y-4">
 
             {/* 품목명 — 자동완성 */}
             <div className="space-y-2">
