@@ -400,34 +400,36 @@ export default function TransferPage() {
             <p className="text-[12px] font-bold text-gray-400 ml-1">
               이동 목록 ({cart.length}건)
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {cart.map((item) => (
                 <div
                   key={item.cartId}
-                  className="flex items-stretch gap-2 bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
+                  className="flex min-h-0 min-w-0 items-stretch gap-2 bg-white rounded-2xl border border-gray-100 p-3 shadow-sm"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-[11px] font-bold text-gray-400 truncate">
                       {item.lotNumber}
                     </p>
-                    <p className="text-[15px] font-black text-gray-800 mt-0.5 truncate">
+                    <p className="text-[14px] font-black text-gray-800 mt-0.5 truncate">
                       {item.productName}
                     </p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       <span className="text-[13px] font-bold text-[#FF8C00]">
                         {item.transferQty}박스
                       </span>
-                      <span className="text-[12px] text-gray-400">→ {item.targetStorageName}</span>
+                      <span className="text-[12px] text-gray-400 truncate">→ {item.targetStorageName}</span>
                       <span className="text-[12px] text-gray-400">{item.transferDate}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setCart((prev) => prev.filter((c) => c.cartId !== item.cartId))}
-                    className="shrink-0 flex items-center text-gray-300 hover:text-red-500 active:scale-90 transition-all p-1"
-                    aria-label="목록에서 삭제"
-                  >
-                    <TrashIcon className="w-5 h-5" />
-                  </button>
+                  <div className="flex shrink-0 items-center justify-end">
+                    <button
+                      onClick={() => setCart((prev) => prev.filter((c) => c.cartId !== item.cartId))}
+                      className="p-2 text-gray-300 hover:text-red-500 active:scale-90 transition-all"
+                      aria-label="목록에서 삭제"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
