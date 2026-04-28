@@ -280,7 +280,7 @@ export default function OutboundRecordPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-32">
+    <main className="min-h-screen bg-[#F2F4F6] pb-32 font-['Spoqa_Han_Sans_Neo']">
       {/* 헤더 */}
       <PageHeader
         title="물품 출고"
@@ -319,7 +319,7 @@ export default function OutboundRecordPage() {
         <div className="flex bg-gray-200 p-1 rounded-2xl">
           <button
             onClick={switchToManual}
-            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
               searchMode === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
@@ -328,7 +328,7 @@ export default function OutboundRecordPage() {
           </button>
           <button
             onClick={switchToBarcode}
-            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
               searchMode === 'barcode' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
             }`}
           >
@@ -347,7 +347,7 @@ export default function OutboundRecordPage() {
           {/* ── 직접 검색 모드 ─────────────────────────────────────────── */}
           {searchMode === 'manual' && !selectedLot && (
             <form onSubmit={handleSearch} className="space-y-3">
-              <label className="text-sm font-bold text-gray-400 ml-1">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
                 품목명 또는 LOT 번호
               </label>
               <div className="flex gap-2">
@@ -357,14 +357,17 @@ export default function OutboundRecordPage() {
                   placeholder="예: 고등어, 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  className="flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-lg font-black text-center"
+                  className="flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                 />
                 <button
                   type="submit"
                   disabled={isSearching}
-                  className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold active:scale-95 transition-all"
+                  className="shrink-0 bg-[#FF3B30] text-white px-5 rounded-2xl active:scale-95 transition-transform disabled:opacity-50"
                 >
-                  {isSearching ? '...' : '검색'}
+                  {isSearching
+                    ? <span className="text-[13px] font-bold px-1">...</span>
+                    : <MagnifyingGlassIcon className="w-5 h-5" />
+                  }
                 </button>
               </div>
             </form>
@@ -375,12 +378,12 @@ export default function OutboundRecordPage() {
             <div className="space-y-3">
               {/* PC: 카메라 없음 안내 */}
               {hasCamera === false && (
-                <div className="px-4 py-5 bg-gray-50 rounded-2xl text-center space-y-1">
+                <div className="px-4 py-5 bg-gray-100 rounded-2xl text-center space-y-1">
                   <p className="text-2xl">📵</p>
-                  <p className="text-sm font-bold text-gray-600">
+                  <p className="text-[14px] font-bold text-gray-600">
                     이 기기에서는 카메라를 사용할 수 없습니다.
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[12px] text-gray-400">
                     모바일에서 접속하거나 아래 입력창에 직접 입력하세요.
                   </p>
                 </div>
@@ -409,7 +412,7 @@ export default function OutboundRecordPage() {
               {/* 검색 중 스피너 */}
               {isSearching && (
                 <div className="py-4 text-center">
-                  <p className="text-sm font-bold text-gray-500 animate-pulse">검색 중...</p>
+                  <p className="text-[13px] font-bold text-gray-500 animate-pulse">검색 중...</p>
                 </div>
               )}
 
@@ -421,7 +424,7 @@ export default function OutboundRecordPage() {
                   value={keyword}
                   readOnly={scannerOpen}
                   onChange={(e) => setKeyword(e.target.value)}
-                  className={`flex-1 min-w-0 p-4 bg-gray-50 border-none rounded-2xl text-lg font-black text-center transition-opacity ${
+                  className={`flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all ${
                     scannerOpen ? 'opacity-40 cursor-not-allowed' : ''
                   }`}
                 />
@@ -429,9 +432,9 @@ export default function OutboundRecordPage() {
                   <button
                     type="submit"
                     disabled={isSearching || !keyword.trim()}
-                    className="shrink-0 px-6 py-4 bg-gray-800 text-white rounded-2xl font-bold disabled:opacity-40 active:scale-95 transition-all"
+                    className="shrink-0 bg-[#FF3B30] text-white px-5 rounded-2xl active:scale-95 transition-transform disabled:opacity-40"
                   >
-                    검색
+                    <MagnifyingGlassIcon className="w-5 h-5" />
                   </button>
                 )}
               </form>
@@ -440,30 +443,29 @@ export default function OutboundRecordPage() {
 
           {/* ── 검색 결과 리스트 ─────────────────────────────────────────── */}
           {!selectedLot && searchResults.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-bold text-gray-400 ml-1">
+            <div className="space-y-2">
+              <p className="text-[12px] font-bold text-gray-400 ml-1">
                 출고할 상품을 선택하세요 ({searchResults.length}건)
               </p>
               {searchResults.map((lot) => (
                 <button
                   key={lot.id}
                   onClick={() => setSelectedLot(lot)}
-                  className="w-full text-left p-4 rounded-2xl border border-blue-100 bg-blue-50 active:scale-95 transition-all"
+                  className="w-full text-left p-4 rounded-2xl border border-red-100 bg-red-50 active:scale-95 transition-all"
                 >
-                  <p className="text-xs text-blue-500 font-bold mb-1">{lot.fields['LOT번호']}</p>
-                  <div className="flex justify-between items-center">
-                    <p className="font-black text-lg text-gray-800">
+                  <p className="font-mono text-[12px] font-black text-[#FF3B30] tracking-tight mb-1">
+                    {lot.fields['LOT번호']}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[15px] font-black text-gray-800">
                       {lot.fields['품목명']}{' '}
-                      <span className="text-sm text-gray-500 font-normal">
+                      <span className="text-[13px] text-gray-500 font-normal">
                         (규격 {lot.fields['규격']}kg /{' '}
                         {formatMisuDisplay(lot.fields['미수'] ?? lot.fields['상세규격_표기'])})
                       </span>
                     </p>
-                    <p className="text-sm font-bold text-gray-500">
-                      재고:{' '}
-                      <span className="text-blue-600">
-                        {formatIntKo(Math.trunc(Number(lot.fields['재고수량'] ?? 0)))}
-                      </span>
+                    <p className="text-[13px] font-bold text-blue-600 shrink-0">
+                      {formatIntKo(Math.trunc(Number(lot.fields['재고수량'] ?? 0)))}박스
                     </p>
                   </div>
                 </button>
@@ -476,12 +478,12 @@ export default function OutboundRecordPage() {
             <div className="space-y-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="inline-block px-2 py-1 bg-red-100 text-red-600 text-[10px] font-black rounded-md mb-2">
+                  <span className="inline-block px-2 py-1 bg-red-100 text-[#FF3B30] text-[11px] font-black rounded-md mb-2">
                     선택된 상품
                   </span>
-                  <p className="font-black text-xl text-gray-800">
+                  <p className="text-[15px] font-black text-gray-800">
                     {selectedLot.fields['품목명']}{' '}
-                    <span className="text-base text-gray-500 font-normal">
+                    <span className="text-[13px] text-gray-500 font-normal">
                       (규격 {selectedLot.fields['규격']}kg /{' '}
                       {formatMisuDisplay(
                         selectedLot.fields['미수'] ?? selectedLot.fields['상세규격_표기'],
@@ -489,22 +491,24 @@ export default function OutboundRecordPage() {
                       )
                     </span>
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">{selectedLot.fields['LOT번호']}</p>
+                  <p className="font-mono text-[12px] font-black text-[#FF3B30] tracking-tight mt-0.5">
+                    {selectedLot.fields['LOT번호']}
+                  </p>
                 </div>
-                <button onClick={resetForm} className="text-xs text-gray-400 underline p-2">
+                <button onClick={resetForm} className="text-[12px] text-gray-400 underline p-2 shrink-0">
                   다시 검색
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-400 ml-1">현재 남은 재고</label>
-                  <div className="w-full p-4 bg-gray-50 rounded-2xl text-[15px] font-bold text-blue-600 text-left">
-                    {formatIntKo(Math.trunc(Number(selectedLot.fields['재고수량'] ?? 0)))}
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">현재 남은 재고</label>
+                  <div className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-blue-600">
+                    {formatIntKo(Math.trunc(Number(selectedLot.fields['재고수량'] ?? 0)))}박스
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-400 ml-1">출고할 수량</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">출고할 수량</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -515,31 +519,31 @@ export default function OutboundRecordPage() {
                       const { display } = fromGroupedIntegerInput(e.target.value);
                       setQuantity(display);
                     }}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-red-600 focus:ring-2 focus:ring-red-500 text-left"
+                    className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-[#FF3B30] outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-400 ml-1">보관처</label>
-                <div className="w-full p-4 bg-gray-50 rounded-2xl text-[15px] font-bold text-gray-700 text-left">
+                <label className="text-[13px] font-bold text-gray-500 ml-1">보관처</label>
+                <div className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-700">
                   {String(selectedLot.fields['보관처'] ?? '').trim() || '—'}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-400 ml-1">판매처</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매처</label>
                   <input
                     type="text"
                     placeholder="직접입력"
                     value={seller}
                     onChange={(e) => setSeller(e.target.value)}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-gray-800 text-left"
+                    className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-400 ml-1">판매 금액</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">판매 금액</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -549,14 +553,14 @@ export default function OutboundRecordPage() {
                       const { display } = fromGroupedIntegerInput(e.target.value);
                       setSalePrice(display);
                     }}
-                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-[15px] font-bold text-gray-800 text-left"
+                    className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                   />
                 </div>
               </div>
 
               <button
                 onClick={handleAddToCart}
-                className="w-full py-5 rounded-2xl bg-gray-800 text-white text-lg font-black active:scale-95 transition-all"
+                className="w-full py-4 rounded-2xl bg-gray-800 text-white text-[16px] font-black active:scale-95 transition-all"
               >
                 + 출고 목록에 추가
               </button>
@@ -567,7 +571,7 @@ export default function OutboundRecordPage() {
         {/* ── 장바구니 리스트 ──────────────────────────────────────────────── */}
         {cart.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-bold text-gray-400 ml-1">
+            <p className="text-[12px] font-bold text-gray-400 ml-1">
               출고 목록 ({cart.length}건)
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -578,21 +582,21 @@ export default function OutboundRecordPage() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[11px] font-bold text-gray-400">{item.lotNumber}</p>
-                    <p className="truncate font-black text-base text-gray-800">
+                    <p className="truncate text-[14px] font-black text-gray-800">
                       {item.productName}{' '}
-                      <span className="text-sm font-normal text-gray-500">
-                        (규격 {item.spec}kg / {formatMisuDisplay(item.misu)})
+                      <span className="text-[12px] font-normal text-gray-500">
+                        ({item.spec}kg / {formatMisuDisplay(item.misu)})
                       </span>
                     </p>
-                    <div className="mt-1 flex flex-wrap gap-3">
-                      <span className="text-sm font-bold text-red-600">
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <span className="text-[13px] font-bold text-[#FF3B30]">
                         {formatIntKo(item.quantity)}박스
                       </span>
                       {item.seller && (
-                        <span className="text-sm text-gray-500">{item.seller}</span>
+                        <span className="text-[12px] text-gray-500">{item.seller}</span>
                       )}
                       {item.salePrice != null && (
-                        <span className="text-sm text-gray-500">
+                        <span className="text-[12px] text-gray-500">
                           {formatIntKo(item.salePrice)}원
                         </span>
                       )}
@@ -604,7 +608,7 @@ export default function OutboundRecordPage() {
                       onClick={() =>
                         setCart((prev) => prev.filter((c) => c.cartId !== item.cartId))
                       }
-                      className="p-2 text-gray-900 hover:text-red-600 active:scale-90 transition-all"
+                      className="p-2 text-gray-300 hover:text-red-500 active:scale-90 transition-all"
                       aria-label="목록에서 삭제"
                     >
                       <TrashIcon className="h-5 w-5" />
@@ -619,12 +623,12 @@ export default function OutboundRecordPage() {
 
       {/* ── 출고 신청 버튼 (장바구니 1건 이상) ─────────────────────────────── */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-50 border-t border-gray-100">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F4F6] border-t border-gray-200">
           <button
             onClick={handleSubmitAll}
             disabled={isSubmitting}
-            className={`w-full py-5 rounded-2xl text-xl font-black text-white shadow-lg transition-all ${
-              isSubmitting ? 'bg-red-300 cursor-not-allowed' : 'bg-red-600 active:scale-95'
+            className={`w-full py-5 rounded-2xl text-[18px] font-black text-white shadow-lg transition-all ${
+              isSubmitting ? 'bg-red-300 cursor-not-allowed' : 'bg-[#FF3B30] active:scale-[0.98]'
             }`}
           >
             {isSubmitting ? '신청 중...' : `출고 신청 (${cart.length}건)`}
