@@ -1,241 +1,456 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  FunnelIcon,
-  XMarkIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/24/outline';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import PageHeader from '@/components/PageHeader';
-import { LOT_FIELDS } from '@/lib/airtable-schema';
 import {
-  formatLotSpecDisplayLine,
-  firstLotStringField,
-} from '@/lib/spec-display';
+  XMarkIcon,
+  ArrowsRightLeftIcon,
+  ArrowUpOnSquareIcon,
+} from '@heroicons/react/24/outline';
+import PageHeader from '@/components/PageHeader';
 
-type LotStockRecord = { id: string; fields: Record<string, unknown> };
+type Stage = 'form' | 'results' | 'summary';
 
-function lotProductTitle(fields: Record<string, unknown>): string {
-  const nameField = fields['품목명'];
-  if (typeof nameField === 'string' && nameField.trim()) return nameField.trim();
-  const p = fields['품목'];
-  if (typeof p === 'string' && p.trim()) return p.trim();
-  if (Array.isArray(p) && p.length) {
-    const first = p[0];
-    if (typeof first === 'string' && first.trim() && !first.startsWith('rec')) {
-      return first.trim();
-    }
-  }
-  return '-';
+type LotRecord = {
+  id: string;
+  lotNumber: string;
+  productName: string;
+  spec: string;      // e.g. "11" (kg per box)
+  misu: string;      // e.g. "42/44"
+  stockQty: number;  // boxes
+  salePrice: number; // 원/kg
+};
+
+type Filters = {
+  q: string;
+  spec: string;
+  misu: string;
+  from: string;
+  to: string;
+};
+
+function parseLot(r: { id: string; fields: Record<string, unknown> }): LotRecord {
+  const f = r.fields;
+  const str = (v: unknown) =>
+    Array.isArray(v) ? String(v[0] ?? '').trim() : String(v ?? '').trim();
+
+  return {
+    id: r.id,
+    lotNumber: str(f['LOT번호']),
+    productName: str(f['품목명']),
+    spec: str(f['규격표시']) || str(f['규격']),
+    misu: str(f['상세규격_표기']) || str(f['미수']),
+    stockQty: Number(Array.isArray(f['재고수량']) ? f['재고수량'][0] : f['재고수량']) || 0,
+    salePrice: Number(f['판매원가']) || 0,
+  };
+}
+
+function calcAmount(lot: LotRecord, boxes: number): number {
+  const kg = parseFloat(lot.spec);
+  if (!Number.isFinite(kg) || kg <= 0 || !lot.salePrice) return 0;
+  return Math.round(boxes * kg * lot.salePrice);
+}
+
+function FilterChip({ label }: { label: string }) {
+  return (
+    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[12px] font-bold whitespace-nowrap">
+      {label}
+    </span>
+  );
 }
 
 export default function StockStatusPage() {
   const router = useRouter();
-  const [stocks, setStocks] = useState<LotStockRecord[]>([]);
-  const [filteredStocks, setFilteredStocks] = useState<LotStockRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const [filters, setFilters] = useState({
-    searchTerm: '',
-    startDate: '',
-    endDate: '',
-    spec: '',
-    count: '',
-    origin: '',
-  });
+  const [stage, setStage] = useState<Stage>('form');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lots, setLots] = useState<LotRecord[]>([]);
+  const [selectedQty, setSelectedQty] = useState<Record<string, number>>({});
+  const [filters, setFilters] = useState<Filters>({ q: '', spec: '', misu: '', from: '', to: '' });
+  const [applied, setApplied] = useState<Filters | null>(null);
 
-  const fetchStocks = useCallback(async () => {
-    setLoading(true);
+  const canSearch =
+    filters.q.trim() || filters.spec.trim() || filters.misu.trim() || filters.from || filters.to;
+
+  const handleSearch = useCallback(async () => {
+    if (!canSearch) return;
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/inventory/lot-stock");
+      const p = new URLSearchParams();
+      if (filters.q.trim())   p.set('q',    filters.q.trim());
+      if (filters.spec.trim()) p.set('spec', filters.spec.trim());
+      if (filters.misu.trim()) p.set('misu', filters.misu.trim());
+      if (filters.from)        p.set('from', filters.from);
+      if (filters.to)          p.set('to',   filters.to);
+
+      const res = await fetch(`/api/inventory/lot-search?${p}`);
       if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
       const data = await res.json();
-      const rows = (data.records ?? []) as LotStockRecord[];
-      setStocks(rows);
-      setFilteredStocks(rows);
-    } catch (error) {
-      console.error("데이터 로드 실패:", error);
+      const records = (data.records ?? []).map(parseLot) as LotRecord[];
+      setLots(records);
+      setSelectedQty({});
+      setApplied({ ...filters });
+      setStage('results');
+    } catch {
+      alert('검색 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  }, [filters, canSearch]);
 
-  useEffect(() => {
-    fetchStocks();
-  }, [fetchStocks]);
-
-  const applyFilters = () => {
-    let result = [...stocks];
-
-    if (filters.searchTerm) {
-      const q = filters.searchTerm;
-      result = result.filter((s) => lotProductTitle(s.fields).includes(q));
-    }
-    if (filters.spec) {
-      const q = filters.spec;
-      result = result.filter((s) => {
-        const line = formatLotSpecDisplayLine(s.fields);
-        const raw = firstLotStringField(s.fields, ['규격표시', '규격']);
-        return line.includes(q) || raw.includes(q);
-      });
-    }
-    if (filters.count) {
-      const q = filters.count;
-      result = result.filter((s) => {
-        const misu = String(s.fields['미수'] ?? '');
-        const d1 = String(s.fields['상세규격_표기'] ?? '');
-        const d2 = String(s.fields['상세규격'] ?? '');
-        return misu.includes(q) || d1.includes(q) || d2.includes(q);
-      });
-    }
-
-    setFilteredStocks(result);
-    setIsFilterOpen(false);
+  const handleQtyChange = (id: string, value: string, max: number) => {
+    const n = parseInt(value, 10);
+    setSelectedQty((prev) => {
+      const next = { ...prev };
+      if (isNaN(n) || n <= 0) {
+        delete next[id];
+      } else {
+        next[id] = Math.min(n, max);
+      }
+      return next;
+    });
   };
 
-  const resetFilters = () => {
-    setFilters({ searchTerm: '', startDate: '', endDate: '', spec: '', count: '', origin: '' });
-    setFilteredStocks(stocks);
-    setIsFilterOpen(false);
-  };
+  const selectedLots = lots.filter((l) => (selectedQty[l.id] ?? 0) > 0);
+  const totalBoxes   = selectedLots.reduce((s, l) => s + (selectedQty[l.id] ?? 0), 0);
+  const totalAmount  = selectedLots.reduce((s, l) => s + calcAmount(l, selectedQty[l.id] ?? 0), 0);
 
-  return (
-    <main className="min-h-screen bg-gray-50 pb-10 relative" style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}>
-      {/* 상단 헤더 */}
-      <PageHeader
-        title="실시간 재고 현황"
-        onBack={() => router.push('/')}
-        rightSlot={
-          <button
-            onClick={() => setIsFilterOpen(true)}
-            className="p-1.5 bg-blue-50 rounded-xl text-blue-600 active:scale-95 transition-all"
-          >
-            <FunnelIcon className="w-5 h-5" />
-          </button>
-        }
-      />
+  /* ── 1단계: 검색 폼 ────────────────────────────────────────────── */
+  if (stage === 'form') {
+    return (
+      <main
+        className="min-h-screen bg-[#F2F4F6]"
+        style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+      >
+        <PageHeader title="재고 조회" onBack={() => router.push('/')} />
 
-      {/* 재고 리스트 */}
-      <div className="bg-white mt-2 px-4">
-        {loading ? (
-          <div className="text-center py-20 text-gray-400">최신 재고를 불러오는 중...</div>
-        ) : filteredStocks.length > 0 ? (
-          filteredStocks.map((stock) => {
-            const specRaw = firstLotStringField(stock.fields, ['규격표시', '규격']);
-            const misuRaw = firstLotStringField(stock.fields, ['미수', '상세규격_표기', '상세규격']);
-            const rawStockKg = stock.fields['재고수량'];
-            const stockKg = Number(Array.isArray(rawStockKg) ? rawStockKg[0] : rawStockKg) || 0;
-            const lotNo = String(stock.fields[LOT_FIELDS.lotNumber] ?? '').trim() || '-';
-            const salePriceRaw = stock.fields[LOT_FIELDS.salePrice];
-            const salePriceN = typeof salePriceRaw === 'number' ? salePriceRaw : Number(salePriceRaw);
+        <div className="p-5 space-y-4">
+          <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_24px_rgba(149,157,165,0.08)] space-y-5">
+            <h2 className="text-[15px] font-bold text-gray-700">검색 조건</h2>
 
-            return (
-              <div key={stock.id} className="py-3.5 border-b border-gray-300 last:border-0">
-                {/* 1줄: 품목명 + 총중량 */}
-                <div className="flex justify-between items-baseline gap-2">
-                  <p className="font-bold text-[15px] text-gray-900 truncate">
-                    {lotProductTitle(stock.fields)}
-                  </p>
-                  <p className="shrink-0 text-[14px] font-bold text-blue-600">
-                    {stockKg.toLocaleString('ko-KR')} kg
-                  </p>
-                </div>
-                {/* 2줄: LOT번호 */}
-                <p className="text-[12px] font-mono font-bold text-blue-500 mt-0.5">{lotNo}</p>
-                {/* 3줄: 규격/미수 + 판매원가 */}
-                <div className="flex justify-between items-baseline mt-0.5">
-                  <p className="text-[13px] text-gray-500">
-                    규격 {specRaw || '-'} / 미수 {misuRaw || '-'}
-                  </p>
-                  <p className="shrink-0 text-[13px] text-gray-600">
-                    {Number.isFinite(salePriceN) && salePriceN > 0
-                      ? `${Math.round(salePriceN).toLocaleString('ko-KR')}원`
-                      : '—'}
-                  </p>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="text-center py-20 text-gray-400">조건에 맞는 재고가 없습니다.</div>
-        )}
-      </div>
-
-      {/* 우측 슬라이드 팝업 필터 */}
-      {isFilterOpen && (
-        <div className="fixed inset-0 z-30 flex justify-end">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsFilterOpen(false)} />
-          <div className="relative w-4/5 max-w-sm bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold">상세 필터</h2>
-              <button onClick={() => setIsFilterOpen(false)}><XMarkIcon className="w-6 h-6" /></button>
+            {/* 품목명 */}
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500">품목명</label>
+              <input
+                type="text"
+                placeholder="예: 연어 필렛"
+                value={filters.q}
+                onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* 규격 + 미수 */}
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">품명 검색</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="품목명 입력"
-                    className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
-                    value={filters.searchTerm}
-                    onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
-                  />
-                  <MagnifyingGlassIcon className="w-5 h-5 absolute right-4 top-4 text-gray-400" />
-                </div>
+                <label className="text-[13px] font-bold text-gray-500">규격</label>
+                <input
+                  type="text"
+                  placeholder="예: 11"
+                  value={filters.spec}
+                  onChange={(e) => setFilters((f) => ({ ...f, spec: e.target.value }))}
+                  className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
               </div>
-
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">기간 설정</label>
-                <div className="flex gap-2 items-center text-xs">
-                  <input type="date" className="flex-1 p-3 bg-gray-100 rounded-xl border-none" />
-                  <span>~</span>
-                  <input type="date" className="flex-1 p-3 bg-gray-100 rounded-xl border-none" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">규격</label>
-                  <input
-                    type="text" placeholder="예: 11"
-                    className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
-                    value={filters.spec}
-                    onChange={(e) => setFilters({...filters, spec: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">미수</label>
-                  <input
-                    type="text" placeholder="예: 42/44"
-                    className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm"
-                    value={filters.count}
-                    onChange={(e) => setFilters({...filters, count: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">원산지</label>
-                <select className="w-full p-4 bg-gray-100 rounded-xl border-none text-sm appearance-none">
-                  <option>전체</option>
-                  <option>국산</option>
-                  <option>러시아</option>
-                  <option>중국</option>
-                </select>
+                <label className="text-[13px] font-bold text-gray-500">미수</label>
+                <input
+                  type="text"
+                  placeholder="예: 42/44"
+                  value={filters.misu}
+                  onChange={(e) => setFilters((f) => ({ ...f, misu: e.target.value }))}
+                  className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 flex gap-3">
-              <button onClick={resetFilters} className="flex-1 py-4 bg-white border border-gray-200 rounded-2xl font-bold text-gray-500">초기화</button>
-              <button onClick={applyFilters} className="flex-[2] py-4 bg-blue-600 rounded-2xl font-bold text-white shadow-lg">적용하기</button>
+            {/* 입고기간 */}
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500">입고기간</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={filters.from}
+                  onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+                  className="flex-1 bg-gray-100 rounded-2xl px-4 py-3.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                <span className="text-gray-400 font-bold shrink-0">~</span>
+                <input
+                  type="date"
+                  value={filters.to}
+                  onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+                  className="flex-1 bg-gray-100 rounded-2xl px-4 py-3.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={handleSearch}
+            disabled={!canSearch || isLoading}
+            className="w-full py-4 rounded-[20px] bg-blue-600 text-white text-[16px] font-black shadow-[0_4px_16px_rgba(59,130,246,0.3)] active:scale-[0.98] transition-all disabled:opacity-40"
+          >
+            {isLoading ? '조회 중...' : '조회하기'}
+          </button>
         </div>
-      )}
+      </main>
+    );
+  }
+
+  /* ── 2단계: 결과 리스트 ─────────────────────────────────────────── */
+  if (stage === 'results') {
+    return (
+      <main
+        className="min-h-screen bg-[#F2F4F6] pb-36"
+        style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+      >
+        <PageHeader
+          title="재고 조회"
+          onBack={() => setStage('form')}
+          rightSlot={
+            <button
+              onClick={() => { setStage('form'); setLots([]); setSelectedQty({}); }}
+              className="text-[13px] font-bold text-blue-600"
+            >
+              재검색
+            </button>
+          }
+        />
+
+        {/* 적용된 검색 조건 칩 */}
+        <div className="px-5 pt-3 pb-1 flex flex-wrap gap-2">
+          {applied?.q    && <FilterChip label={applied.q} />}
+          {applied?.spec && <FilterChip label={`규격 ${applied.spec}kg`} />}
+          {applied?.misu && <FilterChip label={`${applied.misu}미`} />}
+          {(applied?.from || applied?.to) && (
+            <FilterChip label={`${applied.from || '—'} ~ ${applied.to || '—'}`} />
+          )}
+        </div>
+
+        <p className="px-5 py-2 text-[13px] font-bold text-gray-400">
+          {lots.length}개 LOT
+        </p>
+
+        {/* LOT 카드 리스트 */}
+        <div className="px-5 space-y-3">
+          {lots.length === 0 ? (
+            <div className="bg-white rounded-[24px] py-20 text-center text-gray-400 font-bold shadow-[0_4px_12px_rgba(149,157,165,0.06)]">
+              조건에 맞는 재고가 없습니다
+            </div>
+          ) : (
+            lots.map((lot) => {
+              const selected = selectedQty[lot.id] ?? 0;
+              const est = calcAmount(lot, selected);
+              return (
+                <div
+                  key={lot.id}
+                  className={`bg-white rounded-[24px] p-5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-4 transition-all ${
+                    selected > 0 ? 'ring-2 ring-blue-400' : ''
+                  }`}
+                >
+                  {/* LOT 번호 */}
+                  <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed">
+                    {lot.lotNumber || '—'}
+                  </p>
+
+                  {/* 품목 정보 + 재고 */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[16px] font-black text-gray-900 truncate">
+                        {lot.productName || '—'}
+                      </p>
+                      <p className="text-[13px] text-gray-500 mt-0.5">
+                        {lot.spec ? `${lot.spec}kg` : '—'} ·{' '}
+                        {lot.misu ? `${lot.misu}미` : '—'}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[17px] font-black text-blue-600">
+                        {lot.stockQty.toLocaleString('ko-KR')}박스
+                      </p>
+                      {lot.salePrice > 0 && (
+                        <p className="text-[12px] text-gray-400 mt-0.5">
+                          {lot.salePrice.toLocaleString('ko-KR')}원/kg
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 수량 입력 */}
+                  <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
+                    <span className="text-[13px] font-bold text-gray-500 whitespace-nowrap shrink-0">
+                      선택 수량
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={lot.stockQty}
+                      value={selected || ''}
+                      onChange={(e) => handleQtyChange(lot.id, e.target.value, lot.stockQty)}
+                      placeholder="0"
+                      className="flex-1 text-right bg-gray-100 rounded-xl px-4 py-3 font-black text-[16px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                    <span className="text-[14px] font-bold text-gray-500 whitespace-nowrap shrink-0">
+                      박스
+                    </span>
+                  </div>
+
+                  {/* 예상 금액 */}
+                  {selected > 0 && est > 0 && (
+                    <p className="text-right text-[13px] font-bold text-blue-500">
+                      예상 {est.toLocaleString('ko-KR')}원
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* 하단 고정 바 */}
+        {lots.length > 0 && (
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 px-5 py-4"
+            style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold text-gray-400">선택</p>
+                <p className="text-[20px] font-black text-blue-600 leading-tight">
+                  {totalBoxes.toLocaleString('ko-KR')}박스
+                </p>
+                {totalAmount > 0 && (
+                  <p className="text-[12px] text-gray-500">
+                    {totalAmount.toLocaleString('ko-KR')}원 (예상)
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setStage('summary')}
+                disabled={totalBoxes === 0}
+                className="shrink-0 px-8 py-4 rounded-2xl bg-blue-600 text-white font-black text-[15px] shadow-[0_4px_16px_rgba(59,130,246,0.3)] active:scale-[0.98] transition-all disabled:opacity-40"
+              >
+                요약하기
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  }
+
+  /* ── 3단계: 요약 바텀시트 ───────────────────────────────────────── */
+  return (
+    <main
+      className="min-h-screen bg-[#F2F4F6]"
+      style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
+    >
+      {/* 딤 오버레이 */}
+      <div
+        className="fixed inset-0 bg-black/40 z-40"
+        onClick={() => setStage('results')}
+      />
+
+      {/* 바텀시트 */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] max-h-[85vh] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.15)]">
+        {/* 핸들 바 */}
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
+        </div>
+
+        {/* 헤더 */}
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between shrink-0">
+          <div>
+            <p className="text-[12px] font-bold text-gray-400 mb-1">
+              {[
+                applied?.q,
+                applied?.spec && `규격 ${applied.spec}kg`,
+                applied?.misu && `${applied.misu}미`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+            <h2 className="text-[22px] font-black text-gray-900">견적 요약</h2>
+          </div>
+          <button onClick={() => setStage('results')} className="p-2 -mr-1 mt-1">
+            <XMarkIcon className="w-6 h-6 text-gray-500" />
+          </button>
+        </div>
+
+        {/* LOT 목록 */}
+        <div className="flex-1 overflow-y-auto px-6 pb-2">
+          {selectedLots.map((lot, i) => {
+            const boxes  = selectedQty[lot.id] ?? 0;
+            const amount = calcAmount(lot, boxes);
+            return (
+              <div
+                key={lot.id}
+                className={`py-4 ${i < selectedLots.length - 1 ? 'border-b border-gray-100' : ''}`}
+              >
+                <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all mb-1">
+                  {lot.lotNumber}
+                </p>
+                <div className="flex justify-between items-baseline gap-2">
+                  <p className="text-[15px] font-black text-gray-900">
+                    {boxes.toLocaleString('ko-KR')}박스
+                  </p>
+                  {amount > 0 ? (
+                    <p className="text-[14px] font-bold text-gray-700 shrink-0">
+                      {amount.toLocaleString('ko-KR')}원
+                    </p>
+                  ) : (
+                    <p className="text-[13px] text-gray-400 shrink-0">단가 미산출</p>
+                  )}
+                </div>
+                <p className="text-[12px] text-gray-400 mt-0.5">
+                  {lot.productName}
+                  {lot.spec ? ` · ${lot.spec}kg` : ''}
+                  {lot.misu ? ` · ${lot.misu}미` : ''}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 합계 + 버튼 */}
+        <div
+          className="px-6 pt-4 pb-6 bg-gray-50 border-t border-gray-100 shrink-0 space-y-5"
+          style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex justify-between items-center">
+            <p className="text-[15px] font-bold text-gray-500">합계</p>
+            <div className="text-right">
+              <p className="text-[26px] font-black text-blue-600 leading-tight">
+                {totalBoxes.toLocaleString('ko-KR')}박스
+              </p>
+              {totalAmount > 0 && (
+                <p className="text-[14px] font-bold text-gray-500 mt-0.5">
+                  {totalAmount.toLocaleString('ko-KR')}원 (예상)
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => router.push('/inventory/transfer')}
+              className="py-4 rounded-2xl border-2 border-orange-400 text-orange-500 font-black text-[14px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+            >
+              <ArrowsRightLeftIcon className="w-5 h-5" />
+              재고 이동
+            </button>
+            <button
+              onClick={() => router.push('/inventory/outbound')}
+              className="py-4 rounded-2xl bg-red-600 text-white font-black text-[14px] flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(239,68,68,0.3)] active:scale-[0.98] transition-all"
+            >
+              <ArrowUpOnSquareIcon className="w-5 h-5" />
+              출고 요청
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>로그인 디자인 미리보기</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+  body { font-family: 'Noto Sans KR', sans-serif; background: #e5e7eb; }
+
+  /* 바텀시트 슬라이드업 */
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .slide-up { animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1) both; }
+
+  /* 도트 채우기 */
+  @keyframes dotFill {
+    0%   { transform: scale(0.6); }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  .dot-filled { animation: dotFill 0.18s ease both; }
+
+  /* 페이드인 */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .fade-in { animation: fadeIn 0.25s ease both; }
+</style>
+</head>
+<body class="p-8">
+
+<h1 class="text-center text-2xl font-black text-gray-800 mb-2">로그인 UI 디자인 비교</h1>
+<p class="text-center text-gray-500 text-sm mb-10">클릭하면 PIN 입력 화면이 나타납니다</p>
+
+<div class="flex flex-wrap justify-center gap-10">
+
+  <!-- ───────────────────────────── A: 토스 바텀시트 ───────────────────────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">A — 토스 바텀 시트</span>
+    <!-- 폰 프레임 -->
+    <div class="relative bg-white rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;">
+
+      <!-- 작업자 선택 화면 -->
+      <div id="A-home" class="absolute inset-0 bg-[#F2F4F6] flex flex-col">
+        <div class="px-6 pt-10 pb-4">
+          <h1 class="text-2xl font-black text-[#3182F6]">SEAERP</h1>
+          <p class="text-[13px] text-gray-500 font-medium mt-1">작업자를 선택하세요</p>
+        </div>
+        <div class="px-5 flex flex-col gap-2.5 mt-2">
+          <button onclick="openA()" class="bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform">
+            <div class="w-10 h-10 rounded-full bg-[#3182F6] flex items-center justify-center text-white font-bold text-[15px] shrink-0">김</div>
+            <span class="font-bold text-gray-900 text-[16px]">김창수</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="openA()" class="bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform">
+            <div class="w-10 h-10 rounded-full bg-[#00D082] flex items-center justify-center text-white font-bold text-[15px] shrink-0">이</div>
+            <span class="font-bold text-gray-900 text-[16px]">이정훈</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="openA()" class="bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform">
+            <div class="w-10 h-10 rounded-full bg-[#FF8C00] flex items-center justify-center text-white font-bold text-[15px] shrink-0">박</div>
+            <span class="font-bold text-gray-900 text-[16px]">박민준</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 바텀시트 오버레이 -->
+      <div id="A-overlay" class="absolute inset-0 hidden" style="background:rgba(0,0,0,0.45);" onclick="closeA()">
+        <div class="slide-up absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] pt-6 pb-8"
+             onclick="event.stopPropagation()">
+          <!-- 핸들 -->
+          <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+          <!-- 이름 + 안내 -->
+          <div class="px-6 mb-5">
+            <p class="text-[13px] text-gray-400 font-medium">비밀번호 입력</p>
+            <h2 class="text-[22px] font-black text-gray-900 mt-0.5">김창수</h2>
+          </div>
+          <!-- 도트 4개 -->
+          <div class="flex justify-center gap-5 mb-2" id="A-dots">
+            <div class="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+            <div class="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+          </div>
+          <p class="text-center text-[12px] text-red-500 font-medium mb-5 h-4" id="A-err"></p>
+          <!-- 키패드 (테두리 없음) -->
+          <div class="grid grid-cols-3 px-4" style="gap:2px;">
+            <button onclick="tapA('1')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">1</button>
+            <button onclick="tapA('2')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">2</button>
+            <button onclick="tapA('3')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">3</button>
+            <button onclick="tapA('4')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">4</button>
+            <button onclick="tapA('5')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">5</button>
+            <button onclick="tapA('6')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">6</button>
+            <button onclick="tapA('7')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">7</button>
+            <button onclick="tapA('8')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">8</button>
+            <button onclick="tapA('9')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">9</button>
+            <button onclick="clearA()" class="h-[58px] rounded-xl text-[14px] font-semibold text-gray-500 active:bg-gray-100 transition-colors">지움</button>
+            <button onclick="tapA('0')" class="h-[58px] rounded-xl text-[22px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">0</button>
+            <button onclick="backA()" class="h-[58px] rounded-xl flex items-center justify-center active:bg-gray-100 transition-colors">
+              <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ───────────────────────────── B: 카카오페이 풀스크린 ───────────────────────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">B — 카카오 풀스크린</span>
+    <div class="relative bg-white rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;">
+
+      <!-- 작업자 선택 화면 -->
+      <div id="B-home" class="absolute inset-0 bg-white flex flex-col">
+        <div class="px-6 pt-10 pb-6 border-b border-gray-100">
+          <h1 class="text-xl font-black text-gray-900">로그인</h1>
+        </div>
+        <div class="px-5 py-4 flex flex-col gap-0 divide-y divide-gray-100">
+          <button onclick="openB()" class="py-4 flex items-center gap-3 w-full text-left active:bg-gray-50">
+            <div class="w-9 h-9 rounded-full bg-yellow-300 flex items-center justify-center font-bold text-gray-800 text-sm shrink-0">K</div>
+            <span class="font-semibold text-gray-900 text-[16px]">김창수</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="openB()" class="py-4 flex items-center gap-3 w-full text-left active:bg-gray-50">
+            <div class="w-9 h-9 rounded-full bg-yellow-300 flex items-center justify-center font-bold text-gray-800 text-sm shrink-0">L</div>
+            <span class="font-semibold text-gray-900 text-[16px]">이정훈</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="openB()" class="py-4 flex items-center gap-3 w-full text-left active:bg-gray-50">
+            <div class="w-9 h-9 rounded-full bg-yellow-300 flex items-center justify-center font-bold text-gray-800 text-sm shrink-0">P</div>
+            <span class="font-semibold text-gray-900 text-[16px]">박민준</span>
+            <svg class="ml-auto w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 풀스크린 PIN -->
+      <div id="B-pin" class="absolute inset-0 bg-white flex-col hidden fade-in">
+        <div class="flex items-center px-4 pt-8 pb-3">
+          <button onclick="closeB()" class="w-10 h-10 flex items-center justify-center rounded-full active:bg-gray-100">
+            <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+        </div>
+        <div class="flex-1 flex flex-col items-center justify-center px-6" style="margin-top:-40px">
+          <p class="text-[13px] text-gray-400 font-medium mb-1">비밀번호</p>
+          <h2 class="text-[24px] font-black text-gray-900 mb-8">김창수 님</h2>
+          <!-- 도트 -->
+          <div class="flex gap-4 mb-2" id="B-dots">
+            <div class="w-5 h-5 rounded-full border-2 border-gray-300 transition-all"></div>
+            <div class="w-5 h-5 rounded-full border-2 border-gray-300 transition-all"></div>
+            <div class="w-5 h-5 rounded-full border-2 border-gray-300 transition-all"></div>
+            <div class="w-5 h-5 rounded-full border-2 border-gray-300 transition-all"></div>
+          </div>
+          <p class="text-[12px] text-red-500 font-medium h-4 mb-4" id="B-err"></p>
+        </div>
+        <!-- 키패드 -->
+        <div class="grid grid-cols-3 px-6 pb-8" style="gap:8px;">
+          <button onclick="tapB('1')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">1</button>
+          <button onclick="tapB('2')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">2</button>
+          <button onclick="tapB('3')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">3</button>
+          <button onclick="tapB('4')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">4</button>
+          <button onclick="tapB('5')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">5</button>
+          <button onclick="tapB('6')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">6</button>
+          <button onclick="tapB('7')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">7</button>
+          <button onclick="tapB('8')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">8</button>
+          <button onclick="tapB('9')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">9</button>
+          <button onclick="clearB()" class="h-14 rounded-2xl bg-gray-50 text-[13px] font-semibold text-gray-500 active:bg-gray-200 transition-colors">전체삭제</button>
+          <button onclick="tapB('0')" class="h-14 rounded-2xl bg-gray-50 text-[20px] font-semibold text-gray-900 active:bg-gray-200 transition-colors">0</button>
+          <button onclick="backB()" class="h-14 rounded-2xl bg-gray-50 flex items-center justify-center active:bg-gray-200 transition-colors">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ───────────────────────────── C: 미니멀 다크 오버레이 ───────────────────────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">C — 미니멀 다크</span>
+    <div class="relative bg-[#F2F4F6] rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;">
+
+      <!-- 홈 (기존 앱과 유사) -->
+      <div id="C-home" class="absolute inset-0 bg-[#F2F4F6] flex flex-col">
+        <div class="px-6 pt-10 pb-4">
+          <h1 class="text-[22px] font-black text-[#3182F6]">SEAERP</h1>
+          <p class="text-[12px] text-gray-400 font-medium mt-0.5">이름을 눌러 로그인하세요</p>
+        </div>
+        <div class="px-5 mt-2 grid grid-cols-2 gap-3">
+          <button onclick="openC()" class="bg-white rounded-[20px] px-4 py-5 flex flex-col items-center gap-2 shadow-sm active:scale-[0.97] transition-transform">
+            <div class="w-12 h-12 rounded-full bg-[#3182F6] flex items-center justify-center text-white font-black text-lg">김</div>
+            <span class="font-bold text-gray-900 text-[14px]">김창수</span>
+          </button>
+          <button onclick="openC()" class="bg-white rounded-[20px] px-4 py-5 flex flex-col items-center gap-2 shadow-sm active:scale-[0.97] transition-transform">
+            <div class="w-12 h-12 rounded-full bg-[#00D082] flex items-center justify-center text-white font-black text-lg">이</div>
+            <span class="font-bold text-gray-900 text-[14px]">이정훈</span>
+          </button>
+          <button onclick="openC()" class="bg-white rounded-[20px] px-4 py-5 flex flex-col items-center gap-2 shadow-sm active:scale-[0.97] transition-transform">
+            <div class="w-12 h-12 rounded-full bg-[#FF8C00] flex items-center justify-center text-white font-black text-lg">박</div>
+            <span class="font-bold text-gray-900 text-[14px]">박민준</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 다크 오버레이 + 카드 -->
+      <div id="C-overlay" class="absolute inset-0 hidden" style="background:rgba(10,10,20,0.72);" onclick="closeC()">
+        <div class="fade-in absolute left-4 right-4 top-1/2 -translate-y-1/2 bg-white rounded-[28px] px-6 py-7 shadow-2xl"
+             onclick="event.stopPropagation()">
+          <!-- 닫기 -->
+          <button onclick="closeC()" class="absolute right-5 top-5 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-sm font-bold">✕</button>
+          <!-- 이름 -->
+          <div class="mb-5">
+            <p class="text-[11px] text-gray-400 font-semibold tracking-widest uppercase mb-0.5">PASSCODE</p>
+            <h2 class="text-[20px] font-black text-gray-900">김창수</h2>
+          </div>
+          <!-- 도트 -->
+          <div class="flex justify-center gap-4 mb-1" id="C-dots">
+            <div class="w-[14px] h-[14px] rounded-full bg-gray-200 transition-all"></div>
+            <div class="w-[14px] h-[14px] rounded-full bg-gray-200 transition-all"></div>
+            <div class="w-[14px] h-[14px] rounded-full bg-gray-200 transition-all"></div>
+            <div class="w-[14px] h-[14px] rounded-full bg-gray-200 transition-all"></div>
+          </div>
+          <p class="text-center text-[11px] text-red-500 font-medium mb-4 h-4" id="C-err"></p>
+          <!-- 키패드 원형 -->
+          <div class="grid grid-cols-3" style="gap:6px;">
+            <button onclick="tapC('1')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">1</button>
+            <button onclick="tapC('2')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">2</button>
+            <button onclick="tapC('3')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">3</button>
+            <button onclick="tapC('4')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">4</button>
+            <button onclick="tapC('5')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">5</button>
+            <button onclick="tapC('6')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">6</button>
+            <button onclick="tapC('7')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">7</button>
+            <button onclick="tapC('8')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">8</button>
+            <button onclick="tapC('9')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">9</button>
+            <button onclick="clearC()" class="h-13 py-3 rounded-2xl text-[11px] font-semibold text-gray-400 active:bg-gray-100 transition-colors">지움</button>
+            <button onclick="tapC('0')" class="h-13 rounded-2xl py-3 text-[18px] font-semibold text-gray-900 active:bg-gray-100 transition-colors">0</button>
+            <button onclick="backC()" class="h-13 py-3 rounded-2xl flex items-center justify-center active:bg-gray-100 transition-colors">
+              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ───── A 로직 ─────
+let pinA = '';
+function openA() {
+  pinA = '';
+  document.getElementById('A-overlay').classList.remove('hidden');
+  document.getElementById('A-overlay').classList.add('flex');
+  updateDotsA();
+  document.getElementById('A-err').textContent = '';
+}
+function closeA() {
+  document.getElementById('A-overlay').classList.add('hidden');
+  document.getElementById('A-overlay').classList.remove('flex');
+  pinA = '';
+}
+function updateDotsA() {
+  const dots = document.querySelectorAll('#A-dots div');
+  dots.forEach((d, i) => {
+    if (i < pinA.length) {
+      d.style.background = '#191F28';
+      d.style.borderColor = '#191F28';
+      d.classList.add('dot-filled');
+    } else {
+      d.style.background = '';
+      d.style.borderColor = '#d1d5db';
+      d.classList.remove('dot-filled');
+    }
+  });
+}
+function tapA(n) {
+  if (pinA.length >= 4) return;
+  pinA += n;
+  updateDotsA();
+  if (pinA.length === 4) {
+    setTimeout(() => {
+      if (pinA === '1234') {
+        document.getElementById('A-err').textContent = '✓ 로그인 성공!';
+        document.getElementById('A-err').style.color = '#00D082';
+        setTimeout(closeA, 800);
+      } else {
+        document.getElementById('A-err').textContent = '비밀번호가 올바르지 않습니다';
+        document.getElementById('A-err').style.color = '#ef4444';
+        pinA = '';
+        updateDotsA();
+      }
+    }, 120);
+  }
+}
+function backA() { if (pinA.length) { pinA = pinA.slice(0,-1); updateDotsA(); } }
+function clearA() { pinA = ''; updateDotsA(); }
+
+// ───── B 로직 ─────
+let pinB = '';
+function openB() {
+  pinB = '';
+  document.getElementById('B-home').style.display = 'none';
+  document.getElementById('B-pin').classList.remove('hidden');
+  document.getElementById('B-pin').classList.add('flex');
+  updateDotsB();
+  document.getElementById('B-err').textContent = '';
+}
+function closeB() {
+  document.getElementById('B-pin').classList.add('hidden');
+  document.getElementById('B-pin').classList.remove('flex');
+  document.getElementById('B-home').style.display = '';
+  pinB = '';
+}
+function updateDotsB() {
+  const dots = document.querySelectorAll('#B-dots div');
+  dots.forEach((d, i) => {
+    if (i < pinB.length) {
+      d.style.background = '#3182F6';
+      d.style.borderColor = '#3182F6';
+      d.style.transform = 'scale(1.1)';
+    } else {
+      d.style.background = '';
+      d.style.borderColor = '#d1d5db';
+      d.style.transform = '';
+    }
+  });
+}
+function tapB(n) {
+  if (pinB.length >= 4) return;
+  pinB += n;
+  updateDotsB();
+  if (pinB.length === 4) {
+    setTimeout(() => {
+      if (pinB === '1234') {
+        document.getElementById('B-err').textContent = '✓ 로그인 성공!';
+        document.getElementById('B-err').style.color = '#00D082';
+        setTimeout(closeB, 800);
+      } else {
+        document.getElementById('B-err').textContent = '비밀번호가 올바르지 않습니다';
+        document.getElementById('B-err').style.color = '#ef4444';
+        pinB = '';
+        updateDotsB();
+      }
+    }, 120);
+  }
+}
+function backB() { if (pinB.length) { pinB = pinB.slice(0,-1); updateDotsB(); } }
+function clearB() { pinB = ''; updateDotsB(); }
+
+// ───── C 로직 ─────
+let pinC = '';
+function openC() {
+  pinC = '';
+  document.getElementById('C-overlay').classList.remove('hidden');
+  document.getElementById('C-overlay').classList.add('flex');
+  updateDotsC();
+  document.getElementById('C-err').textContent = '';
+}
+function closeC() {
+  document.getElementById('C-overlay').classList.add('hidden');
+  document.getElementById('C-overlay').classList.remove('flex');
+  pinC = '';
+}
+function updateDotsC() {
+  const dots = document.querySelectorAll('#C-dots div');
+  dots.forEach((d, i) => {
+    if (i < pinC.length) {
+      d.style.background = '#191F28';
+      d.style.width = '16px';
+      d.style.height = '16px';
+    } else {
+      d.style.background = '#e5e7eb';
+      d.style.width = '14px';
+      d.style.height = '14px';
+    }
+  });
+}
+function tapC(n) {
+  if (pinC.length >= 4) return;
+  pinC += n;
+  updateDotsC();
+  if (pinC.length === 4) {
+    setTimeout(() => {
+      if (pinC === '1234') {
+        document.getElementById('C-err').textContent = '✓ 로그인 성공!';
+        document.getElementById('C-err').style.color = '#00D082';
+        setTimeout(closeC, 800);
+      } else {
+        document.getElementById('C-err').textContent = '비밀번호가 올바르지 않습니다';
+        document.getElementById('C-err').style.color = '#ef4444';
+        pinC = '';
+        updateDotsC();
+      }
+    }, 120);
+  }
+}
+function backC() { if (pinC.length) { pinC = pinC.slice(0,-1); updateDotsC(); } }
+function clearC() { pinC = ''; updateDotsC(); }
+</script>
+
+<p class="text-center text-xs text-gray-400 mt-10">테스트 비밀번호: <strong>1234</strong></p>
+</body>
+</html>
