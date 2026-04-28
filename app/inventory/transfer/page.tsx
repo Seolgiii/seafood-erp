@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MagnifyingGlassIcon, TrashIcon } from '@heroicons/react/24/outline';
+import dynamic from 'next/dynamic';
+import { MagnifyingGlassIcon, QrCodeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { searchTransferLot, createTransferRecord, getStorageOptions } from '@/app/actions';
 import type { TransferLotResult } from '@/app/actions/inventory/transfer';
 import { readSession } from '@/lib/session';
+
+const BarcodeScanner = dynamic(
+  () => import('@/app/components/BarcodeScanner'),
+  { ssr: false, loading: () => null },
+);
 
 function todayKST(): string {
   const now = new Date();
@@ -36,6 +42,11 @@ export default function TransferPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState('');
   const [storageOptions, setStorageOptions] = useState<{ id: string; name: string }[]>([]);
+
+  // 검색 모드
+  const [searchMode, setSearchMode] = useState<'manual' | 'barcode'>('manual');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
 
   // LOT 검색
   const [keyword, setKeyword] = useState('');
@@ -90,6 +101,18 @@ export default function TransferPage() {
     } catch {}
   }, []);
 
+  // 카메라 지원 여부 감지
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      setHasCamera(false);
+      return;
+    }
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => setHasCamera(devices.some((d) => d.kind === 'videoinput')))
+      .catch(() => setHasCamera(false));
+  }, []);
+
   // 보관처 드롭다운 바깥 클릭 닫기
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -101,13 +124,14 @@ export default function TransferPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSearch = async () => {
-    if (!keyword.trim()) return;
+  // 검색 공통 로직
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) return;
     setIsSearching(true);
     setSelectedLot(null);
     setSearchResults([]);
     try {
-      const res = await searchTransferLot(keyword);
+      const res = await searchTransferLot(q);
       if (res.success) {
         if (res.records.length === 0) {
           alert('일치하는 재고가 없습니다.');
@@ -122,6 +146,35 @@ export default function TransferPage() {
     } finally {
       setIsSearching(false);
     }
+  }, []);
+
+  const handleSearch = () => doSearch(keyword);
+
+  // 바코드 감지 콜백
+  const handleBarcodeDetected = useCallback(async (raw: string) => {
+    let code = raw.trim();
+    try {
+      const url = new URL(code);
+      const lotParam = url.searchParams.get('lot');
+      if (lotParam) code = lotParam;
+    } catch {}
+    setScannerOpen(false);
+    setKeyword(code);
+    await doSearch(code);
+  }, [doSearch]);
+
+  const switchToManual = () => {
+    setSearchMode('manual');
+    setScannerOpen(false);
+    setKeyword('');
+    setSearchResults([]);
+  };
+
+  const switchToBarcode = () => {
+    setSearchMode('barcode');
+    setKeyword('');
+    setSearchResults([]);
+    if (hasCamera) setScannerOpen(true);
   };
 
   const handleSelect = (lot: TransferLotResult) => {
@@ -138,6 +191,7 @@ export default function TransferPage() {
     setTargetStorageName('');
     setKeyword('');
     setSearchResults([]);
+    if (searchMode === 'barcode' && hasCamera) setScannerOpen(true);
   };
 
   const filteredStorage = storageOptions.filter((o) => o.name.includes(storageQuery));
@@ -168,12 +222,12 @@ export default function TransferPage() {
       },
     ]);
 
-    // 검색 결과 유지, 선택만 초기화 → 같은 검색 결과에서 다른 LOT 선택 가능
     setSelectedLot(null);
     setTransferQty('');
     setStorageQuery('');
     setTargetStorageId('');
     setTargetStorageName('');
+    if (searchMode === 'barcode' && hasCamera) setScannerOpen(true);
   };
 
   const handleSubmitAll = async () => {
@@ -214,13 +268,38 @@ export default function TransferPage() {
 
       <main className="p-4 flex flex-col gap-4">
 
+        {/* 검색 모드 탭 */}
+        <div className="flex bg-gray-200 p-1 rounded-2xl">
+          <button
+            onClick={switchToManual}
+            className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+              searchMode === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            <MagnifyingGlassIcon className="w-5 h-5" />
+            직접 검색
+          </button>
+          <button
+            onClick={switchToBarcode}
+            className={`flex-1 py-3 text-[14px] font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
+              searchMode === 'barcode' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            <QrCodeIcon className="w-5 h-5" />
+            QR 스캔
+            {hasCamera === false && (
+              <span className="text-[10px] font-normal text-gray-400">(카메라 없음)</span>
+            )}
+          </button>
+        </div>
+
         {/* LOT 검색 + 이동 정보 카드 */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
 
-          {/* 검색 입력 (LOT 미선택 시) */}
-          {!selectedLot && (
+          {/* 직접 검색 모드 */}
+          {searchMode === 'manual' && !selectedLot && (
             <div className="space-y-3">
-              <label className="text-[13px] font-bold text-gray-400 ml-1">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
                 LOT 일련번호 또는 품목명
               </label>
               <div className="flex gap-2">
@@ -242,6 +321,65 @@ export default function TransferPage() {
                     : <MagnifyingGlassIcon className="w-5 h-5" />
                   }
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* QR 스캔 모드 */}
+          {searchMode === 'barcode' && !selectedLot && (
+            <div className="space-y-3">
+              {hasCamera === false && (
+                <div className="px-4 py-5 bg-gray-100 rounded-2xl text-center space-y-1">
+                  <p className="text-2xl">📵</p>
+                  <p className="text-[14px] font-bold text-gray-600">
+                    이 기기에서는 카메라를 사용할 수 없습니다.
+                  </p>
+                  <p className="text-[12px] text-gray-400">
+                    모바일에서 접속하거나 아래 입력창에 직접 입력하세요.
+                  </p>
+                </div>
+              )}
+
+              {hasCamera && scannerOpen && (
+                <BarcodeScanner onDetected={handleBarcodeDetected} />
+              )}
+
+              {hasCamera && !scannerOpen && !isSearching && (
+                <button
+                  onClick={() => { setKeyword(''); setSearchResults([]); setScannerOpen(true); }}
+                  className="w-full py-4 rounded-2xl bg-[#FF8C00] text-white text-[14px] font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <QrCodeIcon className="w-5 h-5" />
+                  다시 스캔하기
+                </button>
+              )}
+
+              {isSearching && (
+                <div className="py-4 text-center">
+                  <p className="text-[13px] font-bold text-gray-500 animate-pulse">검색 중...</p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={scannerOpen ? '스캔 대기중...' : '스캔 결과 또는 직접 입력'}
+                  value={keyword}
+                  readOnly={scannerOpen}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className={`flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF8C00] transition-all ${
+                    scannerOpen ? 'opacity-40 cursor-not-allowed' : ''
+                  }`}
+                />
+                {!scannerOpen && (
+                  <button
+                    onClick={handleSearch}
+                    disabled={isSearching || !keyword.trim()}
+                    className="shrink-0 bg-[#FF8C00] text-white px-5 rounded-2xl active:scale-95 transition-transform disabled:opacity-40"
+                  >
+                    <MagnifyingGlassIcon className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -280,7 +418,6 @@ export default function TransferPage() {
           {/* 선택된 LOT + 이동 정보 입력 */}
           {selectedLot && (
             <div className="space-y-5">
-              {/* 선택된 LOT 표시 */}
               <div className="flex items-start justify-between">
                 <div>
                   <span className="inline-block px-2 py-1 bg-orange-100 text-[#FF8C00] text-[11px] font-black rounded-md mb-2">
