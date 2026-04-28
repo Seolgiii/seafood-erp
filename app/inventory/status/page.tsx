@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   XMarkIcon,
@@ -21,19 +21,14 @@ type LotRecord = {
   salePrice: number; // 원/kg
 };
 
-type Filters = {
-  q: string;
-  spec: string;
-  misu: string;
-  from: string;
-  to: string;
-};
+type Product = { id: string; name: string; spec: string; detailSpec: string };
+
+type Filters = { q: string; spec: string; misu: string; from: string; to: string };
 
 function parseLot(r: { id: string; fields: Record<string, unknown> }): LotRecord {
   const f = r.fields;
   const str = (v: unknown) =>
     Array.isArray(v) ? String(v[0] ?? '').trim() : String(v ?? '').trim();
-
   return {
     id: r.id,
     lotNumber: str(f['LOT번호']),
@@ -68,6 +63,23 @@ export default function StockStatusPage() {
   const [selectedQty, setSelectedQty] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<Filters>({ q: '', spec: '', misu: '', from: '', to: '' });
   const [applied, setApplied] = useState<Filters | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  // 품목명 자동완성
+  const [productList, setProductList] = useState<Product[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/products/list')
+      .then((r) => r.json())
+      .then((d) => setProductList(d.products ?? []))
+      .catch(() => {});
+  }, []);
+
+  const filteredProducts = filters.q.trim().length > 0
+    ? productList.filter((p) => p.name.includes(filters.q.trim())).slice(0, 8)
+    : [];
 
   const canSearch =
     filters.q.trim() || filters.spec.trim() || filters.misu.trim() || filters.from || filters.to;
@@ -75,9 +87,10 @@ export default function StockStatusPage() {
   const handleSearch = useCallback(async () => {
     if (!canSearch) return;
     setIsLoading(true);
+    setNotFound(false);
     try {
       const p = new URLSearchParams();
-      if (filters.q.trim())   p.set('q',    filters.q.trim());
+      if (filters.q.trim())    p.set('q',    filters.q.trim());
       if (filters.spec.trim()) p.set('spec', filters.spec.trim());
       if (filters.misu.trim()) p.set('misu', filters.misu.trim());
       if (filters.from)        p.set('from', filters.from);
@@ -87,12 +100,18 @@ export default function StockStatusPage() {
       if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
       const data = await res.json();
       const records = (data.records ?? []).map(parseLot) as LotRecord[];
+
+      if (records.length === 0) {
+        setNotFound(true);
+        return; // 폼 유지
+      }
+
       setLots(records);
       setSelectedQty({});
       setApplied({ ...filters });
       setStage('results');
     } catch {
-      alert('검색 중 오류가 발생했습니다.');
+      alert('서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }
@@ -115,7 +134,47 @@ export default function StockStatusPage() {
   const totalBoxes   = selectedLots.reduce((s, l) => s + (selectedQty[l.id] ?? 0), 0);
   const totalAmount  = selectedLots.reduce((s, l) => s + calcAmount(l, selectedQty[l.id] ?? 0), 0);
 
-  /* ── 1단계: 검색 폼 ────────────────────────────────────────────── */
+  // Phase 2: sessionStorage에 저장 후 페이지 이동
+  const handleOutboundRequest = () => {
+    try {
+      sessionStorage.setItem(
+        'sea_outbound_draft',
+        JSON.stringify(
+          selectedLots.map((l) => ({
+            lotId: l.id,
+            lotNumber: l.lotNumber,
+            productName: l.productName,
+            spec: l.spec,
+            misu: l.misu,
+            stockQty: l.stockQty,
+            selectedBoxes: selectedQty[l.id] ?? 0,
+          })),
+        ),
+      );
+    } catch {}
+    router.push('/inventory/outbound');
+  };
+
+  const handleTransferRequest = () => {
+    const first = selectedLots[0];
+    if (!first) return;
+    try {
+      sessionStorage.setItem(
+        'sea_transfer_draft',
+        JSON.stringify({
+          lotId: first.id,
+          lotNumber: first.lotNumber,
+          productName: first.productName,
+          spec: first.spec,
+          misu: first.misu,
+          stockQty: first.stockQty,
+        }),
+      );
+    } catch {}
+    router.push('/inventory/transfer');
+  };
+
+  /* ── 1단계: 검색 폼 ──────────────────────────────────────────────── */
   if (stage === 'form') {
     return (
       <main
@@ -128,17 +187,56 @@ export default function StockStatusPage() {
           <div className="bg-white rounded-[24px] p-6 shadow-[0_8px_24px_rgba(149,157,165,0.08)] space-y-5">
             <h2 className="text-[15px] font-bold text-gray-700">검색 조건</h2>
 
-            {/* 품목명 */}
+            {/* 품목명 — 자동완성 */}
             <div className="space-y-2">
               <label className="text-[13px] font-bold text-gray-500">품목명</label>
-              <input
-                type="text"
-                placeholder="예: 연어 필렛"
-                value={filters.q}
-                onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
+              <div className="relative" ref={dropdownRef}>
+                <input
+                  type="text"
+                  placeholder="예: 연어 필렛"
+                  value={filters.q}
+                  onChange={(e) => {
+                    setFilters((f) => ({ ...f, q: e.target.value }));
+                    setNotFound(false);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { setShowDropdown(false); handleSearch(); }
+                    if (e.key === 'Escape') setShowDropdown(false);
+                  }}
+                  className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                {showDropdown && filteredProducts.length > 0 && (
+                  <ul className="absolute z-20 w-full mt-1 bg-white rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden border border-gray-100 max-h-52 overflow-y-auto">
+                    {filteredProducts.map((p) => (
+                      <li
+                        key={p.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setFilters((f) => ({
+                            ...f,
+                            q: p.name,
+                            spec: p.spec ? p.spec : f.spec,
+                            misu: p.detailSpec ? p.detailSpec : f.misu,
+                          }));
+                          setShowDropdown(false);
+                          setNotFound(false);
+                        }}
+                        className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 active:bg-blue-100 cursor-pointer flex items-center justify-between"
+                      >
+                        <span>{p.name}</span>
+                        {p.spec && (
+                          <span className="text-[12px] text-gray-400 font-normal">
+                            {p.spec}kg {p.detailSpec && `· ${p.detailSpec}미`}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* 규격 + 미수 */}
@@ -149,7 +247,7 @@ export default function StockStatusPage() {
                   type="text"
                   placeholder="예: 11"
                   value={filters.spec}
-                  onChange={(e) => setFilters((f) => ({ ...f, spec: e.target.value }))}
+                  onChange={(e) => { setFilters((f) => ({ ...f, spec: e.target.value })); setNotFound(false); }}
                   className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
@@ -159,7 +257,7 @@ export default function StockStatusPage() {
                   type="text"
                   placeholder="예: 42/44"
                   value={filters.misu}
-                  onChange={(e) => setFilters((f) => ({ ...f, misu: e.target.value }))}
+                  onChange={(e) => { setFilters((f) => ({ ...f, misu: e.target.value })); setNotFound(false); }}
                   className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
@@ -172,14 +270,14 @@ export default function StockStatusPage() {
                 <input
                   type="date"
                   value={filters.from}
-                  onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+                  onChange={(e) => { setFilters((f) => ({ ...f, from: e.target.value })); setNotFound(false); }}
                   className="flex-1 bg-gray-100 rounded-2xl px-4 py-3.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
                 <span className="text-gray-400 font-bold shrink-0">~</span>
                 <input
                   type="date"
                   value={filters.to}
-                  onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+                  onChange={(e) => { setFilters((f) => ({ ...f, to: e.target.value })); setNotFound(false); }}
                   className="flex-1 bg-gray-100 rounded-2xl px-4 py-3.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
@@ -193,12 +291,20 @@ export default function StockStatusPage() {
           >
             {isLoading ? '조회 중...' : '조회하기'}
           </button>
+
+          {/* 결과 없음 인라인 메시지 */}
+          {notFound && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-center">
+              <p className="text-[14px] font-bold text-amber-700">일치하는 재고가 없습니다</p>
+              <p className="text-[12px] text-amber-500 mt-1">검색 조건을 바꿔서 다시 시도해보세요</p>
+            </div>
+          )}
         </div>
       </main>
     );
   }
 
-  /* ── 2단계: 결과 리스트 ─────────────────────────────────────────── */
+  /* ── 2단계: 결과 리스트 ──────────────────────────────────────────── */
   if (stage === 'results') {
     return (
       <main
@@ -228,134 +334,114 @@ export default function StockStatusPage() {
           )}
         </div>
 
-        <p className="px-5 py-2 text-[13px] font-bold text-gray-400">
-          {lots.length}개 LOT
-        </p>
+        <p className="px-5 py-2 text-[13px] font-bold text-gray-400">{lots.length}개 LOT</p>
 
-        {/* LOT 카드 리스트 */}
+        {/* LOT 카드 */}
         <div className="px-5 space-y-3">
-          {lots.length === 0 ? (
-            <div className="bg-white rounded-[24px] py-20 text-center text-gray-400 font-bold shadow-[0_4px_12px_rgba(149,157,165,0.06)]">
-              조건에 맞는 재고가 없습니다
-            </div>
-          ) : (
-            lots.map((lot) => {
-              const selected = selectedQty[lot.id] ?? 0;
-              const est = calcAmount(lot, selected);
-              return (
-                <div
-                  key={lot.id}
-                  className={`bg-white rounded-[24px] p-5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-4 transition-all ${
-                    selected > 0 ? 'ring-2 ring-blue-400' : ''
-                  }`}
-                >
-                  {/* LOT 번호 */}
-                  <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed">
-                    {lot.lotNumber || '—'}
-                  </p>
-
-                  {/* 품목 정보 + 재고 */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[16px] font-black text-gray-900 truncate">
-                        {lot.productName || '—'}
-                      </p>
-                      <p className="text-[13px] text-gray-500 mt-0.5">
-                        {lot.spec ? `${lot.spec}kg` : '—'} ·{' '}
-                        {lot.misu ? `${lot.misu}미` : '—'}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[17px] font-black text-blue-600">
-                        {lot.stockQty.toLocaleString('ko-KR')}박스
-                      </p>
-                      {lot.salePrice > 0 && (
-                        <p className="text-[12px] text-gray-400 mt-0.5">
-                          {lot.salePrice.toLocaleString('ko-KR')}원/kg
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 수량 입력 */}
-                  <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
-                    <span className="text-[13px] font-bold text-gray-500 whitespace-nowrap shrink-0">
-                      선택 수량
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={lot.stockQty}
-                      value={selected || ''}
-                      onChange={(e) => handleQtyChange(lot.id, e.target.value, lot.stockQty)}
-                      placeholder="0"
-                      className="flex-1 text-right bg-gray-100 rounded-xl px-4 py-3 font-black text-[16px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                    <span className="text-[14px] font-bold text-gray-500 whitespace-nowrap shrink-0">
-                      박스
-                    </span>
-                  </div>
-
-                  {/* 예상 금액 */}
-                  {selected > 0 && est > 0 && (
-                    <p className="text-right text-[13px] font-bold text-blue-500">
-                      예상 {est.toLocaleString('ko-KR')}원
-                    </p>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* 하단 고정 바 */}
-        {lots.length > 0 && (
-          <div
-            className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 px-5 py-4"
-            style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-bold text-gray-400">선택</p>
-                <p className="text-[20px] font-black text-blue-600 leading-tight">
-                  {totalBoxes.toLocaleString('ko-KR')}박스
+          {lots.map((lot) => {
+            const selected = selectedQty[lot.id] ?? 0;
+            const est = calcAmount(lot, selected);
+            return (
+              <div
+                key={lot.id}
+                className={`bg-white rounded-[24px] p-5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-4 transition-all ${
+                  selected > 0 ? 'ring-2 ring-blue-400' : ''
+                }`}
+              >
+                <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed">
+                  {lot.lotNumber || '—'}
                 </p>
-                {totalAmount > 0 && (
-                  <p className="text-[12px] text-gray-500">
-                    {totalAmount.toLocaleString('ko-KR')}원 (예상)
+
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-black text-gray-900 truncate">
+                      {lot.productName || '—'}
+                    </p>
+                    <p className="text-[13px] text-gray-500 mt-0.5">
+                      {lot.spec ? `${lot.spec}kg` : '—'} · {lot.misu ? `${lot.misu}미` : '—'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[17px] font-black text-blue-600">
+                      {lot.stockQty.toLocaleString('ko-KR')}박스
+                    </p>
+                    {lot.salePrice > 0 && (
+                      <p className="text-[12px] text-gray-400 mt-0.5">
+                        {lot.salePrice.toLocaleString('ko-KR')}원/kg
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
+                  <span className="text-[13px] font-bold text-gray-500 whitespace-nowrap shrink-0">
+                    선택 수량
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={lot.stockQty}
+                    value={selected || ''}
+                    onChange={(e) => handleQtyChange(lot.id, e.target.value, lot.stockQty)}
+                    placeholder="0"
+                    className="flex-1 text-right bg-gray-100 rounded-xl px-4 py-3 font-black text-[16px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                  <span className="text-[14px] font-bold text-gray-500 whitespace-nowrap shrink-0">
+                    박스
+                  </span>
+                </div>
+
+                {selected > 0 && est > 0 && (
+                  <p className="text-right text-[13px] font-bold text-blue-500">
+                    예상 {est.toLocaleString('ko-KR')}원
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => setStage('summary')}
-                disabled={totalBoxes === 0}
-                className="shrink-0 px-8 py-4 rounded-2xl bg-blue-600 text-white font-black text-[15px] shadow-[0_4px_16px_rgba(59,130,246,0.3)] active:scale-[0.98] transition-all disabled:opacity-40"
-              >
-                요약하기
-              </button>
+            );
+          })}
+        </div>
+
+        {/* 하단 고정 바 */}
+        <div
+          className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 px-5 py-4"
+          style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-bold text-gray-400">선택</p>
+              <p className="text-[20px] font-black text-blue-600 leading-tight">
+                {totalBoxes.toLocaleString('ko-KR')}박스
+              </p>
+              {totalAmount > 0 && (
+                <p className="text-[12px] text-gray-500">
+                  {totalAmount.toLocaleString('ko-KR')}원 (예상)
+                </p>
+              )}
             </div>
+            <button
+              onClick={() => setStage('summary')}
+              disabled={totalBoxes === 0}
+              className="shrink-0 px-8 py-4 rounded-2xl bg-blue-600 text-white font-black text-[15px] shadow-[0_4px_16px_rgba(59,130,246,0.3)] active:scale-[0.98] transition-all disabled:opacity-40"
+            >
+              요약하기
+            </button>
           </div>
-        )}
+        </div>
       </main>
     );
   }
 
-  /* ── 3단계: 요약 바텀시트 ───────────────────────────────────────── */
+  /* ── 3단계: 요약 바텀시트 ─────────────────────────────────────────── */
   return (
     <main
       className="min-h-screen bg-[#F2F4F6]"
       style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >
-      {/* 딤 오버레이 */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40"
-        onClick={() => setStage('results')}
-      />
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setStage('results')} />
 
-      {/* 바텀시트 */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-[32px] max-h-[85vh] flex flex-col shadow-[0_-8px_40px_rgba(0,0,0,0.15)]">
-        {/* 핸들 바 */}
+        {/* 핸들 */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
         </div>
@@ -435,14 +521,19 @@ export default function StockStatusPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => router.push('/inventory/transfer')}
-              className="py-4 rounded-2xl border-2 border-orange-400 text-orange-500 font-black text-[14px] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+              onClick={handleTransferRequest}
+              className="py-4 rounded-2xl border-2 border-orange-400 text-orange-500 font-black text-[14px] flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all"
             >
-              <ArrowsRightLeftIcon className="w-5 h-5" />
-              재고 이동
+              <div className="flex items-center gap-1.5">
+                <ArrowsRightLeftIcon className="w-5 h-5" />
+                재고 이동
+              </div>
+              {selectedLots.length > 1 && (
+                <span className="text-[10px] font-normal text-orange-400">첫 번째 LOT만 이동</span>
+              )}
             </button>
             <button
-              onClick={() => router.push('/inventory/outbound')}
+              onClick={handleOutboundRequest}
               className="py-4 rounded-2xl bg-red-600 text-white font-black text-[14px] flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(239,68,68,0.3)] active:scale-[0.98] transition-all"
             >
               <ArrowUpOnSquareIcon className="w-5 h-5" />

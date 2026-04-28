@@ -7,6 +7,11 @@ function esc(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
+/** IFERROR로 감싸 없는 필드가 있어도 formula 에러 방지 */
+function safe(field: string): string {
+  return `IFERROR({${field}},'')`;
+}
+
 export async function GET(request: Request) {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return NextResponse.json({ error: "서버 환경 설정 오류" }, { status: 500 });
@@ -21,9 +26,9 @@ export async function GET(request: Request) {
 
   const conditions: string[] = ["{재고수량} > 0"];
 
-  if (q)    conditions.push(`FIND('${esc(q)}', {품목명})`);
-  if (spec) conditions.push(`OR(FIND('${esc(spec)}', {규격표시}), FIND('${esc(spec)}', {규격}))`);
-  if (misu) conditions.push(`OR(FIND('${esc(misu)}', {상세규격_표기}), FIND('${esc(misu)}', {미수}))`);
+  if (q)    conditions.push(`FIND('${esc(q)}', ${safe("품목명")})`);
+  if (spec) conditions.push(`OR(FIND('${esc(spec)}', ${safe("규격표시")}), FIND('${esc(spec)}', ${safe("규격")}))`);
+  if (misu) conditions.push(`OR(FIND('${esc(misu)}', ${safe("상세규격_표기")}), FIND('${esc(misu)}', ${safe("미수")}))`);
   if (from) conditions.push(`NOT(IS_BEFORE({입고일자}, '${from}'))`);
   if (to)   conditions.push(`NOT(IS_AFTER({입고일자}, '${to}'))`);
 
@@ -53,6 +58,10 @@ export async function GET(request: Request) {
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       console.error("[lot-search] Airtable 조회 실패:", res.status, body);
+      // formula 오류(422)나 기타 에러는 빈 결과로 내려줘 클라이언트 alert 방지
+      if (res.status === 422) {
+        return NextResponse.json({ records: [] });
+      }
       return NextResponse.json({ error: "데이터 조회 실패" }, { status: 502 });
     }
 

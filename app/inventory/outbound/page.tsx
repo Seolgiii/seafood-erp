@@ -7,6 +7,7 @@ import {
   MagnifyingGlassIcon,
   QrCodeIcon,
   TrashIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
@@ -66,11 +67,41 @@ export default function OutboundRecordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [draftBanner, setDraftBanner] = useState(0); // 재고 조회에서 불러온 LOT 수
 
   // ── 초기화 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
+  }, []);
+
+  // 재고 조회 → 출고 Phase 2: sessionStorage draft 자동 적재
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('sea_outbound_draft');
+      if (!raw) return;
+      sessionStorage.removeItem('sea_outbound_draft');
+      const draft = JSON.parse(raw) as Array<{
+        lotId: string; lotNumber: string; productName: string;
+        spec: string; misu: string; stockQty: number; selectedBoxes: number;
+      }>;
+      if (!Array.isArray(draft) || draft.length === 0) return;
+      const items: CartItem[] = draft.map((d, i) => ({
+        cartId: `draft-${d.lotId}-${i}`,
+        lotId: d.lotId,
+        lotNumber: d.lotNumber,
+        productName: d.productName,
+        spec: d.spec,
+        misu: d.misu,
+        origin: '',
+        storage: '',
+        quantity: d.selectedBoxes,
+        seller: '',
+        salePrice: undefined,
+      }));
+      setCart(items);
+      setDraftBanner(items.length);
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -267,6 +298,21 @@ export default function OutboundRecordPage() {
           </div>
         }
       />
+
+      {/* 재고 조회 연동 배너 */}
+      {draftBanner > 0 && (
+        <div className="mx-4 mt-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between gap-3">
+          <p className="text-[13px] font-bold text-blue-700">
+            재고 조회에서 {draftBanner}개 LOT를 불러왔습니다.
+            <span className="block text-[11px] font-normal text-blue-500 mt-0.5">
+              판매처·금액 입력 후 출고 신청하세요
+            </span>
+          </p>
+          <button onClick={() => setDraftBanner(0)} className="shrink-0 text-blue-400">
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       <div className="p-4 space-y-4">
         {/* ── 검색 모드 탭 ──────────────────────────────────────────────── */}

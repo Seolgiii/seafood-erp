@@ -50,6 +50,29 @@ export default function TransferPage() {
       .catch((e) => console.error('[보관처옵션 오류]', e));
   }, []);
 
+  // 재고 조회 → 재고 이동 Phase 2: sessionStorage draft 자동 선택
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('sea_transfer_draft');
+      if (!raw) return;
+      sessionStorage.removeItem('sea_transfer_draft');
+      const d = JSON.parse(raw) as {
+        lotId: string; lotNumber: string; productName: string;
+        spec: string; misu: string; stockQty: number;
+      };
+      setSelectedLot({
+        lotRecordId: d.lotId,
+        lotNumber: d.lotNumber,
+        productName: d.productName,
+        spec: d.spec,
+        misu: d.misu,
+        stockQty: d.stockQty,
+        storage: '',
+        inboundRecordId: '',
+      });
+    } catch {}
+  }, []);
+
   // 드롭다운 바깥 클릭 시 닫기
   useEffect(() => {
     const handler = (e: MouseEvent) => {
