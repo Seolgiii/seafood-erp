@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>로그인 디자인 프리뷰 v2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+  body { font-family: 'Noto Sans KR', sans-serif; background: #e5e7eb; }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .slide-up { animation: slideUp 0.32s cubic-bezier(0.32,0.72,0,1) both; }
+
+  @keyframes dotPop {
+    0%   { transform: scale(0.5); }
+    65%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  .dot-pop { animation: dotPop 0.18s ease both; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-6px); }
+    40%       { transform: translateX(6px); }
+    60%       { transform: translateX(-4px); }
+    80%       { transform: translateX(4px); }
+  }
+  .shake { animation: shake 0.38s ease both; }
+</style>
+</head>
+<body class="p-8">
+
+<h1 class="text-center text-2xl font-black text-gray-800 mb-2">로그인 디자인 프리뷰 v2</h1>
+<p class="text-center text-gray-500 text-sm mb-10">작업자를 클릭하면 PIN 입력 화면이 나타납니다 · 테스트 PIN: <strong>1234</strong></p>
+
+<div class="flex flex-wrap justify-center gap-12">
+
+  <!-- ── A: 블루 헤더 + 리스트형 ── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">A — 블루 헤더 · 리스트</span>
+    <div class="relative rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;background:#F2F4F6;">
+
+      <!-- 홈 -->
+      <div id="A-home" class="absolute inset-0 flex flex-col">
+
+        <!-- 블루 헤더 -->
+        <div class="bg-[#3182F6] px-6 pt-12 pb-8 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end" style="min-height:185px;">
+          <!-- 물고기 로고 워터마크 -->
+          <img
+            src="icons/apple-touch-icon.png"
+            alt=""
+            class="absolute pointer-events-none select-none"
+            style="width:400px;max-width:none;left:50%;top:50%;transform:translate(-50%,-50%) rotate(330deg);opacity:0.14;"
+          />
+          <h1 class="text-[26px] font-black text-white tracking-tight leading-none relative">SEAERP</h1>
+          <p class="mt-1.5 text-[13px] font-medium text-blue-100 relative">작업자를 선택해 로그인하세요</p>
+        </div>
+
+        <!-- 작업자 리스트 -->
+        <div class="flex-1 bg-[#F2F4F6] px-4 pt-4 overflow-auto">
+          <div class="flex flex-col gap-2.5">
+            <button onclick="openA(0,'김창수','#3182F6')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#3182F6] flex items-center justify-center text-white font-black text-[15px] shrink-0">김</div>
+              <span class="font-bold text-[#191F28] text-[15px]">김창수</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openA(1,'이정훈','#00D082')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#00D082] flex items-center justify-center text-white font-black text-[15px] shrink-0">이</div>
+              <span class="font-bold text-[#191F28] text-[15px]">이정훈</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openA(2,'박민준','#FF8C00')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#FF8C00] flex items-center justify-center text-white font-black text-[15px] shrink-0">박</div>
+              <span class="font-bold text-[#191F28] text-[15px]">박민준</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openA(3,'최수연','#5061FF')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#5061FF] flex items-center justify-center text-white font-black text-[15px] shrink-0">최</div>
+              <span class="font-bold text-[#191F28] text-[15px]">최수연</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 바텀시트 -->
+      <div id="A-overlay" class="absolute inset-0 hidden" style="background:rgba(0,0,0,0.45);" onclick="closeA()">
+        <div class="slide-up absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] pb-6"
+             onclick="event.stopPropagation()">
+          <div class="flex justify-center pt-3 pb-1">
+            <div class="w-10 h-[5px] rounded-full bg-gray-200"></div>
+          </div>
+          <div class="flex justify-center pt-5 pb-1">
+            <div id="A-avatar" class="w-13 h-13 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black"></div>
+          </div>
+          <p id="A-name" class="text-center text-[18px] font-black text-[#191F28] mt-2"></p>
+          <div class="flex justify-center gap-[18px] py-6" id="A-dots">
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+          </div>
+          <div class="h-4 flex items-center justify-center -mt-2 mb-2">
+            <p id="A-err" class="text-[12px] font-bold text-red-500"></p>
+          </div>
+          <div class="grid grid-cols-3 px-5" style="padding-bottom:max(16px,env(safe-area-inset-bottom))">
+            <button onclick="tapA('1')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">1</button>
+            <button onclick="tapA('2')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">2</button>
+            <button onclick="tapA('3')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">3</button>
+            <button onclick="tapA('4')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">4</button>
+            <button onclick="tapA('5')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">5</button>
+            <button onclick="tapA('6')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">6</button>
+            <button onclick="tapA('7')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">7</button>
+            <button onclick="tapA('8')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">8</button>
+            <button onclick="tapA('9')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">9</button>
+            <button onclick="clearA()" class="h-[64px] text-[13px] font-bold text-gray-400 rounded-2xl active:bg-gray-100 transition-colors">C</button>
+            <button onclick="tapA('0')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">0</button>
+            <button onclick="backA()" class="h-[64px] flex items-center justify-center rounded-2xl active:bg-gray-100 transition-colors">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── B: 블루 헤더 + 그리드형 ── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">B — 블루 헤더 · 그리드</span>
+    <div class="relative rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;background:#F2F4F6;">
+
+      <div id="B-home" class="absolute inset-0 flex flex-col">
+
+        <!-- 블루 헤더 (더 큰 버전) -->
+        <div class="bg-[#3182F6] px-6 pt-12 pb-10 flex-shrink-0">
+          <div class="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center mb-3">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75" />
+            </svg>
+          </div>
+          <h1 class="text-[28px] font-black text-white tracking-tight leading-none">SEAERP</h1>
+          <p class="mt-1.5 text-[13px] font-medium text-blue-100">작업자를 선택해 로그인하세요</p>
+        </div>
+
+        <!-- 그리드형 작업자 -->
+        <div class="flex-1 bg-[#F2F4F6] px-4 pt-4 overflow-auto">
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="openB(0,'김창수','#3182F6')" class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm active:scale-[0.97] transition-transform">
+              <div class="w-12 h-12 rounded-full bg-[#3182F6] flex items-center justify-center text-white font-black text-[18px]">김</div>
+              <span class="font-bold text-[#191F28] text-[14px]">김창수</span>
+            </button>
+            <button onclick="openB(1,'이정훈','#00D082')" class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm active:scale-[0.97] transition-transform">
+              <div class="w-12 h-12 rounded-full bg-[#00D082] flex items-center justify-center text-white font-black text-[18px]">이</div>
+              <span class="font-bold text-[#191F28] text-[14px]">이정훈</span>
+            </button>
+            <button onclick="openB(2,'박민준','#FF8C00')" class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm active:scale-[0.97] transition-transform">
+              <div class="w-12 h-12 rounded-full bg-[#FF8C00] flex items-center justify-center text-white font-black text-[18px]">박</div>
+              <span class="font-bold text-[#191F28] text-[14px]">박민준</span>
+            </button>
+            <button onclick="openB(3,'최수연','#5061FF')" class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2.5 shadow-sm active:scale-[0.97] transition-transform">
+              <div class="w-12 h-12 rounded-full bg-[#5061FF] flex items-center justify-center text-white font-black text-[18px]">최</div>
+              <span class="font-bold text-[#191F28] text-[14px]">최수연</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 바텀시트 -->
+      <div id="B-overlay" class="absolute inset-0 hidden" style="background:rgba(0,0,0,0.45);" onclick="closeB()">
+        <div class="slide-up absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] pb-6"
+             onclick="event.stopPropagation()">
+          <div class="flex justify-center pt-3 pb-1">
+            <div class="w-10 h-[5px] rounded-full bg-gray-200"></div>
+          </div>
+          <div class="flex justify-center pt-5 pb-1">
+            <div id="B-avatar" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black"></div>
+          </div>
+          <p id="B-name" class="text-center text-[18px] font-black text-[#191F28] mt-2"></p>
+          <div class="flex justify-center gap-[18px] py-6" id="B-dots">
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+          </div>
+          <div class="h-4 flex items-center justify-center -mt-2 mb-2">
+            <p id="B-err" class="text-[12px] font-bold text-red-500"></p>
+          </div>
+          <div class="grid grid-cols-3 px-5">
+            <button onclick="tapB('1')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">1</button>
+            <button onclick="tapB('2')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">2</button>
+            <button onclick="tapB('3')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">3</button>
+            <button onclick="tapB('4')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">4</button>
+            <button onclick="tapB('5')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">5</button>
+            <button onclick="tapB('6')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">6</button>
+            <button onclick="tapB('7')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">7</button>
+            <button onclick="tapB('8')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">8</button>
+            <button onclick="tapB('9')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">9</button>
+            <button onclick="clearB()" class="h-[64px] text-[13px] font-bold text-gray-400 rounded-2xl active:bg-gray-100 transition-colors">C</button>
+            <button onclick="tapB('0')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">0</button>
+            <button onclick="backB()" class="h-[64px] flex items-center justify-center rounded-2xl active:bg-gray-100 transition-colors">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── C: 그라디언트 헤더 ── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">C — 그라디언트 헤더</span>
+    <div class="relative rounded-[40px] shadow-2xl overflow-hidden"
+         style="width:320px;height:640px;border:8px solid #111;background:#F2F4F6;">
+
+      <div id="C-home" class="absolute inset-0 flex flex-col">
+
+        <!-- 그라디언트 헤더 -->
+        <div style="background:linear-gradient(135deg,#1a6ef5 0%,#3182F6 55%,#4f9dff 100%)"
+             class="px-6 pt-12 pb-10 flex-shrink-0 relative overflow-hidden">
+          <!-- 배경 장식 원 -->
+          <div class="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-white/10"></div>
+          <div class="absolute -right-2 top-16 w-20 h-20 rounded-full bg-white/10"></div>
+          <div class="w-11 h-11 bg-white/25 rounded-2xl flex items-center justify-center mb-3 relative">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6.75v6.75" />
+            </svg>
+          </div>
+          <h1 class="text-[28px] font-black text-white tracking-tight leading-none relative">SEAERP</h1>
+          <p class="mt-1.5 text-[13px] font-medium text-blue-100 relative">작업자를 선택해 로그인하세요</p>
+        </div>
+
+        <!-- 리스트 -->
+        <div class="flex-1 bg-[#F2F4F6] px-4 pt-4 overflow-auto">
+          <div class="flex flex-col gap-2.5">
+            <button onclick="openC(0,'김창수','#3182F6')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#3182F6] flex items-center justify-center text-white font-black text-[15px] shrink-0">김</div>
+              <span class="font-bold text-[#191F28] text-[15px]">김창수</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openC(1,'이정훈','#00D082')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#00D082] flex items-center justify-center text-white font-black text-[15px] shrink-0">이</div>
+              <span class="font-bold text-[#191F28] text-[15px]">이정훈</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openC(2,'박민준','#FF8C00')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#FF8C00] flex items-center justify-center text-white font-black text-[15px] shrink-0">박</div>
+              <span class="font-bold text-[#191F28] text-[15px]">박민준</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button onclick="openC(3,'최수연','#5061FF')" class="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3.5 shadow-sm active:scale-[0.98] transition-transform">
+              <div class="w-10 h-10 rounded-full bg-[#5061FF] flex items-center justify-center text-white font-black text-[15px] shrink-0">최</div>
+              <span class="font-bold text-[#191F28] text-[15px]">최수연</span>
+              <svg class="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 바텀시트 -->
+      <div id="C-overlay" class="absolute inset-0 hidden" style="background:rgba(0,0,0,0.45);" onclick="closeC()">
+        <div class="slide-up absolute bottom-0 left-0 right-0 bg-white rounded-t-[28px] pb-6"
+             onclick="event.stopPropagation()">
+          <div class="flex justify-center pt-3 pb-1">
+            <div class="w-10 h-[5px] rounded-full bg-gray-200"></div>
+          </div>
+          <div class="flex justify-center pt-5 pb-1">
+            <div id="C-avatar" class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black"></div>
+          </div>
+          <p id="C-name" class="text-center text-[18px] font-black text-[#191F28] mt-2"></p>
+          <div class="flex justify-center gap-[18px] py-6" id="C-dots">
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-[#E5E8EB]"></div>
+          </div>
+          <div class="h-4 flex items-center justify-center -mt-2 mb-2">
+            <p id="C-err" class="text-[12px] font-bold text-red-500"></p>
+          </div>
+          <div class="grid grid-cols-3 px-5">
+            <button onclick="tapC('1')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">1</button>
+            <button onclick="tapC('2')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">2</button>
+            <button onclick="tapC('3')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">3</button>
+            <button onclick="tapC('4')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">4</button>
+            <button onclick="tapC('5')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">5</button>
+            <button onclick="tapC('6')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">6</button>
+            <button onclick="tapC('7')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">7</button>
+            <button onclick="tapC('8')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">8</button>
+            <button onclick="tapC('9')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">9</button>
+            <button onclick="clearC()" class="h-[64px] text-[13px] font-bold text-gray-400 rounded-2xl active:bg-gray-100 transition-colors">C</button>
+            <button onclick="tapC('0')" class="h-[64px] text-[24px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors">0</button>
+            <button onclick="backC()" class="h-[64px] flex items-center justify-center rounded-2xl active:bg-gray-100 transition-colors">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l-4-4m0 0l4-4m-4 4h12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 공통 헬퍼 ──
+function makePin(id) {
+  return {
+    val: '',
+    color: '#191F28',
+    update() {
+      const dots = document.querySelectorAll(`#${id}-dots div`);
+      dots.forEach((d, i) => {
+        if (i < this.val.length) {
+          d.style.backgroundColor = this.color;
+          d.classList.add('dot-pop');
+        } else {
+          d.style.backgroundColor = '#E5E8EB';
+          d.classList.remove('dot-pop');
+        }
+      });
+    },
+    flash(errMsg) {
+      this.val = '';
+      this.update();
+      const dots = document.querySelectorAll(`#${id}-dots div`);
+      dots.forEach(d => { d.style.backgroundColor = '#FF3B30'; });
+      const errEl = document.getElementById(`${id}-err`);
+      if (errEl) errEl.textContent = errMsg;
+      const dotsWrap = document.getElementById(`${id}-dots`);
+      dotsWrap.classList.add('shake');
+      setTimeout(() => {
+        dotsWrap.classList.remove('shake');
+        this.update();
+      }, 400);
+    }
+  };
+}
+
+// ── A ──
+const pA = makePin('A');
+let aWorker = null;
+function openA(idx, name, color) {
+  aWorker = { name, color };
+  pA.val = ''; pA.color = '#191F28'; pA.update();
+  document.getElementById('A-err').textContent = '';
+  document.getElementById('A-avatar').textContent = name[0];
+  document.getElementById('A-avatar').style.backgroundColor = color;
+  document.getElementById('A-name').textContent = name;
+  const ol = document.getElementById('A-overlay');
+  ol.classList.remove('hidden'); ol.classList.add('flex');
+}
+function closeA() {
+  const ol = document.getElementById('A-overlay');
+  ol.classList.add('hidden'); ol.classList.remove('flex');
+  pA.val = '';
+}
+function tapA(n) {
+  if (pA.val.length >= 4) return;
+  pA.val += n; pA.update();
+  if (pA.val.length === 4) setTimeout(() => {
+    if (pA.val === '1234') { document.getElementById('A-err').textContent = '✓ 로그인 성공!'; document.getElementById('A-err').style.color='#00D082'; setTimeout(closeA, 700); }
+    else pA.flash('PIN이 올바르지 않습니다');
+  }, 100);
+}
+function backA() { if (pA.val.length) { pA.val = pA.val.slice(0,-1); pA.update(); } }
+function clearA() { pA.val = ''; pA.update(); }
+
+// ── B ──
+const pB = makePin('B');
+function openB(idx, name, color) {
+  pB.val = ''; pB.color = '#191F28'; pB.update();
+  document.getElementById('B-err').textContent = '';
+  document.getElementById('B-avatar').textContent = name[0];
+  document.getElementById('B-avatar').style.backgroundColor = color;
+  document.getElementById('B-name').textContent = name;
+  const ol = document.getElementById('B-overlay');
+  ol.classList.remove('hidden'); ol.classList.add('flex');
+}
+function closeB() {
+  const ol = document.getElementById('B-overlay');
+  ol.classList.add('hidden'); ol.classList.remove('flex');
+  pB.val = '';
+}
+function tapB(n) {
+  if (pB.val.length >= 4) return;
+  pB.val += n; pB.update();
+  if (pB.val.length === 4) setTimeout(() => {
+    if (pB.val === '1234') { document.getElementById('B-err').textContent = '✓ 로그인 성공!'; document.getElementById('B-err').style.color='#00D082'; setTimeout(closeB, 700); }
+    else pB.flash('PIN이 올바르지 않습니다');
+  }, 100);
+}
+function backB() { if (pB.val.length) { pB.val = pB.val.slice(0,-1); pB.update(); } }
+function clearB() { pB.val = ''; pB.update(); }
+
+// ── C ──
+const pC = makePin('C');
+function openC(idx, name, color) {
+  pC.val = ''; pC.color = '#191F28'; pC.update();
+  document.getElementById('C-err').textContent = '';
+  document.getElementById('C-avatar').textContent = name[0];
+  document.getElementById('C-avatar').style.backgroundColor = color;
+  document.getElementById('C-name').textContent = name;
+  const ol = document.getElementById('C-overlay');
+  ol.classList.remove('hidden'); ol.classList.add('flex');
+}
+function closeC() {
+  const ol = document.getElementById('C-overlay');
+  ol.classList.add('hidden'); ol.classList.remove('flex');
+  pC.val = '';
+}
+function tapC(n) {
+  if (pC.val.length >= 4) return;
+  pC.val += n; pC.update();
+  if (pC.val.length === 4) setTimeout(() => {
+    if (pC.val === '1234') { document.getElementById('C-err').textContent = '✓ 로그인 성공!'; document.getElementById('C-err').style.color='#00D082'; setTimeout(closeC, 700); }
+    else pC.flash('PIN이 올바르지 않습니다');
+  }, 100);
+}
+function backC() { if (pC.val.length) { pC.val = pC.val.slice(0,-1); pC.update(); } }
+function clearC() { pC.val = ''; pC.update(); }
+</script>
+
+</body>
+</html>

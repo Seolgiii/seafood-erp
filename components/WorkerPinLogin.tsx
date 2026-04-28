@@ -153,17 +153,36 @@ export function WorkerPinLogin() {
 
   return (
     <main
-      className="flex min-h-screen flex-col bg-white"
+      className="flex min-h-screen flex-col bg-[#F2F4F6]"
       style={{ fontFamily: "'Spoqa Han Sans Neo', sans-serif" }}
     >
-      {/* 헤더 */}
-      <header className="px-6 pt-14 pb-6">
-        <h1 className="text-[26px] font-black text-[#191F28] tracking-tight">SEAERP</h1>
-        <p className="mt-1 text-[15px] font-medium text-gray-400">작업자를 선택하세요</p>
+      {/* 블루 헤더 */}
+      <header
+        className="bg-[#3182F6] px-6 pt-12 pb-8 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end"
+        style={{ minHeight: 185 }}
+      >
+        {/* 물고기 워터마크 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/apple-touch-icon.png"
+          alt=""
+          aria-hidden="true"
+          className="absolute pointer-events-none select-none"
+          style={{
+            width: 400,
+            maxWidth: 'none',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%) rotate(330deg)',
+            opacity: 0.14,
+          }}
+        />
+        <h1 className="text-[26px] font-black text-white tracking-tight leading-none relative">SEAERP</h1>
+        <p className="mt-1.5 text-[13px] font-medium text-blue-100 relative">작업자를 선택해 로그인하세요</p>
       </header>
 
       {/* 작업자 목록 */}
-      <div className="flex-1 px-2">
+      <div className="flex-1 px-4 pt-4">
         {loadingList && (
           <div className="flex justify-center pt-24">
             <div className="w-8 h-8 border-[3px] border-gray-200 border-t-[#3182F6] rounded-full animate-spin" />
@@ -173,7 +192,7 @@ export function WorkerPinLogin() {
           <p className="text-center text-[15px] text-red-500 pt-24">{loadError}</p>
         )}
         {!loadingList && !loadError && (
-          <ul className="flex flex-col">
+          <ul className="flex flex-col gap-2.5">
             {workers.length === 0 ? (
               <li className="text-center text-[15px] text-gray-400 pt-24">등록된 작업자가 없습니다</li>
             ) : (
@@ -182,15 +201,18 @@ export function WorkerPinLogin() {
                   <button
                     type="button"
                     onClick={() => openForWorker(w, i)}
-                    className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl active:bg-gray-50 transition-colors touch-manipulation"
+                    className="w-full bg-white flex items-center gap-3.5 px-4 py-3.5 rounded-2xl shadow-sm active:scale-[0.98] transition-transform touch-manipulation"
                   >
                     <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[18px] font-black shrink-0"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[15px] font-black shrink-0"
                       style={{ backgroundColor: avatarColor(i) }}
                     >
                       {w.name[0]}
                     </div>
-                    <span className="text-[17px] font-bold text-[#191F28]">{w.name}</span>
+                    <span className="text-[15px] font-bold text-[#191F28]">{w.name}</span>
+                    <svg className="ml-auto w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
                 </li>
               ))
