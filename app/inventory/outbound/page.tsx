@@ -44,7 +44,6 @@ function formatMisuDisplay(raw: unknown): string {
 export default function OutboundRecordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [now, setNow] = useState<Date | null>(null);
   const [workerId, setWorkerId] = useState('');
 
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -102,10 +101,6 @@ export default function OutboundRecordPage() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // 카메라 지원 여부 감지 (모바일: true, PC: false)
   useEffect(() => {
@@ -233,7 +228,7 @@ export default function OutboundRecordPage() {
 
     for (const item of cart) {
       const result = await createOutboundRecord({
-        date: (now ?? new Date()).toISOString().split('T')[0],
+        date: new Date().toISOString().split('T')[0],
         lotNumber: item.lotNumber,
         lotRecordId: item.lotId,
         quantity: item.quantity,
@@ -267,26 +262,16 @@ export default function OutboundRecordPage() {
         onBack={() => router.push('/')}
         titleClassName="text-[#FF3B30] font-black"
         rightSlot={
-          <div className="flex items-center gap-2">
-            {hasCamera !== false && (
-              <button
-                onClick={() => setScannerOpen((v) => !v)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-all ${
-                  scannerOpen ? 'bg-[#FF3B30] text-white' : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                <QrCodeIcon className="w-5 h-5" />
-              </button>
-            )}
-            <div className="text-right leading-tight">
-              <p className="text-[10px] text-gray-500 font-medium">
-                {now ? now.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : ''}
-              </p>
-              <p className="text-[12px] font-bold text-gray-900">
-                {now ? now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-              </p>
-            </div>
-          </div>
+          hasCamera !== false ? (
+            <button
+              onClick={() => setScannerOpen((v) => !v)}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-all ${
+                scannerOpen ? 'bg-[#FF3B30] text-white' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              <QrCodeIcon className="w-5 h-5" />
+            </button>
+          ) : null
         }
       />
 
