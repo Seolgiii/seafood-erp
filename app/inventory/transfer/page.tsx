@@ -371,7 +371,7 @@ export default function TransferPage() {
               </div>
 
               {/* 이동일 */}
-              <div className="space-y-2">
+              <div className="space-y-2 overflow-hidden">
                 <label className="text-[13px] font-bold text-gray-500 ml-1">
                   이동일 <span className="text-red-500">*</span>
                 </label>
@@ -379,7 +379,7 @@ export default function TransferPage() {
                   type="date"
                   value={transferDate}
                   onChange={(e) => setTransferDate(e.target.value)}
-                  className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF8C00] transition-all"
+                  className="w-full max-w-full bg-gray-100 text-gray-900 text-[14px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF8C00] transition-all"
                 />
               </div>
 
