@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 import { unstable_cache } from "next/cache";
@@ -52,7 +53,7 @@ async function fetchAllRecords(
         cache: "no-store",
       });
       if (!res.ok) {
-        console.error(`[dashboard] ${tableName} fetch 실패: ${res.status}`);
+        logError(`[dashboard] ${tableName} fetch 실패: ${res.status}`);
         break;
       }
       const data = (await res.json()) as AirtableListResponse;
@@ -65,7 +66,7 @@ async function fetchAllRecords(
       }
       offset = data.offset;
     } catch (e) {
-      console.error(`[dashboard] ${tableName} fetch 예외:`, e);
+      logError(`[dashboard] ${tableName} fetch 예외:`, e);
       break;
     }
   } while (offset);
@@ -133,7 +134,7 @@ async function computeStats(requesterWorkerId?: string): Promise<DashboardStats>
     pendingApprovals: inboundPending + outboundPending + expensePending,
   };
 
-  console.log("[dashboard] stats", { requesterWorkerId: requesterWorkerId ?? "ALL", ...stats });
+  log("[dashboard] stats", { requesterWorkerId: requesterWorkerId ?? "ALL", ...stats });
   return stats;
 }
 

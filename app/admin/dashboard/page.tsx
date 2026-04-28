@@ -21,6 +21,7 @@ import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import { usePullToRefresh } from "@/lib/pull-to-refresh";
+import { logError } from "@/lib/logger";
 
 const PENDING_STATUSES = ["승인 대기", "최종 승인 대기"];
 
@@ -154,7 +155,7 @@ export default function AdminDashboardPage() {
         loadData();
       }
     } catch (err) {
-      console.error("[handleApprove] uncaught error", err);
+      logError("[handleApprove] uncaught error", err);
       toast("승인 처리 중 오류가 발생했습니다.");
       loadData();
     }

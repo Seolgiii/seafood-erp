@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ async function fetchRecord(
     next: { revalidate: 0 },
   });
   if (!res.ok) {
-    console.error(`[fetchRecord] ${tableName}/${recordId} 조회 실패:`, res.status);
+    logError(`[fetchRecord] ${tableName}/${recordId} 조회 실패:`, res.status);
     return null;
   }
   const data = await res.json();
@@ -91,7 +92,7 @@ async function patchRecord(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error(`[patchRecord] ${tableName}/${recordId} PATCH 실패:`, res.status, body);
+    logError(`[patchRecord] ${tableName}/${recordId} PATCH 실패:`, res.status, body);
   }
   return res.ok;
 }
@@ -157,23 +158,23 @@ async function resolveStorageName(rawField: unknown): Promise<string> {
  * 저장된 PDF URL을 입고 관리 레코드의 '입고증URL' 필드에 기록합니다.
  */
 async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
-  console.log("[generateAndSaveInboundPdf] 시작:", recordId);
+  log("[generateAndSaveInboundPdf] 시작:", recordId);
   try {
     const fields = await fetchRecord("입고 관리", recordId);
     if (!fields) {
-      console.error("[generateAndSaveInboundPdf] 입고 관리 레코드 조회 실패:", recordId);
+      logError("[generateAndSaveInboundPdf] 입고 관리 레코드 조회 실패:", recordId);
       return;
     }
 
     const workerRecId = firstLinkId(fields["작업자"]);
     const productRecId = firstLinkId(fields["품목마스터"] ?? fields["품목"]);
-    console.log("[generateAndSaveInboundPdf] 연결 ID:", { workerRecId, productRecId });
+    log("[generateAndSaveInboundPdf] 연결 ID:", { workerRecId, productRecId });
 
     const [requester, productName] = await Promise.all([
       workerRecId ? fetchWorkerName(workerRecId) : Promise.resolve(""),
       productRecId ? fetchProductName(productRecId) : Promise.resolve(""),
     ]);
-    console.log("[generateAndSaveInboundPdf] 이름 조회 완료:", { requester, productName });
+    log("[generateAndSaveInboundPdf] 이름 조회 완료:", { requester, productName });
 
     const pdfData = {
       lotNumber: String(fields["LOT번호"] ?? ""),
@@ -186,24 +187,24 @@ async function generateAndSaveInboundPdf(recordId: string): Promise<void> {
       date: String(fields["입고일"] ?? ""),
       requester,
     };
-    console.log("[generateAndSaveInboundPdf] PDF 데이터:", pdfData);
+    log("[generateAndSaveInboundPdf] PDF 데이터:", pdfData);
 
-    console.log("[generateAndSaveInboundPdf] renderToBuffer 시작...");
+    log("[generateAndSaveInboundPdf] renderToBuffer 시작...");
     const pdfBuffer = await generateInboundPdf(pdfData);
-    console.log("[generateAndSaveInboundPdf] renderToBuffer 완료, 크기:", pdfBuffer.length);
+    log("[generateAndSaveInboundPdf] renderToBuffer 완료, 크기:", pdfBuffer.length);
 
-    console.log("[generateAndSaveInboundPdf] Blob 업로드 시작...");
+    log("[generateAndSaveInboundPdf] Blob 업로드 시작...");
     const blob = await put(
       `pdfs/inbound-${recordId}-${Date.now()}.pdf`,
       pdfBuffer,
       { access: "public", contentType: "application/pdf" },
     );
-    console.log("[generateAndSaveInboundPdf] Blob 업로드 완료:", blob.url);
+    log("[generateAndSaveInboundPdf] Blob 업로드 완료:", blob.url);
 
     await patchRecord("입고 관리", recordId, { "입고증URL": blob.url });
-    console.log("[generateAndSaveInboundPdf] Airtable URL 저장 완료");
+    log("[generateAndSaveInboundPdf] Airtable URL 저장 완료");
   } catch (e) {
-    console.error("[generateAndSaveInboundPdf] 오류 발생:", e instanceof Error ? e.stack : e);
+    logError("[generateAndSaveInboundPdf] 오류 발생:", e instanceof Error ? e.stack : e);
     throw e;
   }
 }
@@ -257,7 +258,7 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
     { access: "public", contentType: "application/pdf" },
   );
   await patchRecord("출고 관리", recordId, { "출고증URL": blob.url });
-  console.log("[generateAndSaveOutboundPdf] PDF 저장 완료:", blob.url);
+  log("[generateAndSaveOutboundPdf] PDF 저장 완료:", blob.url);
 }
 
 /**
@@ -291,7 +292,7 @@ async function generateAndSaveExpensePdf(recordId: string): Promise<void> {
     { access: "public", contentType: "application/pdf" },
   );
   await patchRecord("지출결의", recordId, { "지출결의서URL": blob.url });
-  console.log("[generateAndSaveExpensePdf] PDF 저장 완료:", blob.url);
+  log("[generateAndSaveExpensePdf] PDF 저장 완료:", blob.url);
 }
 
 /**
@@ -342,7 +343,7 @@ async function createLotOnInboundApproval(
   );
   if (!lotQueryRes.ok) {
     const body = await lotQueryRes.text().catch(() => "");
-    console.error("[createLotOnInboundApproval] LOT별 재고 조회 실패:", lotQueryRes.status, body);
+    logError("[createLotOnInboundApproval] LOT별 재고 조회 실패:", lotQueryRes.status, body);
     return { success: false, message: "LOT별 재고 조회에 실패했습니다." };
   }
   const lotQueryData = await lotQueryRes.json();
@@ -369,7 +370,7 @@ async function createLotOnInboundApproval(
       if (cost?.inOutFee != null) lotPatchFields["입출고비"] = cost.inOutFee;
       if (cost?.unionFee != null) lotPatchFields["노조비"] = cost.unionFee;
     } catch (e) {
-      console.warn("[createLotOnInboundApproval] 보관처 비용 조회 실패 (승인은 계속 진행):", e);
+      logWarn("[createLotOnInboundApproval] 보관처 비용 조회 실패 (승인은 계속 진행):", e);
     }
   }
 
@@ -378,7 +379,7 @@ async function createLotOnInboundApproval(
     return { success: false, message: "LOT별 재고 수량 업데이트에 실패했습니다." };
   }
 
-  console.log("[createLotOnInboundApproval] 재고수량 반영 완료:", { inboundRecordId, lotRecordId: lotRecord.id, qty, lotNumber });
+  log("[createLotOnInboundApproval] 재고수량 반영 완료:", { inboundRecordId, lotRecordId: lotRecord.id, qty, lotNumber });
   return { success: true };
 }
 
@@ -491,13 +492,13 @@ async function deductStockOnOutboundApproval(
           "출고시점 손익": saleAmount - totalCost,
         });
       } catch (e) {
-        console.warn("[deductStockOnOutboundApproval] 출고시점 비용 저장 실패 (승인은 계속 진행):", e);
+        logWarn("[deductStockOnOutboundApproval] 출고시점 비용 저장 실패 (승인은 계속 진행):", e);
       }
     } else {
-      console.warn("[deductStockOnOutboundApproval] LOT재고레코드ID 있으나 레코드 없음:", lotInventoryRecordId);
+      logWarn("[deductStockOnOutboundApproval] LOT재고레코드ID 있으나 레코드 없음:", lotInventoryRecordId);
     }
   } else {
-    console.warn("[deductStockOnOutboundApproval] LOT재고레코드ID 없음 — LOT별 재고 차감 건너뜀");
+    logWarn("[deductStockOnOutboundApproval] LOT재고레코드ID 없음 — LOT별 재고 차감 건너뜀");
   }
 
   return { success: true };
@@ -519,7 +520,7 @@ export async function updateApprovalStatus(
   newStatus: string,
   rejectReason: string = "",
 ): Promise<{ success: boolean; message?: string }> {
-  console.log("[updateApprovalStatus] entered", { recordId, type, newStatus, rejectReason });
+  log("[updateApprovalStatus] entered", { recordId, type, newStatus, rejectReason });
 
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 AIRTABLE_API_KEY / AIRTABLE_BASE_ID 누락" };
@@ -559,7 +560,7 @@ export async function updateApprovalStatus(
     const fields: Record<string, unknown> = { "승인상태": newStatus };
     if (rejectReason) fields["반려사유"] = rejectReason; // 반려 시 사유도 함께 저장
 
-    console.log("[updateApprovalStatus] patching", { tableName, recordId, fields });
+    log("[updateApprovalStatus] patching", { tableName, recordId, fields });
 
     const res = await fetch(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
@@ -575,11 +576,11 @@ export async function updateApprovalStatus(
 
     if (!res.ok) {
       const body = await res.text();
-      console.error("[updateApprovalStatus] Airtable error", res.status, body);
+      logError("[updateApprovalStatus] Airtable error", res.status, body);
       return { success: false, message: `Airtable 오류 (${res.status})` };
     }
 
-    console.log("[updateApprovalStatus] patch success");
+    log("[updateApprovalStatus] patch success");
 
     // 승인 완료 시 PDF 자동 생성 및 Blob 저장
     // await를 사용해야 Vercel serverless 함수가 종료되기 전에 PDF 생성이 완료됨
@@ -587,15 +588,15 @@ export async function updateApprovalStatus(
     if (newStatus === "승인 완료") {
       if (type === "INBOUND") {
         await generateAndSaveInboundPdf(recordId).catch((e) =>
-          console.error("[updateApprovalStatus] 입고증 PDF 생성 실패:", e),
+          logError("[updateApprovalStatus] 입고증 PDF 생성 실패:", e),
         );
       } else if (type === "OUTBOUND") {
         await generateAndSaveOutboundPdf(recordId).catch((e) =>
-          console.error("[updateApprovalStatus] 출고증 PDF 생성 실패:", e),
+          logError("[updateApprovalStatus] 출고증 PDF 생성 실패:", e),
         );
       } else if (type === "EXPENSE") {
         await generateAndSaveExpensePdf(recordId).catch((e) =>
-          console.error("[updateApprovalStatus] 지출결의서 PDF 생성 실패:", e),
+          logError("[updateApprovalStatus] 지출결의서 PDF 생성 실패:", e),
         );
       }
     }
@@ -607,7 +608,7 @@ export async function updateApprovalStatus(
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "서버 오류가 발생했습니다.";
-    console.error("[updateApprovalStatus] error", msg);
+    logError("[updateApprovalStatus] error", msg);
     return { success: false, message: msg };
   }
 }

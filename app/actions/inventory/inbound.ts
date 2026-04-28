@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ async function getWorkerRecordIdByName(name: string): Promise<string | null> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[createInventoryRecord] 작업자 조회 실패:", { status: res.status, body: body || "(empty)" });
+    logError("[createInventoryRecord] 작업자 조회 실패:", { status: res.status, body: body || "(empty)" });
     return null;
   }
   const data = await res.json();
@@ -133,7 +134,7 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
 } | null> {
   const name = String(formData?.["품목명"] ?? "").trim();
   if (!name) {
-    console.error("[createInventoryRecord] 품목명 없음");
+    logError("[createInventoryRecord] 품목명 없음");
     return null;
   }
   const escaped = name.replace(/'/g, "\\'");
@@ -147,14 +148,14 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
   });
   const getBody = await getRes.text().catch(() => "");
   if (!getRes.ok) {
-    console.error("[createInventoryRecord] 품목마스터 조회 실패:", { status: getRes.status, body: getBody || "(empty)" });
+    logError("[createInventoryRecord] 품목마스터 조회 실패:", { status: getRes.status, body: getBody || "(empty)" });
     return null;
   }
   let data: { records?: { id: string; fields?: Record<string, unknown> }[] };
   try {
     data = getBody ? JSON.parse(getBody) : { records: [] };
   } catch {
-    console.error("[createInventoryRecord] 품목마스터 조회 응답 파싱 실패:", getBody);
+    logError("[createInventoryRecord] 품목마스터 조회 응답 파싱 실패:", getBody);
     return null;
   }
   // 기존 품목마스터 레코드가 있으면 해당 ID와 연결된 LOT 목록 반환
@@ -187,23 +188,23 @@ async function resolveProductMasterForInbound(formData: any): Promise<{
   );
   const postBody = await postRes.text().catch(() => "");
   if (!postRes.ok) {
-    console.error("[createInventoryRecord] 품목마스터(신규) POST 실패:", { status: postRes.status, body: postBody || "(empty)" });
+    logError("[createInventoryRecord] 품목마스터(신규) POST 실패:", { status: postRes.status, body: postBody || "(empty)" });
     return null;
   }
   let created: { id?: string; fields?: Record<string, unknown> };
   try {
     created = postBody ? JSON.parse(postBody) : {};
   } catch {
-    console.error("[createInventoryRecord] 품목마스터(신규) 응답 파싱 실패:", postBody);
+    logError("[createInventoryRecord] 품목마스터(신규) 응답 파싱 실패:", postBody);
     return null;
   }
   if (!created.id || !isRecordId(created.id)) {
-    console.error("[createInventoryRecord] 품목마스터(신규) record id 없음:", postBody);
+    logError("[createInventoryRecord] 품목마스터(신규) record id 없음:", postBody);
     return null;
   }
   const productCode = String(created.fields?.["품목코드"] ?? "").trim();
   const productCategory = String(created.fields?.["품목구분"] ?? "").trim();
-  console.log("[createInventoryRecord] 품목마스터 신규 생성:", { masterId: created.id, productCode });
+  log("[createInventoryRecord] 품목마스터 신규 생성:", { masterId: created.id, productCode });
   return { masterId: created.id, productCode, productCategory, lotIds: [] };
 }
 
@@ -246,7 +247,7 @@ export async function createInventoryRecord(formData: any) {
   try {
     // 환경변수(API키, 데이터베이스ID) 누락 시 오류 반환
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error("[createInventoryRecord] AIRTABLE_API_KEY / BASE_ID 미설정");
+      logError("[createInventoryRecord] AIRTABLE_API_KEY / BASE_ID 미설정");
       return { success: false, message: "서버 환경 설정 오류" };
     }
 
@@ -307,7 +308,7 @@ export async function createInventoryRecord(formData: any) {
     );
     const inboundBodyRaw = await inboundRes.text().catch(() => "");
     if (!inboundRes.ok) {
-      console.error("[createInventoryRecord] 입고 관리 POST 실패:", { status: inboundRes.status, body: inboundBodyRaw || "(empty)" });
+      logError("[createInventoryRecord] 입고 관리 POST 실패:", { status: inboundRes.status, body: inboundBodyRaw || "(empty)" });
       return { success: false, message: "입고 관리 등록 실패" };
     }
     let inboundRecordId: string;
@@ -315,11 +316,11 @@ export async function createInventoryRecord(formData: any) {
       const createdInbound = inboundBodyRaw ? JSON.parse(inboundBodyRaw) : null;
       inboundRecordId = createdInbound?.id;
     } catch {
-      console.error("[createInventoryRecord] 입고 관리 응답 파싱 실패:", inboundBodyRaw);
+      logError("[createInventoryRecord] 입고 관리 응답 파싱 실패:", inboundBodyRaw);
       return { success: false, message: "입고 관리 응답 오류" };
     }
     if (!isRecordId(inboundRecordId)) {
-      console.error("[createInventoryRecord] 입고 관리 record id 없음:", inboundBodyRaw);
+      logError("[createInventoryRecord] 입고 관리 record id 없음:", inboundBodyRaw);
       return { success: false, message: "입고 관리 등록 실패" };
     }
 
@@ -333,7 +334,7 @@ export async function createInventoryRecord(formData: any) {
       misu,
       seq: nextSeq,
     });
-    console.log("[createInventoryRecord] LOT번호 생성:", lotNumber);
+    log("[createInventoryRecord] LOT번호 생성:", lotNumber);
 
     // ── 3. 입고 관리에 LOT번호 PATCH ──
     // 방금 만든 입고 관리 레코드에 LOT번호를 업데이트합니다
@@ -347,7 +348,7 @@ export async function createInventoryRecord(formData: any) {
     );
     const inboundPatchBody = await inboundPatchRes.text().catch(() => "");
     if (!inboundPatchRes.ok) {
-      console.error("[createInventoryRecord] 입고 관리 LOT번호 PATCH 실패:", {
+      logError("[createInventoryRecord] 입고 관리 LOT번호 PATCH 실패:", {
         status: inboundPatchRes.status,
         body: inboundPatchBody || "(empty)",
       });
@@ -387,19 +388,19 @@ export async function createInventoryRecord(formData: any) {
     );
     const lotBodyRaw = await lotRes.text().catch(() => "");
     if (!lotRes.ok) {
-      console.error("[createInventoryRecord] LOT별 재고 POST 실패:", { status: lotRes.status, body: lotBodyRaw || "(empty)" });
+      logError("[createInventoryRecord] LOT별 재고 POST 실패:", { status: lotRes.status, body: lotBodyRaw || "(empty)" });
       return { success: false, message: "재고 등록 실패" };
     }
     let createdLot: { id?: string };
     try {
       createdLot = lotBodyRaw ? JSON.parse(lotBodyRaw) : {};
     } catch {
-      console.error("[createInventoryRecord] LOT별 재고 응답 파싱 실패:", lotBodyRaw);
+      logError("[createInventoryRecord] LOT별 재고 응답 파싱 실패:", lotBodyRaw);
       return { success: false, message: "재고 등록 응답 오류" };
     }
     const newLotId = createdLot.id;
     if (!newLotId || !isRecordId(newLotId)) {
-      console.error("[createInventoryRecord] LOT record id 없음:", lotBodyRaw);
+      logError("[createInventoryRecord] LOT record id 없음:", lotBodyRaw);
       return { success: false, message: "재고 등록 실패" };
     }
 
@@ -417,7 +418,7 @@ export async function createInventoryRecord(formData: any) {
     );
     const patchBody = await patchRes.text().catch(() => "");
     if (!patchRes.ok) {
-      console.error("[createInventoryRecord] 품목마스터 LOT 연결 PATCH 실패:", { status: patchRes.status, body: patchBody || "(empty)" });
+      logError("[createInventoryRecord] 품목마스터 LOT 연결 PATCH 실패:", { status: patchRes.status, body: patchBody || "(empty)" });
     }
 
     // 재고 현황 페이지와 관리자 대시보드 캐시 초기화 (최신 데이터 반영)
@@ -425,7 +426,7 @@ export async function createInventoryRecord(formData: any) {
     revalidatePath("/admin/dashboard");
     return { success: true };
   } catch (error) {
-    console.error("[createInventoryRecord] 예외:", error);
+    logError("[createInventoryRecord] 예외:", error);
     return { success: false };
   }
 }
@@ -447,7 +448,7 @@ export async function getStorageOptions(): Promise<{ id: string; name: string }[
       }
     );
     if (!res.ok) {
-      console.error("[getStorageOptions] 보관처 마스터 fetch 실패:", res.status);
+      logError("[getStorageOptions] 보관처 마스터 fetch 실패:", res.status);
       return [];
     }
     const data = await res.json();
@@ -455,7 +456,7 @@ export async function getStorageOptions(): Promise<{ id: string; name: string }[
       .map((r: { id: string; fields?: Record<string, unknown> }) => ({ id: r.id, name: String(r.fields?.["보관처명"] ?? "") }))
       .filter((o: { id: string; name: string }) => o.name);
   } catch (e) {
-    console.error("[getStorageOptions] 예외:", e);
+    logError("[getStorageOptions] 예외:", e);
     return [];
   }
 }
@@ -468,7 +469,7 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   if (!apiKey || !baseId) {
-    console.error("[getProductOptions] API KEY 또는 BASE ID 미설정");
+    logError("[getProductOptions] API KEY 또는 BASE ID 미설정");
     return [];
   }
 
@@ -482,23 +483,23 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
     let offset: string | undefined;
     let pageNum = 0;
 
-    console.log(`[getProductOptions] 쿼리 시작 — 테이블명: "${tableName}" (인코딩: "${table}")`);
+    log(`[getProductOptions] 쿼리 시작 — 테이블명: "${tableName}" (인코딩: "${table}")`);
 
     do {
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
       const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
-      console.log(`[getProductOptions] 페이지 ${++pageNum} 요청: ${url}`);
+      log(`[getProductOptions] 페이지 ${++pageNum} 요청: ${url}`);
 
       const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error("[getProductOptions] 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+        logError("[getProductOptions] 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
       const pageRecords = data.records ?? [];
-      console.log(`[getProductOptions] 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
+      log(`[getProductOptions] 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
 
       for (const rec of pageRecords) {
         const name = String(rec.fields?.["품목명"] ?? "").trim();
@@ -513,10 +514,10 @@ export async function getProductOptions(): Promise<{ id: string; name: string; c
       offset = data.offset;
     } while (offset);
 
-    console.log(`[getProductOptions] 완료 — 총 ${allRecords.length}건`);
+    log(`[getProductOptions] 완료 — 총 ${allRecords.length}건`);
     return allRecords;
   } catch (e) {
-    console.error("[getProductOptions] 예외:", e);
+    logError("[getProductOptions] 예외:", e);
     return [];
   }
 }
@@ -529,13 +530,13 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   if (!apiKey || !baseId) {
-    console.error("[getSupplierOptions] API KEY 또는 BASE ID 미설정");
+    logError("[getSupplierOptions] API KEY 또는 BASE ID 미설정");
     return [];
   }
 
   // 1. 매입처 마스터 테이블 우선 시도
   const masterTableName = AIRTABLE_TABLE.suppliers;
-  console.log(`[getSupplierOptions] 쿼리 시작 — 테이블명: "${masterTableName}"`);
+  log(`[getSupplierOptions] 쿼리 시작 — 테이블명: "${masterTableName}"`);
   try {
     const table = encodeURIComponent(masterTableName);
     const fieldParams = `fields[]=${encodeURIComponent("매입처명")}`;
@@ -548,18 +549,18 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
       const params = new URLSearchParams({ pageSize: "100" });
       if (offset) params.set("offset", offset);
       const url = `https://api.airtable.com/v0/${baseId}/${table}?${fieldParams}&${params}`;
-      console.log(`[getSupplierOptions] 매입처 마스터 페이지 ${++pageNum} 요청: ${url}`);
+      log(`[getSupplierOptions] 매입처 마스터 페이지 ${++pageNum} 요청: ${url}`);
 
       const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.warn("[getSupplierOptions] 매입처 마스터 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+        logWarn("[getSupplierOptions] 매입처 마스터 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         masterOk = false;
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
       const pageRecords = data.records ?? [];
-      console.log(`[getSupplierOptions] 매입처 마스터 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
+      log(`[getSupplierOptions] 매입처 마스터 페이지 ${pageNum} 결과: ${pageRecords.length}건, 샘플:`, pageRecords.slice(0, 2).map((r) => ({ id: r.id, fields: r.fields })));
 
       for (const rec of pageRecords) {
         const name = String(rec.fields?.["매입처명"] ?? "").trim();
@@ -569,17 +570,17 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
     } while (offset);
 
     if (masterOk && allRecords.length > 0) {
-      console.log(`[getSupplierOptions] 완료 — 총 ${allRecords.length}건`);
+      log(`[getSupplierOptions] 완료 — 총 ${allRecords.length}건`);
       return allRecords;
     }
-    console.warn(`[getSupplierOptions] 매입처 마스터에서 0건 조회됨 — 폴백으로 전환`);
+    logWarn(`[getSupplierOptions] 매입처 마스터에서 0건 조회됨 — 폴백으로 전환`);
   } catch (e) {
-    console.warn("[getSupplierOptions] 매입처 마스터 예외:", e);
+    logWarn("[getSupplierOptions] 매입처 마스터 예외:", e);
   }
 
   // 2. 폴백: 입고 관리 테이블의 매입처 필드에서 unique 값 수집 (ID 없음)
   const fallbackTableName = process.env.AIRTABLE_INBOUND_TABLE?.trim() ?? "입고 관리";
-  console.log(`[getSupplierOptions] 폴백 — 테이블명: "${fallbackTableName}"`);
+  log(`[getSupplierOptions] 폴백 — 테이블명: "${fallbackTableName}"`);
   try {
     const table = encodeURIComponent(fallbackTableName);
     const fieldParams = `fields[]=${encodeURIComponent("매입처")}`;
@@ -593,7 +594,7 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
       const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        console.error("[getSupplierOptions] 폴백 조회 실패:", { status: res.status, body: body.slice(0, 500) });
+        logError("[getSupplierOptions] 폴백 조회 실패:", { status: res.status, body: body.slice(0, 500) });
         break;
       }
       const data = await res.json() as { records?: { id: string; fields?: Record<string, unknown> }[]; offset?: string };
@@ -605,10 +606,10 @@ export async function getSupplierOptions(): Promise<{ id: string; name: string }
     } while (offset);
 
     const results = [...nameSet].sort().map((name) => ({ id: "", name }));
-    console.log(`[getSupplierOptions] 폴백 완료 — 총 ${results.length}건`);
+    log(`[getSupplierOptions] 폴백 완료 — 총 ${results.length}건`);
     return results;
   } catch (e) {
-    console.error("[getSupplierOptions] 폴백 예외:", e);
+    logError("[getSupplierOptions] 폴백 예외:", e);
     return [];
   }
 }

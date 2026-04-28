@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,8 +430,8 @@ export async function getMyRequests(
 
   const workerSample = Object.fromEntries(Object.entries(workerMap).slice(0, 3));
   const productSample = Object.fromEntries(Object.entries(productMap).slice(0, 3));
-  console.log("[getMyRequests] workerMap size=", Object.keys(workerMap).length, "sample=", workerSample);
-  console.log("[getMyRequests] productMap size=", Object.keys(productMap).length, "sample=", productSample);
+  log("[getMyRequests] workerMap size=", Object.keys(workerMap).length, "sample=", workerSample);
+  log("[getMyRequests] productMap size=", Object.keys(productMap).length, "sample=", productSample);
 
   const items: RequestItem[] = [];
 
@@ -443,7 +444,7 @@ export async function getMyRequests(
     const wId = wLink.id;
     const requester = wId ? (workerMap[wId] ?? "") : "";
     const passReq = passesRequesterFilter(requesterWorkerId, requesterName, wId, requester);
-    console.log(
+    log(
       JSON.stringify({
         type: "INBOUND",
         id: r.id,
@@ -461,7 +462,7 @@ export async function getMyRequests(
     const pLink = firstRecordIdFromFields(f, PRODUCT_LINK_FIELD_CANDIDATES);
     const pId = pLink.id;
     const productName = pId ? (productMap[pId] ?? "") : "";
-    console.log(
+    log(
       JSON.stringify({
         type: "INBOUND",
         id: r.id,
@@ -515,7 +516,7 @@ export async function getMyRequests(
     const wId = wLink.id;
     const requester = wId ? (workerMap[wId] ?? "") : "";
     const passReq = passesRequesterFilter(requesterWorkerId, requesterName, wId, requester);
-    console.log(
+    log(
       JSON.stringify({
         type: "OUTBOUND",
         id: r.id,
@@ -552,7 +553,7 @@ export async function getMyRequests(
       productName = productMap[directPl.id];
     }
     const viaLotPid = lotLinkId ? inboundProductMap[lotLinkId] ?? null : null;
-    console.log(
+    log(
       JSON.stringify({
         type: "OUTBOUND",
         id: r.id,
@@ -597,7 +598,7 @@ export async function getMyRequests(
     const wId = wLink.id;
     const requester = wId ? (workerMap[wId] ?? "") : "";
     const passReq = passesRequesterFilter(requesterWorkerId, requesterName, wId, requester);
-    console.log(
+    log(
       JSON.stringify({
         type: "EXPENSE",
         id: r.id,
@@ -662,7 +663,7 @@ export async function getMyRequests(
     });
   }
 
-  console.log("[getMyRequests] 최종 합계:", items.length, "건 (입고:", inboundRaw.length, "/ 출고:", outboundRaw.length, "/ 지출:", expenseRaw.length, "/ 이동:", transferRaw.length, ")");
+  log("[getMyRequests] 최종 합계:", items.length, "건 (입고:", inboundRaw.length, "/ 출고:", outboundRaw.length, "/ 지출:", expenseRaw.length, "/ 이동:", transferRaw.length, ")");
   // Airtable createdTime 기준 내림차순 정렬 (최신 신청 건이 위에 표시)
   items.sort((a, b) => sortTimestamp(b) - sortTimestamp(a));
   return items;

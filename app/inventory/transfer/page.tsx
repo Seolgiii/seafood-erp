@@ -75,7 +75,7 @@ export default function TransferPage() {
   useEffect(() => {
     getStorageOptions()
       .then(setStorageOptions)
-      .catch((e) => console.error('[보관처옵션 오류]', e));
+      .catch(() => {});
   }, []);
 
   // 재고 조회 → 재고 이동 Phase 2: sessionStorage draft 자동 선택

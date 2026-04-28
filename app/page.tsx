@@ -41,7 +41,7 @@ export default function WorkerDashboard() {
     const workerId = isAdminRole ? undefined : session.workerId;
     getDashboardStats(workerId)
       .then(setStats)
-      .catch((e) => console.error("[dashboard] stats fetch 오류", e));
+      .catch(() => {});
   }, []);
 
   const heroItems = [

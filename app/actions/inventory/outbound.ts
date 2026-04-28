@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ async function getWorkerRecordIdByName(name: string): Promise<string | null> {
     next: { revalidate: 0 },
   });
   if (!res.ok) {
-    console.error("[getWorkerRecordIdByName] Airtable 조회 실패:", res.status);
+    logError("[getWorkerRecordIdByName] Airtable 조회 실패:", res.status);
     return null;
   }
   const data = await res.json();
@@ -88,16 +89,16 @@ async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | 
     next: { revalidate: 0 },
   });
   if (!res.ok) {
-    console.error("[getInboundRecordIdFromLot] LOT 조회 실패:", res.status, lotRecordId);
+    logError("[getInboundRecordIdFromLot] LOT 조회 실패:", res.status, lotRecordId);
     return null;
   }
   const data = await res.json();
   const fields = data.fields as Record<string, unknown> | undefined;
   const fieldKeys = fields ? Object.keys(fields) : [];
-  console.log("[getInboundRecordIdFromLot] table:", "LOT별 재고");
-  console.log("[getInboundRecordIdFromLot] recordId:", lotRecordId);
-  console.log("[getInboundRecordIdFromLot] fieldKeys:", fieldKeys);
-  console.log(
+  log("[getInboundRecordIdFromLot] table:", "LOT별 재고");
+  log("[getInboundRecordIdFromLot] recordId:", lotRecordId);
+  log("[getInboundRecordIdFromLot] fieldKeys:", fieldKeys);
+  log(
     "[getInboundRecordIdFromLot] hasInboundLinkField:",
     fieldKeys.includes(LOT_TO_INBOUND_FIELD),
     "(LOT_TO_INBOUND_FIELD:",
@@ -106,7 +107,7 @@ async function getInboundRecordIdFromLot(lotRecordId: string): Promise<string | 
   if (!fields) return null;
   const linked = firstLinkedRecordId(fields[LOT_TO_INBOUND_FIELD]);
   if (linked) return linked;
-  console.error("[getInboundRecordIdFromLot] 링크 없음:", {
+  logError("[getInboundRecordIdFromLot] 링크 없음:", {
     lotRecordId,
     field: LOT_TO_INBOUND_FIELD,
     hasField: LOT_TO_INBOUND_FIELD in fields,
@@ -129,7 +130,7 @@ async function getInboundRemainingQty(
   });
   if (!res.ok) {
     const errBody = await res.text().catch(() => "");
-    console.error("[getInboundRemainingQty] 입고 관리 조회 실패:", {
+    logError("[getInboundRemainingQty] 입고 관리 조회 실패:", {
       inboundRecordId,
       status: res.status,
       responseBody: errBody || "(empty)",
@@ -143,12 +144,12 @@ async function getInboundRemainingQty(
   const rawQty = fields?.[INBOUND_REMAINING_QTY_FIELD];
   const currentQty = Number(rawQty);
 
-  console.log("[getInboundRemainingQty] fieldKeys:", fieldKeys);
-  console.log("[getInboundRemainingQty] remainingQtyField:", INBOUND_REMAINING_QTY_FIELD);
-  console.log("[getInboundRemainingQty] remainingQtyRaw:", rawQty);
+  log("[getInboundRemainingQty] fieldKeys:", fieldKeys);
+  log("[getInboundRemainingQty] remainingQtyField:", INBOUND_REMAINING_QTY_FIELD);
+  log("[getInboundRemainingQty] remainingQtyRaw:", rawQty);
 
   if (!Number.isFinite(currentQty)) {
-    console.error("[getInboundRemainingQty] 잔여수량 숫자 변환 실패:", {
+    logError("[getInboundRemainingQty] 잔여수량 숫자 변환 실패:", {
       inboundRecordId,
       field: INBOUND_REMAINING_QTY_FIELD,
       rawQty,
@@ -173,7 +174,7 @@ async function getInboundRemainingQty(
 export async function searchLotByKeyword(keyword: string) {
   try {
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error("[searchLotByKeyword] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
+      logError("[searchLotByKeyword] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
       return { success: false, records: [], error: "서버 환경 설정 오류" };
     }
     const tableName = encodeURIComponent("LOT별 재고");
@@ -196,7 +197,7 @@ export async function searchLotByKeyword(keyword: string) {
       } catch {
         /* ignore */
       }
-      console.error("[searchLotByKeyword] Airtable 응답 실패:", msg);
+      logError("[searchLotByKeyword] Airtable 응답 실패:", msg);
       return { success: false, records: [], error: msg };
     }
 
@@ -232,7 +233,7 @@ export async function searchLotByKeyword(keyword: string) {
 
     return { success: true, records };
   } catch (error) {
-    console.error("🔴 출고 검색 에러:", error);
+    logError("🔴 출고 검색 에러:", error);
     return { success: false, records: [], error: "검색 중 서버 오류" };
   }
 }
@@ -251,7 +252,7 @@ export async function searchLotByKeyword(keyword: string) {
 export async function createOutboundRecord(payload: any) {
   try {
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      console.error("[createOutboundRecord] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
+      logError("[createOutboundRecord] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
       return { success: false, error: "서버 환경 설정 오류" };
     }
 
@@ -307,7 +308,7 @@ export async function createOutboundRecord(payload: any) {
     const { currentQty: currentRemain, storageId } = inboundRemain;
     if (qty > currentRemain) {
       // 출고 요청 수량이 잔여 재고보다 많으면 신청 자체를 거부
-      console.error("[createOutboundRecord] 잔여수량 부족(출고 관리 미생성):", {
+      logError("[createOutboundRecord] 잔여수량 부족(출고 관리 미생성):", {
         inboundRecordId,
         qty,
         currentRemain,
@@ -338,8 +339,8 @@ export async function createOutboundRecord(payload: any) {
     const postUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${outboundTablePath()}`;
     const requestBody = JSON.stringify({ fields });
 
-    console.log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리");
-    console.log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
+    log("[createOutboundRecord] POST table:", process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리");
+    log("[createOutboundRecord] POST fields:", JSON.stringify(fields));
 
     const response = await fetch(postUrl, {
       method: "POST",
@@ -351,9 +352,9 @@ export async function createOutboundRecord(payload: any) {
     });
 
     const responseBodyRaw = await response.text().catch(() => "");
-    console.log("[createOutboundRecord] POST response.status:", response.status);
-    console.log("[createOutboundRecord] POST response.ok:", response.ok);
-    console.log("[createOutboundRecord] POST response.body (raw):", responseBodyRaw || "(empty)");
+    log("[createOutboundRecord] POST response.status:", response.status);
+    log("[createOutboundRecord] POST response.ok:", response.ok);
+    log("[createOutboundRecord] POST response.body (raw):", responseBodyRaw || "(empty)");
 
     if (!response.ok) {
       let message = "저장 실패";
@@ -367,7 +368,7 @@ export async function createOutboundRecord(payload: any) {
           ? responseBodyRaw.slice(0, 500)
           : `HTTP ${response.status}`;
       }
-      console.error("[createOutboundRecord] POST 실패 — 명시 처리:", {
+      logError("[createOutboundRecord] POST 실패 — 명시 처리:", {
         table: process.env.AIRTABLE_OUTBOUND_TABLE?.trim() ?? "출고 관리",
         status: response.status,
         ok: response.ok,
@@ -381,7 +382,7 @@ export async function createOutboundRecord(payload: any) {
 
     try {
       const created = responseBodyRaw ? JSON.parse(responseBodyRaw) : null;
-      console.log("[createOutboundRecord] POST 성공:", {
+      log("[createOutboundRecord] POST 성공:", {
         createdRecordId: created?.id ?? null,
         createdFieldKeys:
           created?.fields && typeof created.fields === "object"
@@ -389,14 +390,14 @@ export async function createOutboundRecord(payload: any) {
             : [],
       });
     } catch {
-      console.log("[createOutboundRecord] POST 성공(본문 JSON 파싱 생략)");
+      log("[createOutboundRecord] POST 성공(본문 JSON 파싱 생략)");
     }
 
     // 관리자 대시보드 캐시 초기화 (새 출고 신청이 바로 보이도록)
     revalidatePath("/admin/dashboard");
     return { success: true };
   } catch (error) {
-    console.error("[createOutboundRecord] 예외:", error);
+    logError("[createOutboundRecord] 예외:", error);
     const msg = error instanceof Error ? error.message : "서버 오류가 발생했습니다.";
     return { success: false, error: msg };
   }

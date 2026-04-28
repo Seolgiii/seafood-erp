@@ -9,6 +9,7 @@ import {
   touchSession,
   SESSION_IDLE_MS,
 } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 // 세션 검사 없이 누구나 접근 가능한 경로
 const PUBLIC_PATHS = ['/login'];
@@ -61,8 +62,7 @@ export default function SessionGuard({ children }: { children: React.ReactNode }
       const remaining = SESSION_IDLE_MS - (Date.now() - s.lastActivityAt);
       if (remaining < 3 * 60 * 1000 && !warnedRef.current) {
         warnedRef.current = true;
-        // 브라우저 알림 대신 콘솔 경고 (toast 컴포넌트 없음)
-        console.warn('[SessionGuard] 세션 만료 3분 전');
+        toast('세션이 3분 후 만료됩니다. 계속 사용하려면 화면을 터치해 주세요.', 'info');
       }
     }, CHECK_INTERVAL_MS);
 

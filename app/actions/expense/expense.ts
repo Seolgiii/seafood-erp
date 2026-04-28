@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -13,19 +14,19 @@ export async function getApplicantInfo(name: string) {
       headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
     });
     const data = await response.json();
-    console.log("getApplicantInfo response", {
+    log("getApplicantInfo response", {
       status: response.status,
       recordsCount: data.records?.length ?? 0,
       firstRecordId: data.records?.[0]?.id ?? null,
     });
     const record = data.records?.[0];
     if (!record) {
-      console.warn("getApplicantInfo no record found", { name });
+      logWarn("getApplicantInfo no record found", { name });
       return null;
     }
     return { ...record.fields, _recordId: record.id };
   } catch (error) {
-    console.error("getApplicantInfo failed", error);
+    logError("getApplicantInfo failed", error);
     return null;
   }
 }
@@ -82,7 +83,7 @@ export async function createExpenseRecord(formData: any) {
         }
       }
 
-      console.error("createExpenseRecord Airtable response error", {
+      logError("createExpenseRecord Airtable response error", {
         status: response.status,
         body: responseBody,
       });
@@ -94,7 +95,7 @@ export async function createExpenseRecord(formData: any) {
     revalidatePath("/admin/dashboard");
     return { success: true };
   } catch (error) {
-    console.error("createExpenseRecord unexpected error", error);
+    logError("createExpenseRecord unexpected error", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "지출 저장 중 오류가 발생했습니다.",
@@ -106,14 +107,14 @@ export async function createExpenseRecord(formData: any) {
 export async function uploadReceipt(formData: FormData) {
   const file = formData.get("file") as File;
   if (!file) {
-    console.error("[uploadReceipt] file이 없습니다. 서버 액션 body 크기 제한(1MB)을 초과했을 수 있습니다.");
+    logError("[uploadReceipt] file이 없습니다. 서버 액션 body 크기 제한(1MB)을 초과했을 수 있습니다.");
     return { success: false, url: null };
   }
   try {
     const blob = await put(`receipts/${Date.now()}-${file.name}`, file, { access: "public" });
     return { success: true, url: blob.url };
   } catch (error) {
-    console.error("[uploadReceipt] Blob 업로드 실패:", error);
+    logError("[uploadReceipt] Blob 업로드 실패:", error);
     return { success: false, url: null };
   }
 }

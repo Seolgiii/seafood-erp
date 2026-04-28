@@ -56,7 +56,6 @@ export default function OutboundRecordPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedLot, setSelectedLot] = useState<any | null>(null);
-  const hasLoggedSelectedLotRef = useRef(false);
 
   const [quantity, setQuantity] = useState('');
   const [seller, setSeller] = useState('');
@@ -115,22 +114,11 @@ export default function OutboundRecordPage() {
       .catch(() => setHasCamera(false));
   }, []);
 
-  useEffect(() => {
-    if (!selectedLot || hasLoggedSelectedLotRef.current) return;
-    const rawStock = selectedLot?.fields?.['재고수량'];
-    console.group('[outbound diagnostic] selectedLot snapshot');
-    console.log('selectedLot:', selectedLot);
-    console.log("fields['재고수량']:", rawStock, '→ Number:', Number(rawStock));
-    console.groupEnd();
-    hasLoggedSelectedLotRef.current = true;
-  }, [selectedLot]);
-
   // ── 검색 공통 로직 ────────────────────────────────────────────────────────
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) return;
     setIsSearching(true);
     setSelectedLot(null);
-    hasLoggedSelectedLotRef.current = false;
     const result = await searchLotByKeyword(q);
     if (result.success) {
       if (result.records.length === 0) toast('일치하는 재고가 없습니다.', 'info');
@@ -185,7 +173,6 @@ export default function OutboundRecordPage() {
     setSalePrice('');
     setKeyword('');
     setSearchResults([]);
-    hasLoggedSelectedLotRef.current = false;
   };
 
   // ── 장바구니 추가 ─────────────────────────────────────────────────────────
@@ -218,7 +205,6 @@ export default function OutboundRecordPage() {
     setQuantity('');
     setSeller('');
     setSalePrice('');
-    hasLoggedSelectedLotRef.current = false;
   };
 
   // ── 출고 신청 ─────────────────────────────────────────────────────────────

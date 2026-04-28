@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from '@/lib/logger';
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -29,7 +30,7 @@ async function fetchRecord(
     { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
   );
   if (!res.ok) {
-    console.error(`[transfer fetchRecord] ${tableName}/${recordId} 실패:`, res.status);
+    logError(`[transfer fetchRecord] ${tableName}/${recordId} 실패:`, res.status);
     return null;
   }
   const data = await res.json();
@@ -51,7 +52,7 @@ async function patchRecord(
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error(`[transfer patchRecord] ${tableName}/${recordId} 실패:`, res.status, body);
+    logError(`[transfer patchRecord] ${tableName}/${recordId} 실패:`, res.status, body);
   }
   return res.ok;
 }
@@ -70,7 +71,7 @@ async function createRecord(
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
+    logError(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
     return null;
   }
   return await res.json();
@@ -90,7 +91,7 @@ async function createRecordOrThrow(
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
+    logError(`[transfer createRecord] ${tableName} 실패:`, res.status, body);
     let detail = `HTTP ${res.status}`;
     try {
       const parsed = JSON.parse(body);
@@ -214,7 +215,7 @@ export async function searchTransferLot(
 
     return { success: true, records };
   } catch (err) {
-    console.error("[searchTransferLot]", err);
+    logError("[searchTransferLot]", err);
     return { success: false, records: [], error: "검색 중 오류가 발생했습니다." };
   }
 }
@@ -260,14 +261,14 @@ export async function createTransferRecord(payload: {
     if (이동전보관처Id) fields["이동 전 보관처"] = [이동전보관처Id];
 
     const created = await createRecordOrThrow("재고 이동", fields);
-    console.log("[createTransferRecord] 생성 완료:", created.id);
+    log("[createTransferRecord] 생성 완료:", created.id);
 
     revalidatePath("/my-requests");
     revalidatePath("/admin/dashboard");
     return { success: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "알 수 없는 오류";
-    console.error("[createTransferRecord] 실패:", msg);
+    logError("[createTransferRecord] 실패:", msg);
     return { success: false, message: msg };
   }
 }
@@ -403,7 +404,7 @@ export async function approveTransfer(
       if (cost?.inOutFee != null) lotInventoryFields["입출고비"] = cost.inOutFee;
       if (cost?.unionFee != null) lotInventoryFields["노조비"] = cost.unionFee;
     } catch (e) {
-      console.warn("[approveTransfer] 새 보관처 비용 조회 실패 (승인 계속 진행):", e);
+      logWarn("[approveTransfer] 새 보관처 비용 조회 실패 (승인 계속 진행):", e);
     }
   }
 
@@ -425,7 +426,7 @@ export async function approveTransfer(
     "신규 LOT번호": [newLot.id],
   });
 
-  console.log("[approveTransfer] 완료:", {
+  log("[approveTransfer] 완료:", {
     transferRecordId,
     originalLot: originalLotNumber,
     newLot: newLotNumber,

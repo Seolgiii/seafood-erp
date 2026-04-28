@@ -53,7 +53,6 @@ export default function NewExpensePage() {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const info: any = await getApplicantInfo(s.workerName);
-      console.log("getApplicantInfo result", info);
       if (info) {
         setFormData(prev => ({
           ...prev,
@@ -82,11 +81,9 @@ export default function NewExpensePage() {
         setFormData(prev => ({ ...prev, receiptUrl: result.url }));
       } else {
         const msg = result.error || '업로드 실패';
-        console.error('[handleFileChange] 영수증 업로드 실패:', msg);
         setUploadError(msg);
       }
-    } catch (err) {
-      console.error('[handleFileChange] 영수증 업로드 오류:', err);
+    } catch {
       setUploadError('네트워크 오류로 업로드에 실패했습니다.');
     } finally {
       setIsUploading(false);
@@ -97,7 +94,6 @@ export default function NewExpensePage() {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError('');
-    console.log("submit applicantRecordId", formData.applicantRecordId);
 
     const amount = fromGroupedIntegerInput(formData.amount).value;
     const result = await createExpenseRecord({

@@ -212,7 +212,6 @@ export default function BarcodeScanner({ onDetected }: Props) {
 
     run().catch((err) => {
       if (!cancelled) {
-        console.error('[BarcodeScanner]', err);
         setErrorMsg('카메라를 시작할 수 없습니다. 다시 시도해 주세요.');
         setStatus('error');
       }
