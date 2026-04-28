@@ -358,11 +358,6 @@ export default function AdminDashboardPage() {
       <PageHeader
         title="결재 수신함"
         onBack={() => router.push("/")}
-        rightSlot={
-          <div className="text-[11px] font-bold text-white bg-[#191F28] px-2.5 py-1 rounded-lg shadow-sm">
-            관리자 시스템
-          </div>
-        }
       />
 
       {/* 건수 요약 */}

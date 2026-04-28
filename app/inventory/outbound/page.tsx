@@ -261,18 +261,6 @@ export default function OutboundRecordPage() {
         subtitle="어떤 물건이 출고되나요?"
         onBack={() => router.push('/')}
         titleClassName="text-[#FF3B30] font-black"
-        rightSlot={
-          hasCamera !== false ? (
-            <button
-              onClick={() => setScannerOpen((v) => !v)}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-all ${
-                scannerOpen ? 'bg-[#FF3B30] text-white' : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              <QrCodeIcon className="w-5 h-5" />
-            </button>
-          ) : null
-        }
       />
 
       {/* 재고 조회 연동 배너 */}
@@ -294,11 +282,16 @@ export default function OutboundRecordPage() {
         {/* ── 검색 · 선택 카드 ──────────────────────────────────────────── */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
 
-          {/* QR 스캐너 블록 */}
-          {scannerOpen && !selectedLot && (
-            <div className="space-y-3">
-              {hasCamera && <BarcodeScanner onDetected={handleBarcodeDetected} />}
-              {isSearching && (
+          {/* LOT 검색 입력 */}
+          {!selectedLot && (
+            <form onSubmit={handleSearch} className="space-y-3">
+              {!scannerOpen && (
+                <label className="text-[13px] font-bold text-gray-500 ml-1">
+                  품목명 또는 LOT 번호
+                </label>
+              )}
+              {scannerOpen && hasCamera && <BarcodeScanner onDetected={handleBarcodeDetected} />}
+              {scannerOpen && isSearching && (
                 <p className="text-[13px] font-bold text-gray-500 animate-pulse text-center py-2">
                   검색 중...
                 </p>
@@ -306,34 +299,8 @@ export default function OutboundRecordPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="스캔 결과 또는 직접 입력"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
-                />
-                <button
-                  onClick={handleSearch}
-                  disabled={isSearching || !keyword.trim()}
-                  className="shrink-0 bg-[#FF3B30] text-white px-5 rounded-2xl active:scale-95 transition-transform disabled:opacity-40"
-                >
-                  <MagnifyingGlassIcon className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 직접 검색 입력 */}
-          {!scannerOpen && !selectedLot && (
-            <form onSubmit={handleSearch} className="space-y-3">
-              <label className="text-[13px] font-bold text-gray-500 ml-1">
-                품목명 또는 LOT 번호
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="예: 고등어, 0001"
+                  autoFocus={!scannerOpen}
+                  placeholder={scannerOpen ? '스캔 결과 또는 직접 입력' : '예: 고등어, 0001'}
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   className="flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
@@ -348,6 +315,17 @@ export default function OutboundRecordPage() {
                     : <MagnifyingGlassIcon className="w-5 h-5" />
                   }
                 </button>
+                {hasCamera !== false && (
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen((v) => !v)}
+                    className={`shrink-0 w-12 rounded-2xl flex items-center justify-center active:scale-95 transition-all ${
+                      scannerOpen ? 'bg-[#FF3B30] text-white' : 'bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    <QrCodeIcon className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </form>
           )}

@@ -10,7 +10,6 @@ import { readSession } from '@/lib/session';
 
 export default function NewExpensePage() {
   const router = useRouter();
-  const [now, setNow] = useState<Date | null>(null);
   const [workerId, setWorkerId] = useState('');
 
   const [formData, setFormData] = useState({
@@ -37,8 +36,6 @@ export default function NewExpensePage() {
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     setFormData(prev => ({ ...prev, date: today }));
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
   }, []);
 
   // 세션 로드 + 신청자 정보 자동 로드
@@ -122,16 +119,6 @@ export default function NewExpensePage() {
       <PageHeader
         title="지출 결의서 작성"
         onBack={() => router.push('/')}
-        rightSlot={
-          <div className="text-right leading-tight">
-            <p className="text-[10px] text-gray-500 font-medium">
-              {now ? now.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : ""}
-            </p>
-            <p className="text-[12px] font-bold text-gray-900">
-              {now ? now.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }) : ""}
-            </p>
-          </div>
-        }
       />
 
       <div className="p-4 space-y-4">
