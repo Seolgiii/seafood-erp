@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import { createExpenseRecord, getApplicantInfo } from '@/app/actions';
 import { fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 export default function NewExpensePage() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function NewExpensePage() {
     });
 
     if (result.success) {
-      alert("지출 결의서가 제출되었습니다.");
+      toast("지출 결의서가 제출되었습니다.", "success");
       router.push('/');
     } else {
       setSubmitError(result.error || '제출에 실패했습니다. 잠시 후 다시 시도해 주세요.');
@@ -127,7 +128,7 @@ export default function NewExpensePage() {
             <div>
               <label className="text-sm font-bold text-gray-600">지출일</label>
               <div className="relative mt-1">
-                <div className="w-full p-4 bg-gray-50 rounded-xl font-bold">
+                <div className="w-full p-4 bg-gray-50 rounded-2xl font-bold">
                   {formData.date.replace(/-/g, '/')}
                 </div>
                 <input
@@ -142,12 +143,12 @@ export default function NewExpensePage() {
 
             <div>
               <label className="text-sm font-bold text-gray-600">건명 (제목)</label>
-              <input type="text" placeholder="예 : 점심 식대" value={formData.title} onChange={(e)=>setFormData({...formData, title:e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold" required />
+              <input type="text" placeholder="예 : 점심 식대" value={formData.title} onChange={(e)=>setFormData({...formData, title:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
             </div>
 
             <div>
               <label className="text-sm font-bold text-gray-600">적요 (내용)</label>
-              <input type="text" placeholder="예 : 사용처 혹은 목적" value={formData.description} onChange={(e)=>setFormData({...formData, description:e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold" required />
+              <input type="text" placeholder="예 : 사용처 혹은 목적" value={formData.description} onChange={(e)=>setFormData({...formData, description:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
             </div>
 
             <div>
@@ -174,14 +175,14 @@ export default function NewExpensePage() {
                 type="text"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: fromGroupedIntegerInput(e.target.value).display })}
-                className="mt-1 w-full p-4 bg-gray-50 rounded-xl font-black text-blue-600"
+                className="mt-1 w-full p-4 bg-gray-50 rounded-2xl font-black text-blue-600"
                 required
               />
             </div>
 
             <div>
               <label className="text-sm font-bold text-gray-600">비고</label>
-              <input type="text" value={formData.remarks} onChange={(e)=>setFormData({...formData, remarks:e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl mt-1 font-bold" />
+              <input type="text" value={formData.remarks} onChange={(e)=>setFormData({...formData, remarks:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" />
             </div>
 
             {/* 영수증 업로드 */}

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import ServiceWorker from './components/ServiceWorker';
 import SessionGuard from './components/SessionGuard';
+import Toaster from '@/components/Toaster';
 
 export const metadata: Metadata = {
   title: 'SEAERP',
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className="bg-[#F2F4F6] text-gray-900 min-h-screen">
         <ServiceWorker />
         <SessionGuard>{children}</SessionGuard>
+        <Toaster />
       </body>
     </html>
   );

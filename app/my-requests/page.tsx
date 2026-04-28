@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getMyRequests, cancelMyRequest } from "@/app/actions/my-requests";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession } from "@/lib/session";
+import { toast } from "@/lib/toast";
 import PageHeader from "@/components/PageHeader";
 import BottomTabBar from "@/components/BottomTabBar";
 
@@ -96,7 +97,7 @@ export default function MyRequestsPage() {
         prev.map((i) => (i.id === item.id ? { ...i, status: "취소" as const } : i)),
       );
     } else {
-      alert(result.message);
+      toast(result.message);
     }
     setCancellingId(null);
   };

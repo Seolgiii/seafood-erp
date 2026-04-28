@@ -17,6 +17,18 @@ import { getDashboardStats, type DashboardStats } from "@/app/actions/dashboard"
 export default function WorkerDashboard() {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
   const [role, setRole] = useState<string | undefined>(undefined);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 

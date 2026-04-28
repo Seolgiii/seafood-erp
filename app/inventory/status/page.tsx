@@ -8,6 +8,7 @@ import {
   ArrowUpOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
+import { toast } from '@/lib/toast';
 
 type Stage = 'form' | 'results' | 'summary';
 
@@ -109,7 +110,7 @@ export default function StockStatusPage() {
       setApplied({ ...filters });
       setStage('results');
     } catch {
-      alert('서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      toast('서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }

@@ -13,6 +13,7 @@ import PageHeader from '@/components/PageHeader';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 // html5-qrcode는 window/document에 접근하므로 SSR에서 완전히 제외합니다.
 const BarcodeScanner = dynamic(
@@ -132,19 +133,18 @@ export default function OutboundRecordPage() {
     hasLoggedSelectedLotRef.current = false;
     const result = await searchLotByKeyword(q);
     if (result.success) {
-      if (result.records.length === 0) alert('일치하는 재고가 없습니다.');
+      if (result.records.length === 0) toast('일치하는 재고가 없습니다.', 'info');
       setSearchResults(result.records);
-      // 결과가 1건이면 자동 선택 (바코드 스캔 시 즉시 입력 화면으로)
       if (result.records.length === 1) setSelectedLot(result.records[0]);
     } else {
-      alert(`검색 실패: ${result.error}`);
+      toast(`검색 실패: ${result.error}`);
     }
     setIsSearching(false);
   }, []);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!keyword.trim()) return alert('검색어를 입력해주세요.');
+    if (!keyword.trim()) { toast('검색어를 입력해주세요.'); return; }
     await doSearch(keyword);
   };
 
@@ -192,9 +192,9 @@ export default function OutboundRecordPage() {
   const handleAddToCart = () => {
     if (!selectedLot) return;
     const qty = fromGroupedIntegerInput(quantity).value;
-    if (!Number.isFinite(qty) || qty <= 0) return alert('출고 수량을 입력해 주세요.');
+    if (!Number.isFinite(qty) || qty <= 0) { toast('출고 수량을 입력해 주세요.'); return; }
     const currentStock = Number(selectedLot.fields['재고수량'] ?? 0);
-    if (qty > currentStock) return alert('현재 재고보다 많습니다!');
+    if (qty > currentStock) { toast('현재 재고보다 많습니다!'); return; }
 
     setCart((prev) => [
       ...prev,
@@ -223,7 +223,7 @@ export default function OutboundRecordPage() {
 
   // ── 출고 신청 ─────────────────────────────────────────────────────────────
   const handleSubmitAll = async () => {
-    if (cart.length === 0) return alert('출고할 항목이 없습니다.');
+    if (cart.length === 0) return;
     setIsSubmitting(true);
 
     for (const item of cart) {
@@ -242,14 +242,13 @@ export default function OutboundRecordPage() {
 
       if (!result.success) {
         setIsSubmitting(false);
-        return alert(
-          `출고 실패 (${item.lotNumber}): ${result.error}\n\n전체 신청이 취소되었습니다.`,
-        );
+        toast(`출고 실패 (${item.lotNumber}): ${result.error}`);
+        return;
       }
     }
 
     setIsSubmitting(false);
-    alert('출고 신청이 완료되었습니다. 관리자 승인 후 재고가 차감됩니다.');
+    toast('출고 신청이 완료되었습니다. 관리자 승인 후 재고가 차감됩니다.', 'success');
     router.push('/');
   };
 

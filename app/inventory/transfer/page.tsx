@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import { searchTransferLot, createTransferRecord, getStorageOptions } from '@/app/actions';
 import type { TransferLotResult } from '@/app/actions/inventory/transfer';
 import { readSession } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 const BarcodeScanner = dynamic(
   () => import('@/app/components/BarcodeScanner'),
@@ -132,7 +133,7 @@ export default function TransferPage() {
       const res = await searchTransferLot(q);
       if (res.success) {
         if (res.records.length === 0) {
-          alert('일치하는 재고가 없습니다.');
+          toast('일치하는 재고가 없습니다.', 'info');
         } else if (res.records.length === 1) {
           setSelectedLot(res.records[0]);
           setScannerOpen(false);
@@ -141,7 +142,7 @@ export default function TransferPage() {
           setScannerOpen(false);
         }
       } else {
-        alert(res.error ?? '검색 중 오류가 발생했습니다.');
+        toast(res.error ?? '검색 중 오류가 발생했습니다.');
       }
     } finally {
       setIsSearching(false);
@@ -183,10 +184,10 @@ export default function TransferPage() {
   const handleAddToCart = () => {
     if (!selectedLot) return;
     const qty = Number(transferQty.replace(/,/g, ''));
-    if (!qty || qty <= 0) return alert('이동 수량을 올바르게 입력해주세요.');
-    if (qty > selectedLot.stockQty) return alert(`재고 부족 (현재: ${selectedLot.stockQty}박스)`);
-    if (!targetStorageId) return alert('이동 후 보관처를 선택해주세요.');
-    if (!transferDate) return alert('이동일을 입력해주세요.');
+    if (!qty || qty <= 0) { toast('이동 수량을 올바르게 입력해주세요.'); return; }
+    if (qty > selectedLot.stockQty) { toast(`재고 부족 (현재: ${selectedLot.stockQty}박스)`); return; }
+    if (!targetStorageId) { toast('이동 후 보관처를 선택해주세요.'); return; }
+    if (!transferDate) { toast('이동일을 입력해주세요.'); return; }
 
     setCart((prev) => [
       ...prev,
@@ -217,7 +218,7 @@ export default function TransferPage() {
 
   const handleSubmitAll = async () => {
     if (cart.length === 0) return;
-    if (!workerId) return alert('로그인 정보를 확인해주세요.');
+    if (!workerId) { toast('로그인 정보를 확인해주세요.'); return; }
     setIsSubmitting(true);
 
     for (const item of cart) {
@@ -231,14 +232,13 @@ export default function TransferPage() {
 
       if (!result.success) {
         setIsSubmitting(false);
-        return alert(
-          `이동 신청 실패 (${item.lotNumber}): ${result.message}\n\n전체 신청이 취소되었습니다.`,
-        );
+        toast(`이동 신청 실패 (${item.lotNumber}): ${result.message}`);
+        return;
       }
     }
 
     setIsSubmitting(false);
-    alert('재고 이동 신청이 완료되었습니다.');
+    toast('재고 이동 신청이 완료되었습니다.', 'success');
     router.push('/');
   };
 

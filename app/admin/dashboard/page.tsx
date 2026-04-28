@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
@@ -19,6 +19,8 @@ import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
+import { toast } from "@/lib/toast";
+import { usePullToRefresh } from "@/lib/pull-to-refresh";
 
 const PENDING_STATUSES = ["승인 대기", "최종 승인 대기"];
 
@@ -71,14 +73,16 @@ export default function AdminDashboardPage() {
     }
   }, [router]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     const data = await getMyRequests();
     setItems(data);
     setUiOverrides({});
     processingIds.current.clear();
     setIsLoading(false);
-  };
+  }, []);
+
+  const { pullY, isReady } = usePullToRefresh(loadData);
 
   useEffect(() => {
     if (authorized) loadData();
@@ -146,12 +150,12 @@ export default function AdminDashboardPage() {
           setTimeout(() => loadData(), 1200);
         }
       } else {
-        alert(result.message);
+        toast(result.message ?? '처리 중 오류가 발생했습니다.');
         loadData();
       }
     } catch (err) {
       console.error("[handleApprove] uncaught error", err);
-      alert("승인 처리 중 오류가 발생했습니다.");
+      toast("승인 처리 중 오류가 발생했습니다.");
       loadData();
     }
   };
@@ -171,7 +175,7 @@ export default function AdminDashboardPage() {
     if (result.success) {
       setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "REJECTED" }));
     } else {
-      alert(result.message);
+      toast(result.message ?? '처리 중 오류가 발생했습니다.');
       loadData();
     }
   };
@@ -359,6 +363,20 @@ export default function AdminDashboardPage() {
         title="결재 수신함"
         onBack={() => router.push("/")}
       />
+
+      {/* Pull-to-refresh 인디케이터 */}
+      {pullY > 0 && (
+        <div
+          className="flex justify-center items-center overflow-hidden transition-all"
+          style={{ height: pullY }}
+        >
+          <div
+            className={`w-7 h-7 rounded-full border-[3px] border-gray-200 border-t-[#3182F6] transition-transform ${
+              isReady ? 'scale-110 animate-spin' : ''
+            }`}
+          />
+        </div>
+      )}
 
       {/* 건수 요약 */}
       {!isLoading && (
