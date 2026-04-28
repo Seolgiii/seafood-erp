@@ -1,5 +1,5 @@
-import { log, logError, logWarn } from '@/lib/logger';
 "use server";
+import { log, logError, logWarn } from '@/lib/logger';
 
 import { unstable_cache } from "next/cache";
 
