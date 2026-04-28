@@ -21,8 +21,6 @@ type LotRecord = {
   salePrice: number; // 원/kg
 };
 
-type Product = { id: string; name: string; spec: string; detailSpec: string };
-
 type Filters = { q: string; spec: string; misu: string; from: string; to: string };
 
 function parseLot(r: { id: string; fields: Record<string, unknown> }): LotRecord {
@@ -66,19 +64,19 @@ export default function StockStatusPage() {
   const [notFound, setNotFound] = useState(false);
 
   // 품목명 자동완성
-  const [productList, setProductList] = useState<Product[]>([]);
+  const [productNames, setProductNames] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/products/list')
+    fetch('/api/inventory/product-names')
       .then((r) => r.json())
-      .then((d) => setProductList(d.products ?? []))
+      .then((d) => setProductNames(d.names ?? []))
       .catch(() => {});
   }, []);
 
-  const filteredProducts = filters.q.trim().length > 0
-    ? productList.filter((p) => p.name.includes(filters.q.trim())).slice(0, 8)
+  const filteredNames = filters.q.trim().length > 0
+    ? productNames.filter((n) => n.includes(filters.q.trim())).slice(0, 8)
     : [];
 
   const canSearch =
@@ -208,30 +206,20 @@ export default function StockStatusPage() {
                   }}
                   className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
-                {showDropdown && filteredProducts.length > 0 && (
+                {showDropdown && filteredNames.length > 0 && (
                   <ul className="absolute z-20 w-full mt-1 bg-white rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden border border-gray-100 max-h-52 overflow-y-auto">
-                    {filteredProducts.map((p) => (
+                    {filteredNames.map((name) => (
                       <li
-                        key={p.id}
+                        key={name}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setFilters((f) => ({
-                            ...f,
-                            q: p.name,
-                            spec: p.spec ? p.spec : f.spec,
-                            misu: p.detailSpec ? p.detailSpec : f.misu,
-                          }));
+                          setFilters((f) => ({ ...f, q: name }));
                           setShowDropdown(false);
                           setNotFound(false);
                         }}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 active:bg-blue-100 cursor-pointer flex items-center justify-between"
+                        className="px-4 py-3 text-[14px] font-bold text-gray-800 hover:bg-blue-50 active:bg-blue-100 cursor-pointer"
                       >
-                        <span>{p.name}</span>
-                        {p.spec && (
-                          <span className="text-[12px] text-gray-400 font-normal">
-                            {p.spec}kg {p.detailSpec && `· ${p.detailSpec}미`}
-                          </span>
-                        )}
+                        {name}
                       </li>
                     ))}
                   </ul>

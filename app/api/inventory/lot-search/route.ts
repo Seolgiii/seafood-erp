@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
   const conditions: string[] = ["{재고수량} > 0"];
 
-  if (q)    conditions.push(`FIND('${esc(q)}', ${safe("품목명")})`);
+  if (q)    conditions.push(`FIND('${esc(q)}', {품목명})`);
   if (spec) conditions.push(`OR(FIND('${esc(spec)}', ${safe("규격표시")}), FIND('${esc(spec)}', ${safe("규격")}))`);
   if (misu) conditions.push(`OR(FIND('${esc(misu)}', ${safe("상세규격_표기")}), FIND('${esc(misu)}', ${safe("미수")}))`);
   if (from) conditions.push(`NOT(IS_BEFORE({입고일자}, '${from}'))`);
