@@ -159,7 +159,7 @@ export function WorkerPinLogin() {
       {/* 블루 헤더 */}
       <header
         className="bg-[#3182F6] px-6 pt-12 pb-8 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end"
-        style={{ minHeight: 185 }}
+        style={{ minHeight: 259 }}
       >
         {/* 물고기 워터마크 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
