@@ -38,20 +38,21 @@ export default function WorkerDashboard() {
     setRole(session.role);
 
     const isAdminRole = session.role === "ADMIN" || session.role === "MASTER";
-    const workerId = isAdminRole ? undefined : session.workerId;
-    getDashboardStats(workerId)
+    if (!isAdminRole) return;
+
+    getDashboardStats(undefined)
       .then(setStats)
       .catch(() => {});
   }, []);
 
   const heroItems = [
     { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", Icon: ArrowDownOnSquareIcon, iconBg: "#3182F6", path: "/inventory/record" },
-    { id: "outbound", title: "물품 출고", desc: "바코드 즉시 출고", Icon: ArrowUpOnSquareIcon, iconBg: "#FF3B30", path: "/inventory/outbound" },
+    { id: "outbound", title: "물품 출고", desc: "판매처 출고", Icon: ArrowUpOnSquareIcon, iconBg: "#FF3B30", path: "/inventory/outbound" },
   ];
 
   const allSecondaryItems = [
-    { id: "transfer", title: "재고 이동", desc: "보관처 간 이동 신청", Icon: ArrowsRightLeftIcon, iconBg: "#FF8C00", path: "/inventory/transfer" },
-    { id: "status", title: "재고 조회", desc: "실시간 현장 재고", Icon: CubeIcon, iconBg: "#8B95A1", path: "/inventory/status" },
+    { id: "transfer", title: "재고 이동", desc: "보관처 이동", Icon: ArrowsRightLeftIcon, iconBg: "#FF8C00", path: "/inventory/transfer" },
+    { id: "status", title: "재고 조회", desc: "조회 · 묶음 출고/이동", Icon: CubeIcon, iconBg: "#8B95A1", path: "/inventory/status" },
     { id: "expense-new", title: "지출 신청", desc: "자재/경비 결의서", Icon: BanknotesIcon, iconBg: "#00D082", path: "/expense/new" },
     { id: "my-requests", title: "신청 내역", desc: "내 신청 현황 조회", Icon: ClipboardDocumentListIcon, iconBg: "#5061FF", path: "/my-requests" },
     { id: "admin-system", title: "관리자 시스템", desc: "결재 및 통합 관리", Icon: ShieldCheckIcon, iconBg: "#191F28", path: "/admin/dashboard", adminOnly: true },
@@ -72,30 +73,37 @@ export default function WorkerDashboard() {
 
       {/* 메인 콘텐츠 영역 */}
       <main className="flex-1 p-5 flex flex-col gap-4">
-        {/* KPI 스트립 — 오늘의 요약 */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "오늘 입고", value: stats?.todayInbound, highlight: false },
-            { label: "오늘 출고", value: stats?.todayOutbound, highlight: false },
-            { label: "결재 대기", value: stats?.pendingApprovals, highlight: (stats?.pendingApprovals ?? 0) > 0 },
-          ].map((kpi) => (
-            <div
-              key={kpi.label}
-              className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] text-center"
-            >
-              <div className="text-[11px] font-bold text-gray-400 tracking-tight whitespace-nowrap">
-                {kpi.label}
-              </div>
-              <div
-                className={`text-[22px] font-black leading-tight mt-1 ${
-                  kpi.highlight ? "text-[#FF3B30]" : "text-gray-900"
-                }`}
-              >
-                {stats === null ? "-" : `${kpi.value ?? 0}건`}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* KPI 스트립 — 결재 대기 (관리자/마스터 전용) */}
+        {(role === "ADMIN" || role === "MASTER") && (
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "입·출고 대기", value: stats?.pendingLogistics, tab: "LOGISTICS" },
+              { label: "지출 대기", value: stats?.pendingExpense, tab: "EXPENSE" },
+            ].map((kpi) => {
+              const count = kpi.value ?? 0;
+              const highlight = count > 0;
+              return (
+                <button
+                  key={kpi.label}
+                  type="button"
+                  onClick={() => router.push(`/admin/dashboard?tab=${kpi.tab}`)}
+                  className="bg-white rounded-2xl p-3 shadow-[0_4px_12px_rgba(149,157,165,0.06)] text-center active:scale-[0.97] transition-transform touch-manipulation"
+                >
+                  <div className="text-[12px] font-bold text-gray-400 tracking-tight whitespace-nowrap">
+                    {kpi.label}
+                  </div>
+                  <div
+                    className={`text-[24px] font-black leading-tight mt-1 ${
+                      highlight ? "text-[#FF3B30]" : "text-gray-900"
+                    }`}
+                  >
+                    {stats === null ? "-" : `${count}건`}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Hero 카드 — 입고·출고 (대형, 중앙 정렬) */}
         <div className="grid grid-cols-2 gap-4">

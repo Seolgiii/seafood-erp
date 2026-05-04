@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import PageHeader from "@/components/PageHeader";
 import BottomTabBar from "@/components/BottomTabBar";
@@ -49,9 +49,15 @@ function formatSubmittedAt(iso?: string): string | null {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab: AdminTabKey =
+    tabParam === 'LOGISTICS' || tabParam === 'EXPENSE' || tabParam === 'DONE' || tabParam === 'ALL'
+      ? tabParam
+      : 'ALL';
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [role, setRole] = useState<string | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<AdminTabKey>("ALL");
+  const [activeTab, setActiveTab] = useState<AdminTabKey>(initialTab);
   const [items, setItems] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uiOverrides, setUiOverrides] = useState<Record<string, "PROCESSING" | "COMPLETED" | "REJECTED">>({});

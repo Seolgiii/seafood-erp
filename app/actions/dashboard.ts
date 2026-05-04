@@ -20,9 +20,8 @@ type AirtableListResponse = {
 };
 
 export type DashboardStats = {
-  todayInbound: number;
-  todayOutbound: number;
-  pendingApprovals: number;
+  pendingLogistics: number; // 입고 + 출고 + 재고 이동 결재 대기
+  pendingExpense: number;   // 지출 결의 결재 대기
 };
 
 function tableSegmentForUrl(tableName: string): string {
@@ -74,20 +73,6 @@ async function fetchAllRecords(
   return records;
 }
 
-function isTodayLocal(value: unknown): boolean {
-  if (!value) return false;
-  const s = String(value).trim().slice(0, 10);
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
-  return (
-    s === `${y}/${m}/${d}` ||
-    s === `${y}-${m}-${d}` ||
-    s === `${y}.${m}.${d}`
-  );
-}
-
 function firstRecordId(val: unknown): string | null {
   if (typeof val === "string" && /^rec[a-zA-Z0-9]+$/.test(val.trim())) return val.trim();
   if (Array.isArray(val)) {
@@ -99,19 +84,12 @@ function firstRecordId(val: unknown): string | null {
 }
 
 async function computeStats(requesterWorkerId?: string): Promise<DashboardStats> {
-  const [inbound, outbound, expense] = await Promise.all([
+  const [inbound, outbound, transfer, expense] = await Promise.all([
     fetchAllRecords("입고 관리"),
     fetchAllRecords("출고 관리"),
+    fetchAllRecords("재고 이동"),
     fetchAllRecords("지출결의"),
   ]);
-
-  const todayInbound = inbound.filter((r) =>
-    isTodayLocal(r.fields["입고일자"] ?? r.fields["입고일"]),
-  ).length;
-
-  const todayOutbound = outbound.filter((r) =>
-    isTodayLocal(r.fields["출고일"]),
-  ).length;
 
   const isPending = (r: AirtableRecord) => {
     const status = String(r.fields["승인상태"] ?? "").trim();
@@ -126,12 +104,12 @@ async function computeStats(requesterWorkerId?: string): Promise<DashboardStats>
 
   const inboundPending = inbound.filter((r) => isPending(r) && isMine(r, "작업자")).length;
   const outboundPending = outbound.filter((r) => isPending(r) && isMine(r, "작업자")).length;
+  const transferPending = transfer.filter((r) => isPending(r) && isMine(r, "작업자")).length;
   const expensePending = expense.filter((r) => isPending(r) && isMine(r, "신청자")).length;
 
   const stats: DashboardStats = {
-    todayInbound,
-    todayOutbound,
-    pendingApprovals: inboundPending + outboundPending + expensePending,
+    pendingLogistics: inboundPending + outboundPending + transferPending,
+    pendingExpense: expensePending,
   };
 
   log("[dashboard] stats", { requesterWorkerId: requesterWorkerId ?? "ALL", ...stats });
