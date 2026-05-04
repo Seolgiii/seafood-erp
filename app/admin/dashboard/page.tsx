@@ -124,6 +124,12 @@ export default function AdminDashboardPage() {
   const handleApprove = async (item: RequestItem) => {
     if (processingIds.current.has(item.id)) return;
 
+    const session = readSession();
+    if (!session?.workerId) {
+      toast("로그인 정보를 확인해주세요.");
+      return;
+    }
+
     if (!window.confirm("해당 건을 승인하시겠습니까?")) return;
 
     processingIds.current.add(item.id);
@@ -147,7 +153,7 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const result = await updateApprovalStatus(item.id, item.type, nextStatus);
+      const result = await updateApprovalStatus(session.workerId, item.id, item.type, nextStatus);
 
       if (result.success) {
         if (nextStatus === "최종 승인 대기") {
@@ -175,9 +181,15 @@ export default function AdminDashboardPage() {
   const handleRejectSubmit = async (reason: string) => {
     if (!selectedItem) return;
 
+    const session = readSession();
+    if (!session?.workerId) {
+      toast("로그인 정보를 확인해주세요.");
+      return;
+    }
+
     setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "PROCESSING" }));
 
-    const result = await updateApprovalStatus(selectedItem.id, selectedItem.type, "반려", reason);
+    const result = await updateApprovalStatus(session.workerId, selectedItem.id, selectedItem.type, "반려", reason);
 
     if (result.success) {
       setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "REJECTED" }));

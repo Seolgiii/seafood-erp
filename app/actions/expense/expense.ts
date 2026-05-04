@@ -3,9 +3,26 @@ import { log, logError, logWarn } from '@/lib/logger';
 
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
+import { AuthError, requireWorker } from "@/lib/server-auth";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+export type ExpenseCreatePayload = {
+  /** 신청자 record ID — 서버에서 권한 검증 */
+  applicantRecordId: string;
+  date?: string;
+  title?: string;
+  description?: string;
+  amount?: number | string;
+  isCorpCard?: boolean;
+  remarks?: string;
+  receiptUrl?: string;
+  /** 미사용 필드 (호환성용) */
+  applicant?: string;
+  dept?: string;
+  position?: string;
+};
 
 // 인원 정보 가져오기
 export async function getApplicantInfo(name: string) {
@@ -32,15 +49,24 @@ export async function getApplicantInfo(name: string) {
 }
 
 // 지출결의 신청
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function createExpenseRecord(formData: any) {
+export async function createExpenseRecord(formData: ExpenseCreatePayload) {
   try {
     const expenseDate = typeof formData.date === "string" ? formData.date.trim() : "";
     const createdDate = new Date().toISOString().split("T")[0];
-    const applicantRecordId =
+    const rawApplicantId =
       typeof formData.applicantRecordId === "string" ? formData.applicantRecordId.trim() : "";
-    if (!applicantRecordId) {
-      return { success: false, error: "신청자 레코드 ID를 찾지 못했습니다." };
+
+    // 신청자 권한 검증 (Airtable 조회 — 활성 작업자 확인)
+    let applicantRecordId: string;
+    try {
+      const verified = await requireWorker(rawApplicantId);
+      applicantRecordId = verified.id;
+    } catch (e) {
+      if (e instanceof AuthError) {
+        logWarn("[createExpenseRecord] 권한 거부:", e.code, e.message);
+        return { success: false, error: e.message };
+      }
+      throw e;
     }
 
     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/지출결의`, {

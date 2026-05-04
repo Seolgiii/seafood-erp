@@ -9,6 +9,28 @@ import { log, logError, logWarn } from '@/lib/logger';
 
 import { revalidatePath } from "next/cache";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
+import { AuthError, requireWorker } from "@/lib/server-auth";
+
+export type InventoryCreatePayload = {
+  /** YYYY-MM-DD 또는 YYYY/MM/DD 입고일자 */
+  입고일자?: string;
+  품목명?: string;
+  규격?: string;
+  미수?: string;
+  /** 입고 수량(BOX) */
+  "입고수량(BOX)"?: number | string;
+  수매가?: number | string;
+  storageRecordId?: string;
+  원산지?: string;
+  매입처?: string;
+  매입처RecordId?: string;
+  선박명?: string;
+  비고?: string;
+  /** 작업자 record ID — 서버에서 권한 검증용 */
+  작업자: string;
+  /** 호환성: 일부 폼이 영어 키로 보내는 필드(현재 서버는 무시) */
+  [extra: string]: unknown;
+};
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -96,37 +118,10 @@ function inboundDateForAirtable(raw: unknown): string {
 }
 
 /**
- * 작업자 이름으로 작업자 테이블을 검색하여 해당 작업자의 레코드 ID를 반환합니다.
- */
-async function getWorkerRecordIdByName(name: string): Promise<string | null> {
-  const trimmed = String(name ?? "").trim();
-  if (!trimmed) return null;
-  const escaped = trimmed.replace(/'/g, "\\'");
-  const tablePath = encodeURIComponent("작업자");
-  // 작업자명이 일치하는 첫 번째 레코드만 조회
-  const formula = encodeURIComponent(`{작업자명}='${escaped}'`);
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tablePath}?filterByFormula=${formula}&maxRecords=1`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    logError("[createInventoryRecord] 작업자 조회 실패:", { status: res.status, body: body || "(empty)" });
-    return null;
-  }
-  const data = await res.json();
-  const id = data.records?.[0]?.id;
-  return typeof id === "string" && isRecordId(id) ? id : null;
-}
-
-
-/**
  * 품목명으로 품목마스터 id + 품목코드 + 품목구분 + 기존 LOT 링크 배열 확보.
  * 없으면 신규 품목마스터를 먼저 생성.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveProductMasterForInbound(formData: any): Promise<{
+async function resolveProductMasterForInbound(formData: InventoryCreatePayload): Promise<{
   masterId: string;
   productCode: string;
   productCategory: string;
@@ -242,8 +237,7 @@ function buildLotNumber(opts: {
  *   4. LOT별 재고 레코드 생성 (재고수량=0, 승인 후 실제 수량 반영)
  *   5. 품목마스터에 새 LOT 연결
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function createInventoryRecord(formData: any) {
+export async function createInventoryRecord(formData: InventoryCreatePayload) {
   try {
     // 환경변수(API키, 데이터베이스ID) 누락 시 오류 반환
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
@@ -251,13 +245,18 @@ export async function createInventoryRecord(formData: any) {
       return { success: false, message: "서버 환경 설정 오류" };
     }
 
-    // 작업자명 또는 레코드 ID로 작업자 확인
+    // 작업자 권한 검증 (Airtable 조회 — 활성 작업자 확인)
     const rawWorker = String(formData?.["작업자"] ?? "").trim();
-    const workerRecordId = isRecordId(rawWorker)
-      ? rawWorker
-      : await getWorkerRecordIdByName(rawWorker);
-    if (!workerRecordId) {
-      return { success: false, message: "작업자를 찾을 수 없습니다." };
+    let workerRecordId: string;
+    try {
+      const verified = await requireWorker(rawWorker);
+      workerRecordId = verified.id;
+    } catch (e) {
+      if (e instanceof AuthError) {
+        logWarn("[createInventoryRecord] 권한 거부:", e.code, e.message);
+        return { success: false, message: e.message };
+      }
+      throw e;
     }
 
     // 입고 수량 유효성 검사 (0 이하 불가)

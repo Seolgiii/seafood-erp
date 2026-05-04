@@ -14,6 +14,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { getWorkersTablePath, getProductsTablePath } from "@/lib/airtable";
 import { WORKER_FIELDS, PRODUCT_FIELDS } from "@/lib/airtable-schema";
+import { AuthError, requireWorker } from "@/lib/server-auth";
 
 /** 입고/출고: 작업자 링크 필드 후보(첫 번째로 rec id가 나오는 필드만 사용) */
 const WORKER_LINK_FIELD_CANDIDATES = ["작업자"] as const;
@@ -159,9 +160,8 @@ function fieldToDisplayString(val: unknown): string {
  * 알 수 없는 상태값이 들어오면 기본값 "승인 대기"로 처리합니다.
  */
 function normalizeStatus(raw: string): RequestItem["status"] {
-  const VALID: RequestItem["status"][] = ["승인 대기", "승인 완료", "반려", "취소", "최종 승인 대기"];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return VALID.includes(raw as any) ? (raw as RequestItem["status"]) : "승인 대기";
+  const VALID: readonly string[] = ["승인 대기", "승인 완료", "반려", "취소", "최종 승인 대기"];
+  return VALID.includes(raw) ? (raw as RequestItem["status"]) : "승인 대기";
 }
 
 /**
@@ -677,9 +677,25 @@ export async function getMyRequests(
  * 승인이 완료된 건은 취소할 수 없습니다(Airtable에서 상태를 바꾸면 되지만,
  * 이 함수는 단순히 상태를 "취소"로 업데이트할 뿐 추가 검증은 하지 않습니다).
  */
-export async function cancelMyRequest(recordId: string, type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER") {
+export async function cancelMyRequest(
+  workerId: string,
+  recordId: string,
+  type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER",
+) {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 설정이 누락되었습니다." };
+  }
+
+  // 작업자 권한 검증 (Airtable 조회 — 활성 작업자 확인)
+  let verifiedWorker;
+  try {
+    verifiedWorker = await requireWorker(workerId);
+  } catch (e) {
+    if (e instanceof AuthError) {
+      logWarn("[cancelMyRequest] 권한 거부:", e.code, e.message);
+      return { success: false, message: e.message };
+    }
+    throw e;
   }
 
   // 신청 유형에 따라 업데이트할 Airtable 테이블 결정
@@ -690,6 +706,31 @@ export async function cancelMyRequest(recordId: string, type: "INBOUND" | "OUTBO
     TRANSFER: "재고 이동",
   };
   const tableName = tableMap[type] ?? "입고 관리";
+
+  // 본인 신청 건인지 확인 (관리자가 아니면 자기 것만 취소 가능)
+  const linkField = type === "EXPENSE" ? "신청자" : "작업자";
+  const isAdmin = verifiedWorker.role === "ADMIN" || verifiedWorker.role === "MASTER";
+  if (!isAdmin) {
+    try {
+      const checkRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}/${recordId}`,
+        { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
+      );
+      if (!checkRes.ok) {
+        return { success: false, message: "신청 건을 확인할 수 없습니다." };
+      }
+      const data = await checkRes.json() as { fields?: Record<string, unknown> };
+      const linked = data.fields?.[linkField];
+      const ownerId = Array.isArray(linked) && typeof linked[0] === "string" ? linked[0] : null;
+      if (ownerId !== verifiedWorker.id) {
+        logWarn("[cancelMyRequest] 본인 신청이 아님:", { workerId: verifiedWorker.id, ownerId });
+        return { success: false, message: "본인이 신청한 건만 취소할 수 있습니다." };
+      }
+    } catch (e) {
+      logError("[cancelMyRequest] 신청 건 확인 중 오류:", e);
+      return { success: false, message: "신청 건 확인 실패" };
+    }
+  }
 
   try {
     const res = await fetch(

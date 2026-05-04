@@ -24,6 +24,7 @@ import {
   generateOutboundPdf,
   generateExpensePdf,
 } from "@/lib/generate-pdf.server";
+import { AuthError, requireAdmin } from "@/lib/server-auth";
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -515,12 +516,26 @@ async function deductStockOnOutboundApproval(
  *   4. 승인 완료 시 → PDF 자동 생성 및 저장 (백그라운드 실행, 실패해도 승인에 영향 없음)
  */
 export async function updateApprovalStatus(
+  adminWorkerId: string,
   recordId: string,
   type: "INBOUND" | "OUTBOUND" | "EXPENSE" | "TRANSFER",
   newStatus: string,
   rejectReason: string = "",
 ): Promise<{ success: boolean; message?: string }> {
-  log("[updateApprovalStatus] entered", { recordId, type, newStatus, rejectReason });
+  log("[updateApprovalStatus] entered", { adminWorkerId, recordId, type, newStatus, rejectReason });
+
+  // 관리자 권한 검증 (Airtable에서 직접 role 조회)
+  let admin;
+  try {
+    admin = await requireAdmin(adminWorkerId);
+  } catch (e) {
+    if (e instanceof AuthError) {
+      logWarn("[updateApprovalStatus] 권한 거부:", e.code, e.message);
+      return { success: false, message: e.message };
+    }
+    throw e;
+  }
+  log("[updateApprovalStatus] 권한 확인:", { id: admin.id, role: admin.role });
 
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return { success: false, message: "환경변수 AIRTABLE_API_KEY / AIRTABLE_BASE_ID 누락" };

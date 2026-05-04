@@ -87,10 +87,15 @@ export default function MyRequestsPage() {
 
   const handleCancel = async (item: RequestItem) => {
     if (item.status !== "승인 대기") return;
+    const session = readSession();
+    if (!session?.workerId) {
+      toast("로그인 정보를 확인해주세요.");
+      return;
+    }
     if (!window.confirm("이 신청 건을 취소하시겠습니까?")) return;
 
     setCancellingId(item.id);
-    const result = await cancelMyRequest(item.id, item.type);
+    const result = await cancelMyRequest(session.workerId, item.id, item.type);
 
     if (result.success) {
       setItems((prev) =>

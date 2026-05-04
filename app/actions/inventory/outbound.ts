@@ -9,6 +9,28 @@ import { log, logError, logWarn } from '@/lib/logger';
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { revalidatePath } from "next/cache";
+import { AuthError, requireWorker } from "@/lib/server-auth";
+
+export type OutboundCreatePayload = {
+  /** LOT별 재고 레코드 ID (필수) */
+  lotRecordId: string;
+  /** 입고 관리 레코드 ID (선택 — 없으면 LOT으로부터 조회) */
+  inboundRecordId?: string;
+  /** 호출 작업자의 record ID — 서버에서 권한 검증용 */
+  workerRecordId: string;
+  /** 출고 수량(BOX) */
+  quantity: number;
+  /** 출고일 YYYY-MM-DD */
+  date: string;
+  /** 규격·원산지·미수·판매처·판매가 — 선택 입력 */
+  spec?: string;
+  origin?: string;
+  misu?: string;
+  seller?: string;
+  salePrice?: number | string;
+  /** LOT번호 표시용 — 서버는 사용하지 않으나 토스트·로그 식별용으로 클라이언트가 함께 전달 */
+  lotNumber?: string;
+};
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -51,30 +73,6 @@ function firstLinkedRecordId(raw: unknown): string | null {
   const first = raw[0];
   if (typeof first !== "string" || !isRecordId(first)) return null;
   return first;
-}
-
-/**
- * 작업자명으로 작업자 테이블에서 record id 1건 조회 (출고 저장용)
- * 출고 신청 시 작업자를 Airtable 링크 필드로 연결하기 위해 필요합니다.
- */
-async function getWorkerRecordIdByName(name: string): Promise<string | null> {
-  const trimmed = String(name ?? "").trim();
-  if (!trimmed) return null;
-  const escaped = trimmed.replace(/'/g, "\\'");
-  const tablePath = encodeURIComponent("작업자");
-  const formula = encodeURIComponent(`{작업자명}='${escaped}'`);
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${tablePath}?filterByFormula=${formula}&maxRecords=1`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) {
-    logError("[getWorkerRecordIdByName] Airtable 조회 실패:", res.status);
-    return null;
-  }
-  const data = await res.json();
-  const id = data.records?.[0]?.id;
-  return typeof id === "string" && isRecordId(id) ? id : null;
 }
 
 /**
@@ -201,10 +199,10 @@ export async function searchLotByKeyword(keyword: string) {
       return { success: false, records: [], error: msg };
     }
 
-    const data = await response.json();
+    type AirtableRecord = { id: string; fields: Record<string, unknown> };
+    const data = (await response.json()) as { records?: AirtableRecord[] };
     // 재고수량이 1 이상인 항목만 필터링 (소진된 재고 제외)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const records = (data.records || []).filter((r: any) => {
+    const records: AirtableRecord[] = (data.records ?? []).filter((r) => {
       const raw = r.fields?.["재고수량"];
       const qty = Number(Array.isArray(raw) ? raw[0] : raw) || 0;
       return qty > 0;
@@ -216,13 +214,11 @@ export async function searchLotByKeyword(keyword: string) {
       { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 300 } }
     );
     if (masterRes.ok) {
-      const masterData = await masterRes.json();
+      const masterData = (await masterRes.json()) as { records?: AirtableRecord[] };
       const storageNameMap = new Map<string, string>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const r of masterData.records ?? []) {
         storageNameMap.set(r.id, String(r.fields?.["보관처명"] ?? ""));
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const record of records) {
         const raw = record.fields?.["보관처"];
         if (Array.isArray(raw) && raw.length > 0) {
@@ -248,13 +244,25 @@ export async function searchLotByKeyword(keyword: string) {
  *   3. 출고 관리 레코드 생성 (승인 대기 상태)
  * 실제 재고 차감(잔여수량 감소)은 관리자 승인 시 admin.ts에서 처리됩니다.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function createOutboundRecord(payload: any) {
+export async function createOutboundRecord(payload: OutboundCreatePayload) {
   try {
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
       logError("[createOutboundRecord] AIRTABLE_API_KEY / AIRTABLE_BASE_ID 미설정");
       return { success: false, error: "서버 환경 설정 오류" };
     }
+
+    // 작업자 권한 검증 (Airtable 조회 — 활성 작업자인지 확인)
+    let verified;
+    try {
+      verified = await requireWorker(payload?.workerRecordId);
+    } catch (e) {
+      if (e instanceof AuthError) {
+        logWarn("[createOutboundRecord] 권한 거부:", e.code, e.message);
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
+    const workerRecordId = verified.id;
 
     /** LOT별 재고 행 id (검색·선택 결과의 `id`) */
     const lotInventoryRecordId =
@@ -276,19 +284,6 @@ export async function createOutboundRecord(payload: any) {
         success: false,
         error: `LOT에 연결된 입고 관리 레코드를 찾을 수 없습니다. (링크 필드: ${LOT_TO_INBOUND_FIELD})`,
       };
-    }
-
-    // 작업자 레코드 ID 확인 (직접 ID 전달 또는 이름으로 조회)
-    const workerFromPayload =
-      typeof payload?.workerRecordId === "string" ? payload.workerRecordId.trim() : "";
-    let workerRecordId: string | null = isRecordId(workerFromPayload)
-      ? workerFromPayload
-      : null;
-    if (!workerRecordId) {
-      workerRecordId = await getWorkerRecordIdByName(payload?.worker ?? "");
-    }
-    if (!workerRecordId) {
-      return { success: false, error: "작업자를 찾을 수 없습니다. (작업자명 또는 작업자 레코드 ID 확인)" };
     }
 
     // 출고 수량 유효성 검사

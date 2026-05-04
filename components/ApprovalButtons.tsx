@@ -4,14 +4,19 @@ import React, { useState, useEffect } from "react";
 import { updateApprovalStatus } from "@/app/actions";
 import { CheckCircle, XCircle } from "lucide-react";
 import { readSession } from "@/lib/session";
+import { toast } from "@/lib/toast";
 
 export const ApprovalButtons = ({ id, currentStatus }: { id: string, currentStatus: string }) => {
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<string | undefined>(undefined);
+  const [workerId, setWorkerId] = useState<string>("");
 
   useEffect(() => {
     const session = readSession();
-    if (session) setRole(session.role);
+    if (session) {
+      setRole(session.role);
+      setWorkerId(session.workerId);
+    }
   }, []);
 
   if (currentStatus === "승인완료" || currentStatus === "반려") {
@@ -25,9 +30,14 @@ export const ApprovalButtons = ({ id, currentStatus }: { id: string, currentStat
   if (role !== "ADMIN" && role !== "MASTER") return null;
 
   const handleStatusUpdate = async (status: '승인 완료' | '반려') => {
+    if (!workerId) {
+      toast("로그인 정보를 확인해주세요.");
+      return;
+    }
     setLoading(true);
-    await updateApprovalStatus(id, "EXPENSE", status);
+    const result = await updateApprovalStatus(workerId, id, "EXPENSE", status);
     setLoading(false);
+    if (!result.success) toast(result.message ?? "처리 중 오류가 발생했습니다.");
   };
 
   return (

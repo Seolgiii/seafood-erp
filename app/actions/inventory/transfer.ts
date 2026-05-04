@@ -3,6 +3,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 
 import { revalidatePath } from "next/cache";
 import { getStorageCostForLot } from "@/lib/storage-cost";
+import { AuthError, requireWorker } from "@/lib/server-auth";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -236,8 +237,19 @@ export async function createTransferRecord(payload: {
   if (!Number.isFinite(이동수량) || 이동수량 <= 0) return { success: false, message: "이동 수량을 올바르게 입력해주세요." };
   if (!isRecordId(이동후보관처RecordId)) return { success: false, message: "이동 후 보관처를 선택해주세요." };
   if (!이동일) return { success: false, message: "이동일을 입력해주세요." };
-  // workerId는 rec… 형식 레코드ID 또는 유효한 문자열 허용
-  if (!workerId) return { success: false, message: "로그인 정보를 확인해주세요." };
+
+  // 작업자 권한 검증 (Airtable 조회 — 활성 작업자 확인)
+  let verifiedWorkerId: string;
+  try {
+    const verified = await requireWorker(workerId);
+    verifiedWorkerId = verified.id;
+  } catch (e) {
+    if (e instanceof AuthError) {
+      logWarn("[createTransferRecord] 권한 거부:", e.code, e.message);
+      return { success: false, message: e.message };
+    }
+    throw e;
+  }
 
   try {
     // 현재 재고 확인
@@ -256,7 +268,7 @@ export async function createTransferRecord(payload: {
       "이동일": 이동일,
       "승인상태": "승인 대기",
     };
-    if (isRecordId(workerId)) fields["작업자"] = [workerId];
+    fields["작업자"] = [verifiedWorkerId];
     const 이동전보관처Id = firstLink(lotFields["보관처"]);
     if (이동전보관처Id) fields["이동 전 보관처"] = [이동전보관처Id];
 
