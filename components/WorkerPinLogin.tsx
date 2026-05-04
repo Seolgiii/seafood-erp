@@ -306,7 +306,7 @@ export function WorkerPinLogin() {
                 type="button"
                 disabled={submitting}
                 onClick={() => { setPin(""); setAuthError(null); }}
-                className="flex items-center justify-center h-[68px] text-[15px] font-bold text-gray-400 rounded-2xl active:bg-gray-100 transition-colors touch-manipulation"
+                className="flex items-center justify-center h-[68px] text-[26px] font-semibold text-[#191F28] rounded-2xl active:bg-gray-100 transition-colors disabled:opacity-30 touch-manipulation"
               >
                 C
               </button>
@@ -323,9 +323,23 @@ export function WorkerPinLogin() {
                 type="button"
                 disabled={submitting}
                 onClick={backspace}
-                className="flex items-center justify-center h-[68px] text-[22px] text-gray-500 rounded-2xl active:bg-gray-100 transition-colors touch-manipulation"
+                aria-label="한 자리 지우기"
+                className="flex items-center justify-center h-[68px] rounded-2xl active:bg-gray-100 transition-colors disabled:opacity-30 touch-manipulation"
               >
-                ⌫
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#191F28"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M19 12H5" />
+                  <path d="M12 19L5 12L12 5" />
+                </svg>
               </button>
             </div>
           </div>

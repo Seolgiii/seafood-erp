@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PIN 키패드 — 백스페이스 아이콘 후보 (A/B/C)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/css/SpoqaHanSansNeo.css');
+  body { font-family: 'Spoqa Han Sans Neo', 'Noto Sans KR', sans-serif; background: #e5e7eb; }
+  .dot { width:13px; height:13px; border-radius:9999px; }
+  .key {
+    height: 68px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 16px;
+    font-size: 26px; font-weight: 600; color: #191F28;
+    transition: background-color .12s;
+  }
+  .key:active { background:#F2F4F6; }
+  .key-text { font-size:15px; font-weight:700; color:#9ba3af; }
+</style>
+</head>
+<body class="p-8">
+
+<h1 class="text-center text-2xl font-black text-gray-800 mb-2">PIN 키패드 — 백스페이스 아이콘 후보</h1>
+<p class="text-center text-gray-500 text-sm mb-10">현재 <code class="bg-white px-1.5 py-0.5 rounded text-[12px]">⌫</code> 유니코드 글자 → 깔끔한 SVG 아이콘으로 교체</p>
+
+<div class="flex flex-wrap justify-center gap-8">
+
+  <!-- ────────── A: 정통 백스페이스 outline ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">A — 정통 outline</span>
+    <p class="text-xs text-gray-400 max-w-[280px] text-center">
+      iOS·Toss 스타일.<br/>오각형 outline + X.
+    </p>
+    <div class="bg-white rounded-[28px] shadow-xl overflow-hidden" style="width:320px;border:8px solid #111;">
+      <!-- 핸들 -->
+      <div class="flex justify-center pt-3 pb-1"><div class="w-10 h-[5px] rounded-full bg-gray-200"></div></div>
+      <!-- 아바타 -->
+      <div class="flex justify-center pt-6 pb-1">
+        <div class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black" style="background:#3182F6;">김</div>
+      </div>
+      <!-- 점 -->
+      <div class="flex justify-center gap-[18px] py-7">
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+      </div>
+      <div class="h-5 -mt-3 mb-1"></div>
+      <!-- 키패드 -->
+      <div class="grid grid-cols-3 px-6 pb-7">
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key key-text">C</div>
+        <div class="key">0</div>
+        <div class="key">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 5H10.2c-.32 0-.62.15-.81.4l-4.5 6c-.25.34-.25.86 0 1.2l4.5 6c.19.25.49.4.81.4H21c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z"/>
+            <path d="M14 9.5l4 5"/>
+            <path d="M18 9.5l-4 5"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────── B: 부드러운 filled 백스페이스 ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">B — Filled 라운드</span>
+    <p class="text-xs text-gray-400 max-w-[280px] text-center">
+      라운드 강한 filled 태그 + 흰색 X.<br/>버튼처럼 또렷하게 보임.
+    </p>
+    <div class="bg-white rounded-[28px] shadow-xl overflow-hidden" style="width:320px;border:8px solid #111;">
+      <div class="flex justify-center pt-3 pb-1"><div class="w-10 h-[5px] rounded-full bg-gray-200"></div></div>
+      <div class="flex justify-center pt-6 pb-1">
+        <div class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black" style="background:#3182F6;">김</div>
+      </div>
+      <div class="flex justify-center gap-[18px] py-7">
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+      </div>
+      <div class="h-5 -mt-3 mb-1"></div>
+      <div class="grid grid-cols-3 px-6 pb-7">
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key key-text">C</div>
+        <div class="key">0</div>
+        <div class="key">
+          <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 5H10.2c-.32 0-.62.15-.81.4l-4.5 6c-.25.34-.25.86 0 1.2l4.5 6c.19.25.49.4.81.4H21c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z" fill="#9ca3af"/>
+            <path d="M14 9.7l4 4.6M18 9.7l-4 4.6" stroke="white" stroke-width="1.9" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────── C: 미니멀 좌측 화살표 ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">C — 미니멀 화살표</span>
+    <p class="text-xs text-gray-400 max-w-[280px] text-center">
+      가장 절제된 ← 라인.<br/>점 디자인과 톤 통일.
+    </p>
+    <div class="bg-white rounded-[28px] shadow-xl overflow-hidden" style="width:320px;border:8px solid #111;">
+      <div class="flex justify-center pt-3 pb-1"><div class="w-10 h-[5px] rounded-full bg-gray-200"></div></div>
+      <div class="flex justify-center pt-6 pb-1">
+        <div class="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white text-[20px] font-black" style="background:#3182F6;">김</div>
+      </div>
+      <div class="flex justify-center gap-[18px] py-7">
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#191F28;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+        <div class="dot" style="background:#E5E8EB;"></div>
+      </div>
+      <div class="h-5 -mt-3 mb-1"></div>
+      <div class="grid grid-cols-3 px-6 pb-7">
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key key-text">C</div>
+        <div class="key">0</div>
+        <div class="key">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5"/>
+            <path d="M12 19L5 12L12 5"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 비교 섹션: 아이콘만 큰 사이즈로 -->
+<div class="mt-14">
+  <h2 class="text-center text-base font-bold text-gray-700 mb-5">아이콘 단독 비교 (확대)</h2>
+  <div class="flex justify-center gap-10">
+    <div class="flex flex-col items-center gap-2">
+      <div class="w-24 h-24 bg-white rounded-2xl shadow flex items-center justify-center">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 5H10.2c-.32 0-.62.15-.81.4l-4.5 6c-.25.34-.25.86 0 1.2l4.5 6c.19.25.49.4.81.4H21c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z"/>
+          <path d="M14 9.5l4 5"/>
+          <path d="M18 9.5l-4 5"/>
+        </svg>
+      </div>
+      <span class="text-xs font-bold text-gray-500">A</span>
+    </div>
+    <div class="flex flex-col items-center gap-2">
+      <div class="w-24 h-24 bg-white rounded-2xl shadow flex items-center justify-center">
+        <svg width="60" height="60" viewBox="0 0 24 24">
+          <path d="M21 5H10.2c-.32 0-.62.15-.81.4l-4.5 6c-.25.34-.25.86 0 1.2l4.5 6c.19.25.49.4.81.4H21c.55 0 1-.45 1-1V6c0-.55-.45-1-1-1z" fill="#9ca3af"/>
+          <path d="M14 9.7l4 4.6M18 9.7l-4 4.6" stroke="white" stroke-width="1.9" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="text-xs font-bold text-gray-500">B</span>
+    </div>
+    <div class="flex flex-col items-center gap-2">
+      <div class="w-24 h-24 bg-white rounded-2xl shadow flex items-center justify-center">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5"/>
+          <path d="M12 19L5 12L12 5"/>
+        </svg>
+      </div>
+      <span class="text-xs font-bold text-gray-500">C</span>
+    </div>
+    <div class="flex flex-col items-center gap-2">
+      <div class="w-24 h-24 bg-white rounded-2xl shadow flex items-center justify-center text-[44px] text-gray-500">⌫</div>
+      <span class="text-xs font-bold text-gray-400">현재</span>
+    </div>
+  </div>
+</div>
+
+<p class="text-center text-gray-500 text-xs mt-12">선호 안 알려주시면 바로 컴포넌트에 반영하겠습니다.</p>
+
+</body>
+</html>
