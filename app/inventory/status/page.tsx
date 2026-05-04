@@ -8,7 +8,20 @@ import {
   ArrowUpOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
+import { BulkSubmitSheet } from '@/components/BulkSubmitSheet';
 import { toast } from '@/lib/toast';
+import { readSession } from '@/lib/session';
+import {
+  createOutboundRecord,
+  createTransferRecord,
+  getStorageOptions,
+} from '@/app/actions';
+
+function todayKST(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
+}
 
 type Stage = 'form' | 'results' | 'summary';
 
@@ -68,6 +81,29 @@ export default function StockStatusPage() {
   const [productNames, setProductNames] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 묶음 출고/이동 바텀시트
+  const [workerId, setWorkerId] = useState('');
+  const [storageOptions, setStorageOptions] = useState<{ id: string; name: string }[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [outboundOpen, setOutboundOpen] = useState(false);
+  const [seller, setSeller] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [outboundDate, setOutboundDate] = useState(todayKST());
+
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [targetStorageId, setTargetStorageId] = useState('');
+  const [transferDate, setTransferDate] = useState(todayKST());
+
+  useEffect(() => {
+    const s = readSession();
+    if (s) setWorkerId(s.workerId);
+  }, []);
+
+  useEffect(() => {
+    getStorageOptions().then(setStorageOptions).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch('/api/inventory/product-names')
@@ -133,44 +169,78 @@ export default function StockStatusPage() {
   const totalBoxes   = selectedLots.reduce((s, l) => s + (selectedQty[l.id] ?? 0), 0);
   const totalAmount  = selectedLots.reduce((s, l) => s + calcAmount(l, selectedQty[l.id] ?? 0), 0);
 
-  // Phase 2: sessionStorage에 저장 후 페이지 이동
-  const handleOutboundRequest = () => {
-    try {
-      sessionStorage.setItem(
-        'sea_outbound_draft',
-        JSON.stringify(
-          selectedLots.map((l) => ({
-            lotId: l.id,
-            lotNumber: l.lotNumber,
-            productName: l.productName,
-            spec: l.spec,
-            misu: l.misu,
-            stockQty: l.stockQty,
-            selectedBoxes: selectedQty[l.id] ?? 0,
-          })),
-        ),
-      );
-    } catch {}
-    router.push('/inventory/outbound');
+  const openOutboundSheet = () => {
+    if (selectedLots.length === 0) return;
+    setSeller('');
+    setSalePrice('');
+    setOutboundDate(todayKST());
+    setOutboundOpen(true);
   };
 
-  const handleTransferRequest = () => {
-    const first = selectedLots[0];
-    if (!first) return;
-    try {
-      sessionStorage.setItem(
-        'sea_transfer_draft',
-        JSON.stringify({
-          lotId: first.id,
-          lotNumber: first.lotNumber,
-          productName: first.productName,
-          spec: first.spec,
-          misu: first.misu,
-          stockQty: first.stockQty,
-        }),
-      );
-    } catch {}
-    router.push('/inventory/transfer');
+  const openTransferSheet = () => {
+    if (selectedLots.length === 0) return;
+    setTargetStorageId('');
+    setTransferDate(todayKST());
+    setTransferOpen(true);
+  };
+
+  const handleBulkOutbound = async () => {
+    if (!workerId) { toast('로그인 정보를 확인해주세요.'); return; }
+    if (!seller.trim()) { toast('판매처를 입력해주세요.'); return; }
+    if (!salePrice.trim() || Number(salePrice) <= 0) { toast('판매가를 올바르게 입력해주세요.'); return; }
+    if (!outboundDate) { toast('출고일을 입력해주세요.'); return; }
+
+    setSubmitting(true);
+    for (const lot of selectedLots) {
+      const qty = selectedQty[lot.id] ?? 0;
+      const result = await createOutboundRecord({
+        date: outboundDate,
+        lotNumber: lot.lotNumber,
+        lotRecordId: lot.id,
+        quantity: qty,
+        workerRecordId: workerId,
+        spec: lot.spec,
+        misu: lot.misu,
+        seller: seller.trim(),
+        salePrice: Number(salePrice),
+      });
+      if (!result.success) {
+        setSubmitting(false);
+        toast(`출고 신청 실패 (${lot.lotNumber}): ${result.error ?? '오류'}`);
+        return;
+      }
+    }
+    setSubmitting(false);
+    setOutboundOpen(false);
+    toast(`${selectedLots.length}건 출고 신청이 완료되었습니다.`, 'success');
+    router.push('/');
+  };
+
+  const handleBulkTransfer = async () => {
+    if (!workerId) { toast('로그인 정보를 확인해주세요.'); return; }
+    if (!targetStorageId) { toast('이동 후 보관처를 선택해주세요.'); return; }
+    if (!transferDate) { toast('이동일을 입력해주세요.'); return; }
+
+    setSubmitting(true);
+    for (const lot of selectedLots) {
+      const qty = selectedQty[lot.id] ?? 0;
+      const result = await createTransferRecord({
+        lotRecordId: lot.id,
+        이동수량: qty,
+        이동후보관처RecordId: targetStorageId,
+        이동일: transferDate,
+        workerId,
+      });
+      if (!result.success) {
+        setSubmitting(false);
+        toast(`이동 신청 실패 (${lot.lotNumber}): ${result.message ?? '오류'}`);
+        return;
+      }
+    }
+    setSubmitting(false);
+    setTransferOpen(false);
+    toast(`${selectedLots.length}건 재고 이동이 완료되었습니다.`, 'success');
+    router.push('/');
   };
 
   /* ── 1단계: 검색 폼 ──────────────────────────────────────────────── */
@@ -253,7 +323,20 @@ export default function StockStatusPage() {
 
             {/* 입고기간 */}
             <div className="space-y-2">
-              <label className="text-[13px] font-bold text-gray-500">입고기간</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[13px] font-bold text-gray-500">입고기간</label>
+                <button
+                  type="button"
+                  onClick={() => { setFilters((f) => ({ ...f, from: '', to: '' })); setNotFound(false); }}
+                  className={`text-[12px] font-bold px-3 py-1 rounded-full transition-colors ${
+                    !filters.from && !filters.to
+                      ? 'bg-[#3182F6] text-white'
+                      : 'bg-gray-100 text-gray-500 active:bg-gray-200'
+                  }`}
+                >
+                  전체
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -269,6 +352,14 @@ export default function StockStatusPage() {
                   className="flex-1 bg-gray-100 rounded-2xl px-4 py-3.5 text-[14px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
+              {!filters.from && !filters.to && (
+                <p className="text-[12px] font-bold text-[#3182F6] flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                  전체 기간으로 조회됩니다
+                </p>
+              )}
             </div>
           </div>
 
@@ -317,8 +408,10 @@ export default function StockStatusPage() {
           {applied?.q    && <FilterChip label={applied.q} />}
           {applied?.spec && <FilterChip label={`규격 ${applied.spec}kg`} />}
           {applied?.misu && <FilterChip label={`${applied.misu}미`} />}
-          {(applied?.from || applied?.to) && (
+          {applied?.from || applied?.to ? (
             <FilterChip label={`${applied.from || '—'} ~ ${applied.to || '—'}`} />
+          ) : (
+            <FilterChip label="기간 전체" />
           )}
         </div>
 
@@ -329,6 +422,14 @@ export default function StockStatusPage() {
           {lots.map((lot) => {
             const selected = selectedQty[lot.id] ?? 0;
             const est = calcAmount(lot, selected);
+            const isFull = lot.stockQty > 0 && selected === lot.stockQty;
+            const isPartial = selected > 0 && selected < lot.stockQty;
+            const toggleFull = () => {
+              setSelectedQty((p) => ({
+                ...p,
+                [lot.id]: isFull ? 0 : lot.stockQty,
+              }));
+            };
             return (
               <div
                 key={lot.id}
@@ -336,9 +437,33 @@ export default function StockStatusPage() {
                   selected > 0 ? 'ring-2 ring-blue-400' : ''
                 }`}
               >
-                <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed">
-                  {lot.lotNumber || '—'}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed flex-1 min-w-0">
+                    {lot.lotNumber || '—'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={toggleFull}
+                    disabled={lot.stockQty === 0}
+                    aria-label={isFull ? '전체 선택 해제' : '풀 수량 선택'}
+                    aria-pressed={isFull}
+                    className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-manipulation disabled:opacity-30 ${
+                      isFull
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : isPartial
+                        ? 'bg-blue-50 border-2 border-blue-400'
+                        : 'bg-gray-100 border-2 border-gray-200 active:bg-gray-200'
+                    }`}
+                  >
+                    {isFull ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : isPartial ? (
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    ) : null}
+                  </button>
+                </div>
 
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -442,6 +567,9 @@ export default function StockStatusPage() {
                 applied?.q,
                 applied?.spec && `규격 ${applied.spec}kg`,
                 applied?.misu && `${applied.misu}미`,
+                applied?.from || applied?.to
+                  ? `${applied?.from || '—'}~${applied?.to || '—'}`
+                  : '기간 전체',
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -509,19 +637,14 @@ export default function StockStatusPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={handleTransferRequest}
-              className="py-4 rounded-2xl border-2 border-orange-400 text-orange-500 font-black text-[14px] flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all"
+              onClick={openTransferSheet}
+              className="py-4 rounded-2xl bg-orange-500 text-white font-black text-[14px] flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(249,115,22,0.3)] active:scale-[0.98] transition-all"
             >
-              <div className="flex items-center gap-1.5">
-                <ArrowsRightLeftIcon className="w-5 h-5" />
-                재고 이동
-              </div>
-              {selectedLots.length > 1 && (
-                <span className="text-[10px] font-normal text-orange-400">첫 번째 LOT만 이동</span>
-              )}
+              <ArrowsRightLeftIcon className="w-5 h-5" />
+              재고 이동
             </button>
             <button
-              onClick={handleOutboundRequest}
+              onClick={openOutboundSheet}
               className="py-4 rounded-2xl bg-red-600 text-white font-black text-[14px] flex items-center justify-center gap-1.5 shadow-[0_4px_16px_rgba(239,68,68,0.3)] active:scale-[0.98] transition-all"
             >
               <ArrowUpOnSquareIcon className="w-5 h-5" />
@@ -530,6 +653,103 @@ export default function StockStatusPage() {
           </div>
         </div>
       </div>
+
+      {/* ── 묶음 출고 바텀시트 ──────────────────────────────────────────── */}
+      <BulkSubmitSheet
+        isOpen={outboundOpen}
+        onClose={() => setOutboundOpen(false)}
+        title="묶음 출고 신청"
+        subtitle={`${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`}
+        accent="red"
+        canSubmit={!!seller.trim() && !!salePrice.trim() && Number(salePrice) > 0 && !!outboundDate}
+        submitting={submitting}
+        submitLabel={`출고 신청 (${selectedLots.length}건)`}
+        onSubmit={handleBulkOutbound}
+      >
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold text-gray-500 ml-1">
+            판매처 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={seller}
+            onChange={(e) => setSeller(e.target.value)}
+            placeholder="예: ○○수산"
+            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold text-gray-500 ml-1">
+            판매가 (원/kg) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={salePrice}
+            onChange={(e) => setSalePrice(e.target.value)}
+            placeholder="예: 12000"
+            min={0}
+            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold text-gray-500 ml-1">
+            출고일 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            value={outboundDate}
+            onChange={(e) => setOutboundDate(e.target.value)}
+            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+          />
+        </div>
+        <p className="text-[12px] font-medium text-gray-400 pt-1">
+          선택된 {selectedLots.length}건 LOT 모두 동일한 판매처·판매가로 출고됩니다.
+        </p>
+      </BulkSubmitSheet>
+
+      {/* ── 묶음 이동 바텀시트 ──────────────────────────────────────────── */}
+      <BulkSubmitSheet
+        isOpen={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        title="묶음 재고 이동"
+        subtitle={`${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`}
+        accent="orange"
+        canSubmit={!!targetStorageId && !!transferDate}
+        submitting={submitting}
+        submitLabel={`이동 신청 (${selectedLots.length}건)`}
+        onSubmit={handleBulkTransfer}
+      >
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold text-gray-500 ml-1">
+            이동 후 보관처 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={targetStorageId}
+            onChange={(e) => setTargetStorageId(e.target.value)}
+            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all appearance-none"
+          >
+            <option value="">보관처를 선택하세요</option>
+            {storageOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>{opt.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <label className="text-[13px] font-bold text-gray-500 ml-1">
+            이동일 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            value={transferDate}
+            onChange={(e) => setTransferDate(e.target.value)}
+            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+          />
+        </div>
+        <p className="text-[12px] font-medium text-gray-400 pt-1">
+          선택된 {selectedLots.length}건 LOT 모두 동일한 보관처로 이동됩니다.
+        </p>
+      </BulkSubmitSheet>
     </main>
   );
 }
