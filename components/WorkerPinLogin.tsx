@@ -158,27 +158,43 @@ export function WorkerPinLogin() {
     >
       {/* 블루 헤더 */}
       <header
-        className="bg-[#3182F6] px-6 pt-12 pb-8 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end"
-        style={{ minHeight: 259 }}
+        className="bg-[#3182F6] px-6 pt-12 pb-10 flex-shrink-0 relative overflow-hidden flex flex-col items-end justify-end"
+        style={{ minHeight: 210 }}
       >
-        {/* 물고기 워터마크 */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/apple-touch-icon.png"
-          alt=""
+        {/* 헤더 내부 잔잔한 웨이브 */}
+        <svg
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{ bottom: 14, width: "100%", height: 22 }}
+          viewBox="0 0 320 22"
+          preserveAspectRatio="none"
           aria-hidden="true"
-          className="absolute pointer-events-none select-none"
-          style={{
-            width: 400,
-            maxWidth: 'none',
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%) rotate(330deg)',
-            opacity: 0.14,
-          }}
-        />
-        <h1 className="text-[26px] font-black text-white tracking-tight leading-none relative">SEAERP</h1>
-        <p className="mt-1.5 text-[13px] font-medium text-blue-100 relative">작업자를 선택해 로그인하세요</p>
+        >
+          <path
+            d="M0,11 C60,3 120,18 180,11 C240,4 320,13 320,13 L320,22 L0,22 Z"
+            fill="white"
+            fillOpacity="0.13"
+          />
+        </svg>
+        {/* 화이트 컨텐츠로 이어지는 웨이브 컷 */}
+        <svg
+          className="absolute left-0 right-0 bottom-0 pointer-events-none"
+          style={{ width: "100%", height: 16 }}
+          viewBox="0 0 320 16"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M0,9 C80,0 160,16 240,7 C280,3 320,9 320,9 L320,16 L0,16 Z"
+            fill="#F2F4F6"
+          />
+        </svg>
+        <h1
+          className="text-white font-black tracking-tight leading-none relative"
+          style={{ fontSize: 40, letterSpacing: "-1.5px" }}
+        >
+          SEAERP
+        </h1>
+        <p className="mt-2 text-[13px] font-medium text-blue-100 relative">작업자를 선택해 로그인하세요</p>
       </header>
 
       {/* 작업자 목록 */}
