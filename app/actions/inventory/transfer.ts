@@ -4,6 +4,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { AuthError, requireWorker } from "@/lib/server-auth";
+import { calculateTransferPurchasePrice } from "@/lib/cost-calc";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -344,14 +345,15 @@ export async function approveTransfer(
 
   // 4. 새 수매가 = 판매원가 × (이동수량 / 재고수량)
   //    판매원가 = 수매가 + 누적냉장료 + 입출고비 + 노조비 + 동결비
-  const totalCurrentCost =
-    num(lotFields["수매가"]) +
-    num(lotFields["누적냉장료"]) +
-    num(lotFields["입출고비"]) +
-    num(lotFields["노조비"]) +
-    num(lotFields["동결비"]);
-  const ratio = currentStock > 0 ? 이동수량 / currentStock : 0;
-  const newPurchasePrice = Math.round(totalCurrentCost * ratio);
+  const newPurchasePrice = calculateTransferPurchasePrice({
+    purchasePrice: num(lotFields["수매가"]),
+    refrigerationCostAccum: num(lotFields["누적냉장료"]),
+    inOutFee: num(lotFields["입출고비"]),
+    unionFee: num(lotFields["노조비"]),
+    freezeCost: num(lotFields["동결비"]),
+    currentStock,
+    transferQty: 이동수량,
+  });
 
   // 5. 새 LOT번호 (원본 날짜 prefix 유지, 새 일련번호)
   const lotParts = originalLotNumber.split("-");

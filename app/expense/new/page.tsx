@@ -139,12 +139,12 @@ export default function NewExpensePage() {
 
             <div>
               <label className="text-sm font-bold text-gray-600">건명 (제목)</label>
-              <input type="text" placeholder="예 : 점심 식대" value={formData.title} onChange={(e)=>setFormData({...formData, title:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
+              <input type="text" placeholder="예 : 점심 식대" value={formData.title} onChange={(e)=>setFormData({...formData, title:e.target.value})} maxLength={50} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
             </div>
 
             <div>
               <label className="text-sm font-bold text-gray-600">적요 (내용)</label>
-              <input type="text" placeholder="예 : 사용처 혹은 목적" value={formData.description} onChange={(e)=>setFormData({...formData, description:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
+              <input type="text" placeholder="예 : 사용처 혹은 목적" value={formData.description} onChange={(e)=>setFormData({...formData, description:e.target.value})} maxLength={500} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" required />
             </div>
 
             <div>
@@ -178,7 +178,7 @@ export default function NewExpensePage() {
 
             <div>
               <label className="text-sm font-bold text-gray-600">비고</label>
-              <input type="text" value={formData.remarks} onChange={(e)=>setFormData({...formData, remarks:e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" />
+              <input type="text" value={formData.remarks} onChange={(e)=>setFormData({...formData, remarks:e.target.value})} maxLength={200} className="w-full p-4 bg-gray-50 rounded-2xl mt-1 font-bold" />
             </div>
 
             {/* 영수증 업로드 */}

@@ -369,6 +369,7 @@ export default function OutboundRecordPage() {
                     placeholder="직접입력"
                     value={seller}
                     onChange={(e) => setSeller(e.target.value)}
+                    maxLength={30}
                     className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
                   />
                 </div>

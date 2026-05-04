@@ -343,7 +343,7 @@ export default function InventoryRecordPage() {
             ) : (
               <div className="flex flex-col gap-2">
                 <label className="text-[14px] font-bold text-gray-500 ml-1">선박명 (선택)</label>
-                <input type="text" value={formData.shipName} onChange={(e) => setFormData({ ...formData, shipName: e.target.value })} placeholder="선박명 입력 (없으면 비워두세요)" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
+                <input type="text" value={formData.shipName} onChange={(e) => setFormData({ ...formData, shipName: e.target.value })} maxLength={30} placeholder="선박명 입력 (없으면 비워두세요)" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
               </div>
             )}
           </section>
@@ -358,7 +358,7 @@ export default function InventoryRecordPage() {
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-[14px] font-bold text-gray-500 ml-1">비고</label>
-              <textarea value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} placeholder="특이사항을 입력하세요" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]" />
+              <textarea value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} maxLength={200} placeholder="특이사항을 입력하세요" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all resize-none min-h-[100px]" />
             </div>
           </section>
         </div>

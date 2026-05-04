@@ -771,6 +771,7 @@ export default function StockStatusPage() {
                 value={seller}
                 onChange={(e) => setSeller(e.target.value)}
                 placeholder="예: ○○수산"
+                maxLength={30}
                 className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
               />
             </div>

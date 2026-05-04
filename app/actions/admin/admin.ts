@@ -25,6 +25,7 @@ import {
   generateExpensePdf,
 } from "@/lib/generate-pdf.server";
 import { AuthError, requireAdmin } from "@/lib/server-auth";
+import { calculateOutboundCost } from "@/lib/cost-calc";
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -459,38 +460,27 @@ async function deductStockOnOutboundApproval(
       try {
         const num = (v: unknown) =>
           Number(Array.isArray(v) ? v[0] : v) || 0;
-
-        const purchasePrice = num(lotFields["수매가"]);
-        const totalWeight = num(lotFields["총중량"]);
-        const refrigerationFeePerUnit = num(lotFields["냉장료단가"]);
-        const inOutFee = num(lotFields["입출고비"]);
-        const unionFee = num(lotFields["노조비"]);
-        const lotInboundDate = String(lotFields["입고일자"] ?? "").trim();
-
-        const outboundDate = String(outFields["출고일"] ?? "").trim();
         const saleAmount = num(outFields["판매금액"]);
 
-        // 출고시점 단가: 수매가 ÷ 총중량
-        const unitCost = totalWeight > 0 ? purchasePrice / totalWeight : 0;
-
-        // 출고시점 냉장료: 냉장료단가 × 보관일수
-        let daysHeld = 0;
-        if (lotInboundDate && outboundDate) {
-          const diff = new Date(outboundDate).getTime() - new Date(lotInboundDate).getTime();
-          daysHeld = Math.max(0, Math.floor(diff / 86_400_000));
-        }
-        const refrigerationCost = refrigerationFeePerUnit * daysHeld;
-
-        const totalCost = unitCost + refrigerationCost + inOutFee + unionFee;
+        const breakdown = calculateOutboundCost({
+          purchasePrice: num(lotFields["수매가"]),
+          totalWeight: num(lotFields["총중량"]),
+          refrigerationFeePerUnit: num(lotFields["냉장료단가"]),
+          inOutFee: num(lotFields["입출고비"]),
+          unionFee: num(lotFields["노조비"]),
+          saleAmount,
+          inboundDate: String(lotFields["입고일자"] ?? "").trim(),
+          outboundDate: String(outFields["출고일"] ?? "").trim(),
+        });
 
         await patchRecord("출고 관리", outboundRecordId, {
-          "출고시점 단가": unitCost,
-          "출고시점 냉장료": refrigerationCost,
-          "출고시점 입출고비": inOutFee,
-          "출고시점 노조비": unionFee,
-          "출고시점 판매원가": totalCost,
+          "출고시점 단가": breakdown.unitCost,
+          "출고시점 냉장료": breakdown.refrigerationCost,
+          "출고시점 입출고비": breakdown.inOutFee,
+          "출고시점 노조비": breakdown.unionFee,
+          "출고시점 판매원가": breakdown.totalCost,
           "출고시점 판매금액": saleAmount,
-          "출고시점 손익": saleAmount - totalCost,
+          "출고시점 손익": breakdown.profit,
         });
       } catch (e) {
         logWarn("[deductStockOnOutboundApproval] 출고시점 비용 저장 실패 (승인은 계속 진행):", e);

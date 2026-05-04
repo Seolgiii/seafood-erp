@@ -10,6 +10,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { AuthError, requireWorker } from "@/lib/server-auth";
+import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
 
 export type InventoryCreatePayload = {
   /** YYYY-MM-DD 또는 YYYY/MM/DD 입고일자 */
@@ -275,10 +276,19 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
     const spec = String(formData?.["규격"] ?? "").trim();
     const misu = String(formData?.["미수"] ?? "").trim();
     const purchasePrice = Number(formData?.["수매가"]);
-    const memo = String(formData?.["비고"] ?? "").trim();
+
+    // 자유 텍스트 필드 정규화·길이 검사 (비고 200자 / 선박명 30자)
+    let memo: string;
+    let shipName: string;
+    try {
+      memo = sanitizeText(formData?.["비고"], "inboundMemo", "비고");
+      shipName = sanitizeText(formData?.["선박명"], "shipName", "선박명");
+    } catch (e) {
+      if (e instanceof InputValidationError) return { success: false, message: e.message };
+      throw e;
+    }
 
     const supplierRecordId = String(formData?.["매입처RecordId"] ?? "").trim();
-    const shipName = String(formData?.["선박명"] ?? "").trim();
 
     // ── 1. 입고 관리 생성 (LOT번호는 아직 비움) ──
     const inboundFields: Record<string, unknown> = {

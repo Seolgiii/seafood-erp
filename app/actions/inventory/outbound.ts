@@ -10,6 +10,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 
 import { revalidatePath } from "next/cache";
 import { AuthError, requireWorker } from "@/lib/server-auth";
+import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
 
 export type OutboundCreatePayload = {
   /** LOT별 재고 레코드 ID (필수) */
@@ -314,6 +315,15 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
       };
     }
 
+    // 자유 텍스트 필드 정규화·길이 검사 (판매처 30자)
+    let seller: string;
+    try {
+      seller = sanitizeText(payload?.seller, "seller", "판매처");
+    } catch (e) {
+      if (e instanceof InputValidationError) return { success: false, error: e.message };
+      throw e;
+    }
+
     // 출고 관리 레코드에 저장할 필드 구성
     const fields: Record<string, unknown> = {
       "출고일": payload?.date,
@@ -328,7 +338,7 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     if (payload?.origin) fields["원산지"] = String(payload.origin);
     if (payload?.misu) fields["미수"] = String(payload.misu);
     if (storageId) fields["보관처"] = [storageId]; // 입고 관리에서 보관처 link 복사
-    if (payload?.seller) fields["판매처"] = String(payload.seller);
+    if (seller) fields["판매처"] = seller;
     if (payload?.salePrice != null && payload.salePrice !== "") fields["판매가"] = Number(payload.salePrice);
 
     const postUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${outboundTablePath()}`;

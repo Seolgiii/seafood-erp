@@ -4,6 +4,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { AuthError, requireWorker } from "@/lib/server-auth";
+import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -69,6 +70,19 @@ export async function createExpenseRecord(formData: ExpenseCreatePayload) {
       throw e;
     }
 
+    // 자유 텍스트 필드 정규화·길이 검사 (건명 50 / 적요 500 / 비고 200자)
+    let title: string;
+    let description: string;
+    let remarks: string;
+    try {
+      title = sanitizeText(formData.title, "expenseTitle", "건명");
+      description = sanitizeText(formData.description, "expenseDescription", "적요");
+      remarks = sanitizeText(formData.remarks, "expenseRemarks", "비고");
+    } catch (e) {
+      if (e instanceof InputValidationError) return { success: false, error: e.message };
+      throw e;
+    }
+
     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/지출결의`, {
       method: "POST",
       headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -76,11 +90,11 @@ export async function createExpenseRecord(formData: ExpenseCreatePayload) {
         fields: {
           "지출일": expenseDate,
           "작성일": createdDate,
-          "건명": formData.title,
-          "적요": formData.description,
+          "건명": title,
+          "적요": description,
           "금액": Number(formData.amount),
           "법인카드 사용 유무": formData.isCorpCard ? "유" : "무",
-          "비고": formData.remarks || "",
+          "비고": remarks,
           "승인상태": "승인 대기",
           "신청자": [applicantRecordId],
           "영수증사진": formData.receiptUrl ? [{ url: formData.receiptUrl }] : [],
