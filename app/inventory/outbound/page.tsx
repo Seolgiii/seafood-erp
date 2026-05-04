@@ -7,7 +7,6 @@ import {
   MagnifyingGlassIcon,
   QrCodeIcon,
   TrashIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
@@ -35,6 +34,11 @@ type CartItem = {
   salePrice: number | undefined;
 };
 
+// LOT 검색 결과 — Airtable 응답을 구조화하지 않고 그대로 사용
+// (필드 키가 베이스 마이그레이션에 따라 가변적이라 인덱스 시그니처로 표현)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LotSearchResult = { id: string; fields: Record<string, any> };
+
 function formatMisuDisplay(raw: unknown): string {
   const s = String(raw ?? '').trim();
   if (!s) return '—';
@@ -52,10 +56,8 @@ export default function OutboundRecordPage() {
   const [hasCamera, setHasCamera] = useState<boolean | null>(null);
 
   const [keyword, setKeyword] = useState('');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedLot, setSelectedLot] = useState<any | null>(null);
+  const [searchResults, setSearchResults] = useState<LotSearchResult[]>([]);
+  const [selectedLot, setSelectedLot] = useState<LotSearchResult | null>(null);
 
   const [quantity, setQuantity] = useState('');
   const [seller, setSeller] = useState('');
@@ -64,43 +66,12 @@ export default function OutboundRecordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [draftBanner, setDraftBanner] = useState(0); // 재고 조회에서 불러온 LOT 수
 
   // ── 초기화 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
   }, []);
-
-  // 재고 조회 → 출고 Phase 2: sessionStorage draft 자동 적재
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('sea_outbound_draft');
-      if (!raw) return;
-      sessionStorage.removeItem('sea_outbound_draft');
-      const draft = JSON.parse(raw) as Array<{
-        lotId: string; lotNumber: string; productName: string;
-        spec: string; misu: string; stockQty: number; selectedBoxes: number;
-      }>;
-      if (!Array.isArray(draft) || draft.length === 0) return;
-      const items: CartItem[] = draft.map((d, i) => ({
-        cartId: `draft-${d.lotId}-${i}`,
-        lotId: d.lotId,
-        lotNumber: d.lotNumber,
-        productName: d.productName,
-        spec: d.spec,
-        misu: d.misu,
-        origin: '',
-        storage: '',
-        quantity: d.selectedBoxes,
-        seller: '',
-        salePrice: undefined,
-      }));
-      setCart(items);
-      setDraftBanner(items.length);
-    } catch {}
-  }, []);
-
 
   // 카메라 지원 여부 감지 (모바일: true, PC: false)
   useEffect(() => {
@@ -247,21 +218,6 @@ export default function OutboundRecordPage() {
         onBack={() => router.push('/')}
         titleClassName="text-[#FF3B30] font-black"
       />
-
-      {/* 재고 조회 연동 배너 */}
-      {draftBanner > 0 && (
-        <div className="mx-4 mt-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between gap-3">
-          <p className="text-[13px] font-bold text-blue-700">
-            재고 조회에서 {draftBanner}개 LOT를 불러왔습니다.
-            <span className="block text-[11px] font-normal text-blue-500 mt-0.5">
-              판매처·금액 입력 후 출고 신청하세요
-            </span>
-          </p>
-          <button onClick={() => setDraftBanner(0)} className="shrink-0 text-blue-400">
-            <XMarkIcon className="w-5 h-5" />
-          </button>
-        </div>
-      )}
 
       <div className="p-4 space-y-4">
         {/* ── 검색 · 선택 카드 ──────────────────────────────────────────── */}

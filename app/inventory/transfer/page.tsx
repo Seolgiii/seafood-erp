@@ -78,29 +78,6 @@ export default function TransferPage() {
       .catch(() => {});
   }, []);
 
-  // 재고 조회 → 재고 이동 Phase 2: sessionStorage draft 자동 선택
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('sea_transfer_draft');
-      if (!raw) return;
-      sessionStorage.removeItem('sea_transfer_draft');
-      const d = JSON.parse(raw) as {
-        lotId: string; lotNumber: string; productName: string;
-        spec: string; misu: string; stockQty: number;
-      };
-      setSelectedLot({
-        lotRecordId: d.lotId,
-        lotNumber: d.lotNumber,
-        productName: d.productName,
-        spec: d.spec,
-        misu: d.misu,
-        stockQty: d.stockQty,
-        storage: '',
-        inboundRecordId: '',
-      });
-    } catch {}
-  }, []);
-
   // 카메라 지원 여부 감지
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {

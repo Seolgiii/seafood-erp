@@ -6,6 +6,8 @@ import {
   XMarkIcon,
   ArrowsRightLeftIcon,
   ArrowUpOnSquareIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { BulkSubmitSheet } from '@/components/BulkSubmitSheet';
@@ -96,6 +98,14 @@ export default function StockStatusPage() {
   const [targetStorageId, setTargetStorageId] = useState('');
   const [transferDate, setTransferDate] = useState(todayKST());
 
+  // 묶음 처리 결과 (B안: 부분 성공·실패 표시)
+  type BulkResult = {
+    successLots: { lotId: string; lotNumber: string }[];
+    failures: { lotId: string; lotNumber: string; reason: string }[];
+  };
+  const [outboundResult, setOutboundResult] = useState<BulkResult | null>(null);
+  const [transferResult, setTransferResult] = useState<BulkResult | null>(null);
+
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
@@ -174,6 +184,7 @@ export default function StockStatusPage() {
     setSeller('');
     setSalePrice('');
     setOutboundDate(todayKST());
+    setOutboundResult(null);
     setOutboundOpen(true);
   };
 
@@ -181,7 +192,20 @@ export default function StockStatusPage() {
     if (selectedLots.length === 0) return;
     setTargetStorageId('');
     setTransferDate(todayKST());
+    setTransferResult(null);
     setTransferOpen(true);
+  };
+
+  /** 성공한 LOT를 selectedQty에서 제거 (실패 LOT만 남김) */
+  const dropSelectedLots = (lotIds: string[]) => {
+    const drop = new Set(lotIds);
+    setSelectedQty((prev) => {
+      const next: Record<string, number> = {};
+      for (const [id, qty] of Object.entries(prev)) {
+        if (!drop.has(id)) next[id] = qty;
+      }
+      return next;
+    });
   };
 
   const handleBulkOutbound = async () => {
@@ -191,6 +215,9 @@ export default function StockStatusPage() {
     if (!outboundDate) { toast('출고일을 입력해주세요.'); return; }
 
     setSubmitting(true);
+    const successLots: { lotId: string; lotNumber: string }[] = [];
+    const failures: { lotId: string; lotNumber: string; reason: string }[] = [];
+
     for (const lot of selectedLots) {
       const qty = selectedQty[lot.id] ?? 0;
       const result = await createOutboundRecord({
@@ -204,16 +231,44 @@ export default function StockStatusPage() {
         seller: seller.trim(),
         salePrice: Number(salePrice),
       });
-      if (!result.success) {
-        setSubmitting(false);
-        toast(`출고 신청 실패 (${lot.lotNumber}): ${result.error ?? '오류'}`);
-        return;
+      if (result.success) {
+        successLots.push({ lotId: lot.id, lotNumber: lot.lotNumber });
+      } else {
+        failures.push({ lotId: lot.id, lotNumber: lot.lotNumber, reason: result.error ?? '알 수 없는 오류' });
       }
     }
     setSubmitting(false);
+
+    if (failures.length === 0) {
+      setOutboundOpen(false);
+      toast(`${successLots.length}건 출고 신청이 완료되었습니다.`, 'success');
+      router.push('/');
+      return;
+    }
+
+    // 실패 1건이라도 있으면 결과 화면 표시
+    setOutboundResult({ successLots, failures });
+  };
+
+  const retryFailedOutbound = () => {
+    if (!outboundResult) return;
+    // 성공한 LOT는 선택에서 제외 (실패 LOT만 남겨 재시도)
+    dropSelectedLots(outboundResult.successLots.map((s) => s.lotId));
+    setOutboundResult(null);
+  };
+
+  const closeOutboundResult = () => {
+    if (outboundResult) {
+      // 성공 LOT는 더 이상 선택 상태로 유지하지 않음
+      dropSelectedLots(outboundResult.successLots.map((s) => s.lotId));
+      const summary =
+        outboundResult.successLots.length > 0
+          ? `${outboundResult.successLots.length}건 신청 완료, ${outboundResult.failures.length}건 실패`
+          : `${outboundResult.failures.length}건 모두 실패`;
+      toast(summary, outboundResult.successLots.length > 0 ? 'info' : 'error');
+    }
+    setOutboundResult(null);
     setOutboundOpen(false);
-    toast(`${selectedLots.length}건 출고 신청이 완료되었습니다.`, 'success');
-    router.push('/');
   };
 
   const handleBulkTransfer = async () => {
@@ -222,6 +277,9 @@ export default function StockStatusPage() {
     if (!transferDate) { toast('이동일을 입력해주세요.'); return; }
 
     setSubmitting(true);
+    const successLots: { lotId: string; lotNumber: string }[] = [];
+    const failures: { lotId: string; lotNumber: string; reason: string }[] = [];
+
     for (const lot of selectedLots) {
       const qty = selectedQty[lot.id] ?? 0;
       const result = await createTransferRecord({
@@ -231,16 +289,41 @@ export default function StockStatusPage() {
         이동일: transferDate,
         workerId,
       });
-      if (!result.success) {
-        setSubmitting(false);
-        toast(`이동 신청 실패 (${lot.lotNumber}): ${result.message ?? '오류'}`);
-        return;
+      if (result.success) {
+        successLots.push({ lotId: lot.id, lotNumber: lot.lotNumber });
+      } else {
+        failures.push({ lotId: lot.id, lotNumber: lot.lotNumber, reason: result.message ?? '알 수 없는 오류' });
       }
     }
     setSubmitting(false);
+
+    if (failures.length === 0) {
+      setTransferOpen(false);
+      toast(`${successLots.length}건 재고 이동이 완료되었습니다.`, 'success');
+      router.push('/');
+      return;
+    }
+
+    setTransferResult({ successLots, failures });
+  };
+
+  const retryFailedTransfer = () => {
+    if (!transferResult) return;
+    dropSelectedLots(transferResult.successLots.map((s) => s.lotId));
+    setTransferResult(null);
+  };
+
+  const closeTransferResult = () => {
+    if (transferResult) {
+      dropSelectedLots(transferResult.successLots.map((s) => s.lotId));
+      const summary =
+        transferResult.successLots.length > 0
+          ? `${transferResult.successLots.length}건 신청 완료, ${transferResult.failures.length}건 실패`
+          : `${transferResult.failures.length}건 모두 실패`;
+      toast(summary, transferResult.successLots.length > 0 ? 'info' : 'error');
+    }
+    setTransferResult(null);
     setTransferOpen(false);
-    toast(`${selectedLots.length}건 재고 이동이 완료되었습니다.`, 'success');
-    router.push('/');
   };
 
   /* ── 1단계: 검색 폼 ──────────────────────────────────────────────── */
@@ -642,99 +725,217 @@ export default function StockStatusPage() {
       {/* ── 묶음 출고 바텀시트 ──────────────────────────────────────────── */}
       <BulkSubmitSheet
         isOpen={outboundOpen}
-        onClose={() => setOutboundOpen(false)}
-        title="묶음 출고 신청"
-        subtitle={`${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`}
+        onClose={() => (outboundResult ? closeOutboundResult() : setOutboundOpen(false))}
+        title={outboundResult ? '출고 신청 결과' : '묶음 출고 신청'}
+        subtitle={
+          outboundResult
+            ? `성공 ${outboundResult.successLots.length}건 · 실패 ${outboundResult.failures.length}건`
+            : `${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`
+        }
         accent="red"
         canSubmit={!!seller.trim() && !!salePrice.trim() && Number(salePrice) > 0 && !!outboundDate}
         submitting={submitting}
         submitLabel={`출고 신청 (${selectedLots.length}건)`}
         onSubmit={handleBulkOutbound}
+        footer={
+          outboundResult ? (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={retryFailedOutbound}
+                className="w-full py-4 rounded-2xl text-white text-[16px] font-black bg-[#FF3B30] shadow-[0_4px_16px_rgba(255,59,48,0.3)] active:scale-[0.98] transition-all"
+              >
+                실패한 {outboundResult.failures.length}건 다시 시도
+              </button>
+              <button
+                type="button"
+                onClick={closeOutboundResult}
+                className="w-full py-3 rounded-2xl text-gray-700 text-[14px] font-bold bg-gray-100 active:scale-[0.98] transition-all"
+              >
+                닫기
+              </button>
+            </div>
+          ) : undefined
+        }
       >
-        <div className="space-y-2">
-          <label className="text-[13px] font-bold text-gray-500 ml-1">
-            판매처 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={seller}
-            onChange={(e) => setSeller(e.target.value)}
-            placeholder="예: ○○수산"
-            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[13px] font-bold text-gray-500 ml-1">
-            판매가 (원/kg) <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
-            placeholder="예: 12000"
-            min={0}
-            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-[13px] font-bold text-gray-500 ml-1">
-            출고일 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={outboundDate}
-            onChange={(e) => setOutboundDate(e.target.value)}
-            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
-          />
-        </div>
-        <p className="text-[12px] font-medium text-gray-400 pt-1">
-          선택된 {selectedLots.length}건 LOT 모두 동일한 판매처·판매가로 출고됩니다.
-        </p>
+        {outboundResult ? (
+          <BulkResultsPanel result={outboundResult} accent="red" />
+        ) : (
+          <>
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                판매처 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={seller}
+                onChange={(e) => setSeller(e.target.value)}
+                placeholder="예: ○○수산"
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                판매가 (원/kg) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={salePrice}
+                onChange={(e) => setSalePrice(e.target.value)}
+                placeholder="예: 12000"
+                min={0}
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                출고일 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={outboundDate}
+                onChange={(e) => setOutboundDate(e.target.value)}
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              />
+            </div>
+            <p className="text-[12px] font-medium text-gray-400 pt-1">
+              선택된 {selectedLots.length}건 LOT 모두 동일한 판매처·판매가로 출고됩니다.
+            </p>
+          </>
+        )}
       </BulkSubmitSheet>
 
       {/* ── 묶음 이동 바텀시트 ──────────────────────────────────────────── */}
       <BulkSubmitSheet
         isOpen={transferOpen}
-        onClose={() => setTransferOpen(false)}
-        title="묶음 재고 이동"
-        subtitle={`${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`}
+        onClose={() => (transferResult ? closeTransferResult() : setTransferOpen(false))}
+        title={transferResult ? '재고 이동 결과' : '묶음 재고 이동'}
+        subtitle={
+          transferResult
+            ? `성공 ${transferResult.successLots.length}건 · 실패 ${transferResult.failures.length}건`
+            : `${selectedLots.length}건 LOT · 총 ${totalBoxes.toLocaleString('ko-KR')}박스`
+        }
         accent="orange"
         canSubmit={!!targetStorageId && !!transferDate}
         submitting={submitting}
         submitLabel={`이동 신청 (${selectedLots.length}건)`}
         onSubmit={handleBulkTransfer}
+        footer={
+          transferResult ? (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={retryFailedTransfer}
+                className="w-full py-4 rounded-2xl text-white text-[16px] font-black bg-[#FF8C00] shadow-[0_4px_16px_rgba(255,140,0,0.3)] active:scale-[0.98] transition-all"
+              >
+                실패한 {transferResult.failures.length}건 다시 시도
+              </button>
+              <button
+                type="button"
+                onClick={closeTransferResult}
+                className="w-full py-3 rounded-2xl text-gray-700 text-[14px] font-bold bg-gray-100 active:scale-[0.98] transition-all"
+              >
+                닫기
+              </button>
+            </div>
+          ) : undefined
+        }
       >
-        <div className="space-y-2">
-          <label className="text-[13px] font-bold text-gray-500 ml-1">
-            이동 후 보관처 <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={targetStorageId}
-            onChange={(e) => setTargetStorageId(e.target.value)}
-            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all appearance-none"
-          >
-            <option value="">보관처를 선택하세요</option>
-            {storageOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>{opt.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-[13px] font-bold text-gray-500 ml-1">
-            이동일 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={transferDate}
-            onChange={(e) => setTransferDate(e.target.value)}
-            className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-          />
-        </div>
-        <p className="text-[12px] font-medium text-gray-400 pt-1">
-          선택된 {selectedLots.length}건 LOT 모두 동일한 보관처로 이동됩니다.
-        </p>
+        {transferResult ? (
+          <BulkResultsPanel result={transferResult} accent="orange" />
+        ) : (
+          <>
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                이동 후 보관처 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={targetStorageId}
+                onChange={(e) => setTargetStorageId(e.target.value)}
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all appearance-none"
+              >
+                <option value="">보관처를 선택하세요</option>
+                {storageOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                이동일 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={transferDate}
+                onChange={(e) => setTransferDate(e.target.value)}
+                className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+              />
+            </div>
+            <p className="text-[12px] font-medium text-gray-400 pt-1">
+              선택된 {selectedLots.length}건 LOT 모두 동일한 보관처로 이동됩니다.
+            </p>
+          </>
+        )}
       </BulkSubmitSheet>
     </main>
+  );
+}
+
+function BulkResultsPanel({
+  result,
+  accent,
+}: {
+  result: {
+    successLots: { lotId: string; lotNumber: string }[];
+    failures: { lotId: string; lotNumber: string; reason: string }[];
+  };
+  accent: 'red' | 'orange';
+}) {
+  const successColor = accent === 'red' ? 'text-[#FF3B30]' : 'text-[#FF8C00]';
+  return (
+    <div className="space-y-4">
+      {/* 성공 요약 */}
+      {result.successLots.length > 0 && (
+        <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircleIcon className="w-5 h-5 text-green-600" />
+            <p className="text-[14px] font-black text-green-700">
+              {result.successLots.length}건 신청 완료
+            </p>
+          </div>
+          <ul className="text-[12px] font-medium text-green-700 space-y-1 pl-7">
+            {result.successLots.map((s) => (
+              <li key={s.lotId} className="truncate">{s.lotNumber}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 실패 목록 */}
+      {result.failures.length > 0 && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ExclamationCircleIcon className={`w-5 h-5 ${successColor}`} />
+            <p className={`text-[14px] font-black ${successColor}`}>
+              {result.failures.length}건 실패
+            </p>
+          </div>
+          <ul className="space-y-2 pl-7">
+            {result.failures.map((f) => (
+              <li key={f.lotId} className="text-[12px]">
+                <p className="font-bold text-gray-800 truncate">{f.lotNumber}</p>
+                <p className="text-gray-500 mt-0.5">{f.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[12px] font-medium text-gray-400 leading-relaxed">
+        성공한 건은 결재 대기로 등록되었습니다.
+        실패한 건만 다시 시도하거나 닫고 종료할 수 있습니다.
+      </p>
+    </div>
   );
 }
