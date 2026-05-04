@@ -421,7 +421,6 @@ export default function StockStatusPage() {
         <div className="px-5 space-y-3">
           {lots.map((lot) => {
             const selected = selectedQty[lot.id] ?? 0;
-            const est = calcAmount(lot, selected);
             const isFull = lot.stockQty > 0 && selected === lot.stockQty;
             const isPartial = selected > 0 && selected < lot.stockQty;
             const toggleFull = () => {
@@ -433,12 +432,12 @@ export default function StockStatusPage() {
             return (
               <div
                 key={lot.id}
-                className={`bg-white rounded-[24px] p-5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-4 transition-all ${
+                className={`bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3 transition-all ${
                   selected > 0 ? 'ring-2 ring-blue-400' : ''
                 }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-mono text-[11px] font-black text-blue-500 tracking-tight break-all leading-relaxed flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">
                     {lot.lotNumber || '—'}
                   </p>
                   <button
@@ -465,8 +464,8 @@ export default function StockStatusPage() {
                   </button>
                 </div>
 
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 leading-tight">
                     <p className="text-[16px] font-black text-gray-900 truncate">
                       {lot.productName || '—'}
                     </p>
@@ -474,21 +473,16 @@ export default function StockStatusPage() {
                       {lot.spec ? `${lot.spec}kg` : '—'} · {lot.misu ? `${lot.misu}미` : '—'}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[17px] font-black text-blue-600">
-                      {lot.stockQty.toLocaleString('ko-KR')}박스
+                  {lot.salePrice > 0 && (
+                    <p className="text-[17px] font-black text-gray-900 shrink-0 leading-tight">
+                      {Math.round(lot.salePrice).toLocaleString('ko-KR')}원/kg
                     </p>
-                    {lot.salePrice > 0 && (
-                      <p className="text-[12px] text-gray-400 mt-0.5">
-                        {lot.salePrice.toLocaleString('ko-KR')}원/kg
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
 
-                <div className="border-t border-gray-100 pt-4 flex items-center gap-3">
-                  <span className="text-[13px] font-bold text-gray-500 whitespace-nowrap shrink-0">
-                    선택 수량
+                <div className="border-t border-gray-100 pt-3 flex items-center justify-end gap-2">
+                  <span className="text-[16px] font-black text-blue-600 shrink-0 whitespace-nowrap">
+                    {lot.stockQty.toLocaleString('ko-KR')}박스 중
                   </span>
                   <input
                     type="number"
@@ -498,18 +492,9 @@ export default function StockStatusPage() {
                     value={selected || ''}
                     onChange={(e) => handleQtyChange(lot.id, e.target.value, lot.stockQty)}
                     placeholder="0"
-                    className="flex-1 text-right bg-gray-100 rounded-xl px-4 py-3 font-black text-[16px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    className="w-20 text-right bg-gray-100 rounded-xl px-3 py-2.5 font-black text-[16px] text-gray-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                   />
-                  <span className="text-[14px] font-bold text-gray-500 whitespace-nowrap shrink-0">
-                    박스
-                  </span>
                 </div>
-
-                {selected > 0 && est > 0 && (
-                  <p className="text-right text-[13px] font-bold text-blue-500">
-                    예상 {est.toLocaleString('ko-KR')}원
-                  </p>
-                )}
               </div>
             );
           })}

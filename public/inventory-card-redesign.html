@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LOT 카드 — 선택 수량 영역 시안 (A/B/C)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap');
+  body { font-family: 'Noto Sans KR', sans-serif; background: #e5e7eb; }
+</style>
+</head>
+<body class="p-8">
+
+<h1 class="text-center text-2xl font-black text-gray-800 mb-2">LOT 카드 — 선택 수량 영역 시안</h1>
+<p class="text-center text-gray-500 text-sm mb-10">LOT 번호 16px 적용 + 선택 수량 영역 3가지 안 비교</p>
+
+<div class="flex flex-wrap justify-center gap-10">
+
+  <!-- ────────── A: 우측 정렬 + 좁은 입력 + 잔량 표시 ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">A — 우측 정렬 + 잔량 표시</span>
+    <p class="text-xs text-gray-400 max-w-[300px] text-center">"50 / 500박스"로 선택 비율 한눈에.<br/>구조 유지하면서 공간 절약.</p>
+    <div class="relative bg-[#F2F4F6] rounded-[40px] shadow-2xl overflow-hidden" style="width:320px;height:560px;border:8px solid #111;">
+      <div class="px-5 pt-6 pb-3">
+        <p class="text-[13px] font-bold text-gray-400 mb-3">1개 LOT</p>
+
+        <div class="bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3 ring-2 ring-blue-400">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-12345-A</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-blue-50 border-2 border-blue-400">
+              <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">고등어</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">11kg · 42/44미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <p class="text-[17px] font-black text-blue-600">500박스</p>
+              <p class="text-[12px] text-gray-400 mt-0.5">12,000원/kg</p>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-3">
+            <div class="flex items-center justify-end gap-2">
+              <span class="text-[13px] font-bold text-gray-500 shrink-0">선택</span>
+              <input type="number" value="50" class="w-20 text-right bg-gray-100 rounded-xl px-3 py-2.5 font-black text-[16px] text-gray-900 outline-none" />
+              <span class="text-[14px] font-bold text-gray-400 shrink-0">/ 500박스</span>
+            </div>
+            <p class="text-right text-[13px] font-bold text-blue-500 mt-1.5">예상 6,600,000원</p>
+          </div>
+        </div>
+
+        <!-- 빈 카드 (미선택 비교) -->
+        <div class="mt-3 bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-67890-B</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 border-2 border-gray-200"></button>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">갈치</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">10kg · 5/6미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <p class="text-[17px] font-black text-blue-600">320박스</p>
+              <p class="text-[12px] text-gray-400 mt-0.5">18,000원/kg</p>
+            </div>
+          </div>
+          <div class="border-t border-gray-100 pt-3">
+            <div class="flex items-center justify-end gap-2">
+              <span class="text-[13px] font-bold text-gray-500 shrink-0">선택</span>
+              <input type="number" placeholder="0" class="w-20 text-right bg-gray-100 rounded-xl px-3 py-2.5 font-black text-[16px] text-gray-900 outline-none" />
+              <span class="text-[14px] font-bold text-gray-400 shrink-0">/ 320박스</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────── B: 인라인 통합 ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">B — 인라인 통합 (추천)</span>
+    <p class="text-xs text-gray-400 max-w-[300px] text-center">우측 상단 박스 자리에 input 통합.<br/>한 행이 통째로 사라져 가장 컴팩트.</p>
+    <div class="relative bg-[#F2F4F6] rounded-[40px] shadow-2xl overflow-hidden" style="width:320px;height:560px;border:8px solid #111;">
+      <div class="px-5 pt-6 pb-3">
+        <p class="text-[13px] font-bold text-gray-400 mb-3">1개 LOT</p>
+
+        <div class="bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3 ring-2 ring-blue-400">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-12345-A</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-blue-50 border-2 border-blue-400">
+              <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">고등어</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">11kg · 42/44미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <div class="flex items-baseline justify-end gap-1">
+                <input type="number" value="50" class="w-16 text-right bg-blue-50 border-2 border-blue-400 rounded-lg px-2 py-1 font-black text-[17px] text-blue-600 outline-none" />
+                <span class="text-[15px] font-black text-gray-500">/500박스</span>
+              </div>
+              <p class="text-[12px] text-gray-400 mt-1">12,000원/kg · 예상 6,600,000원</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-67890-B</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 border-2 border-gray-200"></button>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">갈치</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">10kg · 5/6미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <div class="flex items-baseline justify-end gap-1">
+                <input type="number" placeholder="0" class="w-16 text-right bg-gray-100 border-2 border-gray-200 rounded-lg px-2 py-1 font-black text-[17px] text-gray-700 outline-none" />
+                <span class="text-[15px] font-black text-gray-500">/320박스</span>
+              </div>
+              <p class="text-[12px] text-gray-400 mt-1">18,000원/kg</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-99999-C</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 border-2 border-gray-200"></button>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">참치</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">15kg · —</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <div class="flex items-baseline justify-end gap-1">
+                <input type="number" placeholder="0" class="w-16 text-right bg-gray-100 border-2 border-gray-200 rounded-lg px-2 py-1 font-black text-[17px] text-gray-700 outline-none" />
+                <span class="text-[15px] font-black text-gray-500">/120박스</span>
+              </div>
+              <p class="text-[12px] text-gray-400 mt-1">25,000원/kg</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────── C: 라벨 축약 + 폭 축소 ────────── -->
+  <div class="flex flex-col items-center gap-3">
+    <span class="text-sm font-bold text-gray-500 tracking-widest uppercase">C — 라벨 축약 + 폭 축소</span>
+    <p class="text-xs text-gray-400 max-w-[300px] text-center">"수량"으로 라벨 축약, input 좁게.<br/>변화 적고 익숙한 UX 유지.</p>
+    <div class="relative bg-[#F2F4F6] rounded-[40px] shadow-2xl overflow-hidden" style="width:320px;height:560px;border:8px solid #111;">
+      <div class="px-5 pt-6 pb-3">
+        <p class="text-[13px] font-bold text-gray-400 mb-3">1개 LOT</p>
+
+        <div class="bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3 ring-2 ring-blue-400">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-12345-A</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-blue-50 border-2 border-blue-400">
+              <div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">고등어</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">11kg · 42/44미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <p class="text-[17px] font-black text-blue-600">500박스</p>
+              <p class="text-[12px] text-gray-400 mt-0.5">12,000원/kg</p>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 pt-3">
+            <div class="flex items-center gap-2">
+              <span class="text-[13px] font-bold text-gray-500 shrink-0">수량</span>
+              <input type="number" value="50" class="flex-1 text-right bg-gray-100 rounded-xl px-3 py-2.5 font-black text-[16px] text-gray-900 outline-none" />
+              <span class="text-[14px] font-bold text-gray-500 shrink-0">박스</span>
+            </div>
+            <p class="text-right text-[13px] font-bold text-blue-500 mt-1.5">예상 6,600,000원</p>
+          </div>
+        </div>
+
+        <div class="mt-3 bg-white rounded-[20px] px-4 py-3.5 shadow-[0_4px_12px_rgba(149,157,165,0.06)] space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <p class="font-mono text-[16px] font-black text-blue-500 tracking-tight break-all leading-tight flex-1 min-w-0">LOT-2024-67890-B</p>
+            <button class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 border-2 border-gray-200"></button>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0 leading-tight">
+              <p class="text-[16px] font-black text-gray-900 truncate">갈치</p>
+              <p class="text-[13px] text-gray-500 mt-0.5">10kg · 5/6미</p>
+            </div>
+            <div class="text-right shrink-0 leading-tight">
+              <p class="text-[17px] font-black text-blue-600">320박스</p>
+              <p class="text-[12px] text-gray-400 mt-0.5">18,000원/kg</p>
+            </div>
+          </div>
+          <div class="border-t border-gray-100 pt-3">
+            <div class="flex items-center gap-2">
+              <span class="text-[13px] font-bold text-gray-500 shrink-0">수량</span>
+              <input type="number" placeholder="0" class="flex-1 text-right bg-gray-100 rounded-xl px-3 py-2.5 font-black text-[16px] text-gray-900 outline-none" />
+              <span class="text-[14px] font-bold text-gray-500 shrink-0">박스</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="text-center text-gray-400 text-xs mt-12">선택한 안을 알려주시면 app/inventory/status/page.tsx에 적용합니다.</p>
+
+</body>
+</html>
