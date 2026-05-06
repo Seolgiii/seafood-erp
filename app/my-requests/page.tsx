@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import { getMyRequests, cancelMyRequest } from "@/app/actions/my-requests";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession } from "@/lib/session";
@@ -44,8 +45,20 @@ function formatSubmittedAt(iso?: string): string | null {
 
 export default function MyRequestsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>("ALL");
+  const searchParams = useSearchParams();
+  // URL 쿼리에서 초기 탭 복원 — 잘못된 값은 ALL로 fallback
+  const initialTab: TabKey = (() => {
+    const t = searchParams.get("tab");
+    return t === "ALL" || t === "LOGISTICS" || t === "EXPENSE" || t === "DONE"
+      ? t
+      : "ALL";
+  })();
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const isDoneTab = activeTab === "DONE";
+
+  // 탭 → URL 동기화 (탭 클릭 즉시 — 디바운스 0)
+  // ALL은 기본값이라 URL에서 제외하기 위해 빈 문자열로 매핑
+  useSyncQueryParams({ tab: activeTab === "ALL" ? "" : activeTab }, 0);
   const [items, setItems] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);

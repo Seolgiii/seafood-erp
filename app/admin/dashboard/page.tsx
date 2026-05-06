@@ -18,6 +18,7 @@ const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import CompletedItemActionSheet from "@/app/components/CompletedItemActionSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
+import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
 import { toast } from "@/lib/toast";
@@ -59,6 +60,8 @@ export default function AdminDashboardPage() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [role, setRole] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<AdminTabKey>(initialTab);
+  // 탭 → URL 동기화 (즉시) — ALL은 기본값이라 URL에서 제외
+  useSyncQueryParams({ tab: activeTab === "ALL" ? "" : activeTab }, 0);
   const [items, setItems] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uiOverrides, setUiOverrides] = useState<Record<string, "PROCESSING" | "COMPLETED" | "REJECTED">>({});

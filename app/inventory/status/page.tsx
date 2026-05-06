@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useSyncQueryParams } from '@/lib/use-sync-query-params';
 import {
   XMarkIcon,
   ArrowsRightLeftIcon,
@@ -70,14 +71,25 @@ function FilterChip({ label }: { label: string }) {
 
 export default function StockStatusPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [stage, setStage] = useState<Stage>('form');
   const [isLoading, setIsLoading] = useState(false);
   const [lots, setLots] = useState<LotRecord[]>([]);
   const [selectedQty, setSelectedQty] = useState<Record<string, number>>({});
-  const [filters, setFilters] = useState<Filters>({ q: '', spec: '', misu: '', from: '', to: '' });
+  // URL 쿼리에서 초기 필터 복원 (뒤로가기·새로고침·링크 공유 시 동일 상태 재현)
+  const [filters, setFilters] = useState<Filters>(() => ({
+    q: searchParams.get('q') ?? '',
+    spec: searchParams.get('spec') ?? '',
+    misu: searchParams.get('misu') ?? '',
+    from: searchParams.get('from') ?? '',
+    to: searchParams.get('to') ?? '',
+  }));
   const [applied, setApplied] = useState<Filters | null>(null);
   const [notFound, setNotFound] = useState(false);
+
+  // 필터 → URL 동기화 (300ms 디바운스, 빈 값은 URL에서 제외)
+  useSyncQueryParams(filters);
 
   // 품목명 자동완성
   const [productNames, setProductNames] = useState<string[]>([]);
