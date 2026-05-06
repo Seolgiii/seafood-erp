@@ -8,7 +8,9 @@ export class AdminUnauthorizedError extends Error {
 
 export function requireAdmin(request: Request): void {
   const secret = process.env.ADMIN_SECRET?.trim();
-  if (!secret) return;
+  if (!secret) {
+    throw new AdminUnauthorizedError();
+  }
   const fromHeader =
     request.headers.get("x-admin-secret") ??
     request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "").trim() ??

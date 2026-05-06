@@ -116,7 +116,10 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
       const completeRes = await fetch("/api/outbound-complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transactionId: data.id }),
+        body: JSON.stringify({
+          transactionId: data.id,
+          workerRecordId: session.workerId,
+        }),
       });
       const completeData = (await completeRes.json()) as { error?: string };
       if (!completeRes.ok) {

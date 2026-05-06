@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { receiveInbound } from "@/lib/inbound-airtable";
+import { AuthError, requireWorker } from "@/lib/server-auth";
 
 function isRecordId(s: string): boolean {
   return /^rec[a-zA-Z0-9]+$/.test(s);
@@ -29,7 +30,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const created = await receiveInbound({ workerRecordId, lotRecordId, receivedQty });
+    let verifiedWorkerId: string;
+    try {
+      const verified = await requireWorker(workerRecordId);
+      verifiedWorkerId = verified.id;
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return NextResponse.json({ error: e.message }, { status: 401 });
+      }
+      throw e;
+    }
+
+    const created = await receiveInbound({
+      workerRecordId: verifiedWorkerId,
+      lotRecordId,
+      receivedQty,
+    });
     return NextResponse.json({ ok: true, id: created.id });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Inbound failed";

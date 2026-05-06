@@ -3,8 +3,16 @@ import { NextResponse } from "next/server";
 /**
  * 진단용: Airtable 베이스의 실제 테이블 목록과 주요 쿼리 결과를 반환합니다.
  * GET /api/debug/airtable-tables
+ *
+ * 보안: Airtable Base ID, 테이블 구조, 샘플 레코드를 노출하므로 production
+ * 환경에서는 항상 404를 반환합니다. 로컬 개발(NODE_ENV !== 'production')에서만
+ * 동작합니다.
  */
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not Found" }, { status: 404 });
+  }
+
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
 

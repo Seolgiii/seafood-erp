@@ -1,17 +1,34 @@
 import { NextResponse } from "next/server";
 import { approveOutboundTransaction } from "@/lib/approval-service";
+import { AuthError, requireWorker } from "@/lib/server-auth";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { transactionId?: string };
+    const body = (await request.json()) as {
+      transactionId?: string;
+      workerRecordId?: string;
+    };
     const transactionId =
       typeof body.transactionId === "string" ? body.transactionId.trim() : "";
+    const workerRecordId =
+      typeof body.workerRecordId === "string"
+        ? body.workerRecordId.trim()
+        : "";
 
     if (!/^rec[a-zA-Z0-9]+$/.test(transactionId)) {
       return NextResponse.json(
         { error: "transactionId required" },
         { status: 400 }
       );
+    }
+
+    try {
+      await requireWorker(workerRecordId);
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return NextResponse.json({ error: e.message }, { status: 401 });
+      }
+      throw e;
     }
 
     const result = await approveOutboundTransaction(transactionId);
