@@ -1,6 +1,5 @@
 import { createAirtableRecord, tablePathSegment } from "@/lib/airtable";
 import {
-  DEFAULT_TXN_TABLE,
   TXN,
   sanitizeSingleSelectValue,
   txnStatusPending,

@@ -37,7 +37,6 @@ function normalizeText(raw: unknown): string {
   if (raw == null) return "";
   const str = typeof raw === "string" ? raw : String(raw);
   // \x00-\x08, \x0B, \x0C, \x0E-\x1F, \x7F 제거 (탭 \x09, LF \x0A, CR \x0D 보존)
-  // eslint-disable-next-line no-control-regex
   return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
 }
 

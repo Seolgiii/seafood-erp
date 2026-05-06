@@ -54,19 +54,11 @@ async function readState(workerRecordId: string): Promise<PinLockState> {
     const failures = Number(fields[FIELD_FAIL_COUNT] ?? 0);
     const lockedUntil = Number(fields[FIELD_LOCKED_UNTIL] ?? 0);
 
-    // escalation 추론: 직전 잠금 기간이 TIER2_LOCK_MS(30분)에 가까웠으면 1단계
-    // (정확한 추론 어려우므로 보수적으로 lockedUntil이 한 번 설정된 적 있으면 escalation=1로 간주)
-    // 단, 완전 초기화(applySuccess) 시 lockedUntil=0이고 failures=0이므로 escalation=0
-    let escalation: 0 | 1 = 0;
-    if (
-      Number.isFinite(lockedUntil) &&
-      lockedUntil > 0 &&
-      Number.isFinite(failures) &&
-      failures > 0
-    ) {
-      // 잠금 활성 또는 재진입 직후 — 보수적으로 0 유지 (오탐보다 잠금 약화 위험이 큼)
-      // → escalation 정확도가 필요하면 별도 필드 추가 권장
-    }
+    // escalation 추론 한계:
+    // lockedUntil 필드 하나로는 직전 잠금 단계(1단계 5분 / 2단계 30분) 정확 구분이 어려움.
+    // 보수적으로 escalation=0 (잠금 풀림 후 다시 1단계부터)으로 시작 — 잠금 약화 위험을 피함.
+    // 정확도 필요시 pin_lock_tier 필드 추가 권장.
+    const escalation: 0 | 1 = 0;
 
     return {
       failures: Number.isFinite(failures) ? Math.max(0, failures) : 0,

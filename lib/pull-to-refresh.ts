@@ -51,7 +51,7 @@ export function usePullToRefresh(onRefresh: () => void | Promise<void>) {
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onEnd);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return { pullY, isReady: pullY >= THRESHOLD };
 }
