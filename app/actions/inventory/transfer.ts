@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { calculateTransferPurchasePrice } from "@/lib/cost-calc";
+import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -102,27 +103,6 @@ async function createRecordOrThrow(
     throw new Error(`[${tableName}] ${detail}`);
   }
   return res.json();
-}
-
-async function getMaxLotSequence(): Promise<number> {
-  let maxSeq = 0;
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams({ pageSize: "100", "fields[]": "LOT번호" });
-    if (offset) params.set("offset", offset);
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?${params}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
-    );
-    if (!res.ok) break;
-    const data = await res.json() as { records?: { fields?: Record<string, unknown> }[]; offset?: string };
-    for (const rec of data.records ?? []) {
-      const m = String(rec.fields?.["LOT번호"] ?? "").match(/-(\d{4})$/);
-      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
-    }
-    offset = data.offset;
-  } while (offset);
-  return maxSeq + 1;
 }
 
 function buildLotNumber(opts: {
@@ -366,8 +346,9 @@ export async function approveTransfer(
 
   const spec = String(inboundFields["규격"] ?? "").trim();
   const misu = String(inboundFields["미수"] ?? "").trim();
-  const seq = await getMaxLotSequence();
-  const newLotNumber = buildLotNumber({ bizDate, productCode, spec, misu, seq });
+  const newLotNumber = await generateUniqueLotNumber((seq) =>
+    buildLotNumber({ bizDate, productCode, spec, misu, seq }),
+  );
 
   // 6. 새 입고관리 레코드 생성
   const productMasterId = firstLink(inboundFields["품목마스터"]);

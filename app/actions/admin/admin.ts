@@ -473,6 +473,21 @@ async function deductStockOnOutboundApproval(
     return { success: false, message: "출고 레코드를 찾을 수 없습니다." };
   }
 
+  // 멱등 가드: 출고시점 판매원가가 양수로 채워져 있으면 이미 차감 완료된 것으로 간주
+  // (반려 시 restoreStockOnOutboundReject가 7개 출고시점 필드를 null로 클리어하므로
+  //  반려 → 재승인 케이스에서는 정상적으로 가드 통과)
+  const existingTotalCost = outFields["출고시점 판매원가"];
+  const totalCostNum = Number(
+    Array.isArray(existingTotalCost) ? existingTotalCost[0] : existingTotalCost,
+  );
+  if (Number.isFinite(totalCostNum) && totalCostNum > 0) {
+    log(
+      "[deductStockOnOutboundApproval] 이미 재고 차감 완료 — 중복 처리 생략:",
+      { outboundRecordId, existingTotalCost: totalCostNum },
+    );
+    return { success: true };
+  }
+
   const outQty = Number(outFields["출고수량"]);
   if (!Number.isFinite(outQty) || outQty <= 0) {
     return { success: false, message: "출고 수량이 올바르지 않습니다." };
@@ -738,7 +753,7 @@ export async function updateApprovalStatus(
     return { success: false, message: "잘못된 유형입니다." };
   }
 
-  // 승인 완료 처리 시 멱등성 가드 + 일부 type 차단
+  // 승인 완료 처리 시 멱등성 가드 + 일부 type 차단 + EXPENSE 100만원 권한 재검증
   // (newStatus === "승인 완료" 인 모든 케이스에 우선 적용)
   if (newStatus === "승인 완료") {
     const currentRecord = await fetchRecord(tableName, recordId);
@@ -762,6 +777,28 @@ export async function updateApprovalStatus(
         message:
           "재고 이동은 반려 후 자동 재승인이 지원되지 않습니다. 새로 신청해주세요.",
       };
+    }
+
+    // EXPENSE 100만원 이상은 MASTER 권한으로만 즉시 승인 가능 (서버 재검증)
+    // 클라이언트가 newStatus를 임의로 "승인 완료"로 보내도 서버에서 차단됨.
+    // 100만원 미만이거나 "최종 승인 대기"로 보내는 경우는 ADMIN/MASTER 모두 허용.
+    if (type === "EXPENSE") {
+      const amount = Number(currentRecord?.["금액"] ?? 0);
+      if (
+        Number.isFinite(amount) &&
+        amount >= 1_000_000 &&
+        admin.role !== "MASTER"
+      ) {
+        logWarn(
+          "[updateApprovalStatus] EXPENSE 100만원+ 즉시 승인 권한 거부:",
+          { recordId, amount, adminRole: admin.role },
+        );
+        return {
+          success: false,
+          message:
+            "100만원 이상 지출은 MASTER 권한으로만 즉시 승인할 수 있습니다.",
+        };
+      }
     }
   }
 

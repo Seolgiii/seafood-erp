@@ -5,6 +5,7 @@ import {
   PRODUCT_FIELDS,
 } from "@/lib/airtable-schema";
 import { asNumber } from "@/lib/lot-inventory";
+import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 import {
   DEFAULT_TXN_TABLE,
   TXN,
@@ -63,33 +64,6 @@ function getBizDateSeoul(): string {
   const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
   const d = String(kst.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-/** LOT별 재고 전체 스캔 → 마지막 4자리 일련번호 최댓값 + 1 반환. */
-async function getMaxLotSequence(lotsPath: string): Promise<number> {
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) return 1;
-  let maxSeq = 0;
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.append("fields[]", "LOT번호");
-    params.append("pageSize", "100");
-    if (offset) params.set("offset", offset);
-    const res = await fetch(
-      `https://api.airtable.com/v0/${baseId}/${lotsPath}?${params}`,
-      { headers: { Authorization: `Bearer ${apiKey}` }, next: { revalidate: 0 } }
-    );
-    if (!res.ok) break;
-    const data = await res.json() as { records?: { fields?: Record<string, unknown> }[]; offset?: string };
-    for (const rec of data.records ?? []) {
-      const match = String(rec.fields?.["LOT번호"] ?? "").match(/-(\d{4})$/);
-      if (match) maxSeq = Math.max(maxSeq, parseInt(match[1], 10));
-    }
-    offset = data.offset;
-  } while (offset);
-  return maxSeq + 1;
 }
 
 /**
@@ -182,14 +156,15 @@ export async function createInboundLotAndTxn(
 
   const lotsPath = lotTable();
   const lotBizDate = getBizDateSeoul();
-  const nextSeq = await getMaxLotSequence(lotsPath);
-  const lotNumber = buildLotNumber({
-    bizDate: lotBizDate,
-    productCode,
-    spec: effectiveSpec,
-    misu: effectiveMisu,
-    seq: nextSeq,
-  });
+  const lotNumber = await generateUniqueLotNumber((seq) =>
+    buildLotNumber({
+      bizDate: lotBizDate,
+      productCode,
+      spec: effectiveSpec,
+      misu: effectiveMisu,
+      seq,
+    }),
+  );
 
   const qtyBase = qtyBoxes;
   const qtyDetail =

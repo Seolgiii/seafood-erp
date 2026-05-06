@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { AIRTABLE_TABLE } from "@/lib/airtable-schema";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { InputValidationError, sanitizeText } from "@/lib/input-sanitize";
+import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 
 export type InventoryCreatePayload = {
   /** YYYY-MM-DD 또는 YYYY/MM/DD 입고일자 */
@@ -74,33 +75,6 @@ function getBizDateSeoul(): string {
   const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
   const d = String(kst.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-/**
- * LOT별 재고 테이블 전체를 조회해 마지막 4자리 일련번호의 최댓값을 반환.
- * 새 LOT 번호 = 최댓값 + 1.
- */
-async function getMaxLotSequence(): Promise<number> {
-  let maxSeq = 0;
-  let offset: string | undefined;
-  do {
-    const params = new URLSearchParams();
-    params.append("fields[]", "LOT번호");
-    params.append("pageSize", "100");
-    if (offset) params.set("offset", offset);
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?${params}`,
-      { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } }
-    );
-    if (!res.ok) break;
-    const data = await res.json() as { records?: { fields?: Record<string, unknown> }[]; offset?: string };
-    for (const rec of data.records ?? []) {
-      const m = String(rec.fields?.["LOT번호"] ?? "").match(/-(\d{4})$/);
-      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
-    }
-    offset = data.offset;
-  } while (offset);
-  return maxSeq + 1;
 }
 
 /**
@@ -333,16 +307,17 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       return { success: false, message: "입고 관리 등록 실패" };
     }
 
-    // ── 2. 영업일 + 전체 일련번호 → LOT번호 생성 ──
+    // ── 2. 영업일 + 전체 일련번호 → LOT번호 생성 (동시성 방어 재시도 포함) ──
     const lotBizDate = getBizDateSeoul();
-    const nextSeq = await getMaxLotSequence();
-    const lotNumber = buildLotNumber({
-      bizDate: lotBizDate,
-      productCode: productMaster.productCode,
-      spec,
-      misu,
-      seq: nextSeq,
-    });
+    const lotNumber = await generateUniqueLotNumber((seq) =>
+      buildLotNumber({
+        bizDate: lotBizDate,
+        productCode: productMaster.productCode,
+        spec,
+        misu,
+        seq,
+      }),
+    );
     log("[createInventoryRecord] LOT번호 생성:", lotNumber);
 
     // ── 3. 입고 관리에 LOT번호 PATCH ──
