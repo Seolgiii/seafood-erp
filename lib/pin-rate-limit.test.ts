@@ -1,15 +1,54 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
-  checkLockout,
-  recordFailure,
-  recordSuccess,
-  resetAll,
-} from "./pin-rate-limit";
+  type PinLockState,
+  INITIAL_STATE,
+  TIER1_LOCK_MS,
+  TIER2_LOCK_MS,
+  applyFailure,
+  applySuccess,
+  evaluateLockout,
+} from "./pin-rate-limit-core";
 
-const KEY = "recWORKER001";
+/**
+ * pin-rate-limit-core 의 순수 로직을 테스트합니다.
+ *
+ * 운영 코드의 lib/pin-rate-limit.ts 는 Airtable 어댑터 레이어이고, 정책 검증은
+ * 본 파일이 담당합니다. 테스트는 메모리 기반 fake 저장소로 어댑터 동작을 모사하여
+ * 기존 동기 API와 동일한 형태로 작성됩니다.
+ */
+
 const MAX = 5;
-const TIER1_MS = 5 * 60 * 1000;
-const TIER2_MS = 30 * 60 * 1000;
+const TIER1_MS = TIER1_LOCK_MS;
+const TIER2_MS = TIER2_LOCK_MS;
+const KEY = "recWORKER001";
+
+const states = new Map<string, PinLockState>();
+
+function readState(key: string): PinLockState {
+  return states.get(key) ?? INITIAL_STATE;
+}
+
+function checkLockout(key: string) {
+  const s = readState(key);
+  const { status, nextState } = evaluateLockout(s, Date.now());
+  if (nextState !== s) states.set(key, nextState);
+  return status;
+}
+
+function recordFailure(key: string) {
+  const s = readState(key);
+  const { result, nextState } = applyFailure(s, Date.now());
+  states.set(key, nextState);
+  return result;
+}
+
+function recordSuccess(key: string) {
+  states.set(key, applySuccess());
+}
+
+function resetAll() {
+  states.clear();
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -45,7 +84,6 @@ describe("PIN rate limit — 기본 동작", () => {
     recordFailure(KEY);
     recordFailure(KEY);
     recordSuccess(KEY);
-    // 다시 실패해도 처음부터 카운팅
     expect(recordFailure(KEY)).toEqual({ locked: false, remainingAttempts: MAX - 1 });
   });
 });
@@ -60,7 +98,7 @@ describe("PIN rate limit — 1단계 5분 잠금", () => {
   test("잠금 중 checkLockout은 잠금 표시 + 남은 시간", () => {
     for (let i = 0; i < 5; i++) recordFailure(KEY);
 
-    vi.advanceTimersByTime(2 * 60 * 1000); // 2분 경과
+    vi.advanceTimersByTime(2 * 60 * 1000);
     const status = checkLockout(KEY);
     expect(status.locked).toBe(true);
     if (status.locked) {
@@ -79,9 +117,8 @@ describe("PIN rate limit — 1단계 5분 잠금", () => {
 describe("PIN rate limit — 2단계 30분 잠금", () => {
   test("1차 잠금 풀린 뒤 5회 실패 → 30분 잠금", () => {
     for (let i = 0; i < 5; i++) recordFailure(KEY);
-    vi.advanceTimersByTime(TIER1_MS); // 5분 경과 → 잠금 해제
+    vi.advanceTimersByTime(TIER1_MS);
 
-    // 단계 진행 (해제 시 카운터 0으로 리셋)
     expect(checkLockout(KEY)).toEqual({ locked: false });
 
     for (let i = 0; i < 4; i++) {
@@ -93,13 +130,12 @@ describe("PIN rate limit — 2단계 30분 잠금", () => {
   });
 
   test("30분 잠금 중 checkLockout은 정확한 남은 시간 보고", () => {
-    // 2단계까지 진입
     for (let i = 0; i < 5; i++) recordFailure(KEY);
     vi.advanceTimersByTime(TIER1_MS);
     checkLockout(KEY);
     for (let i = 0; i < 5; i++) recordFailure(KEY);
 
-    vi.advanceTimersByTime(10 * 60 * 1000); // 10분 경과
+    vi.advanceTimersByTime(10 * 60 * 1000);
     const status = checkLockout(KEY);
     expect(status.locked).toBe(true);
     if (status.locked) {
@@ -110,7 +146,6 @@ describe("PIN rate limit — 2단계 30분 잠금", () => {
 
 describe("PIN rate limit — 30분 후 완전 초기화", () => {
   test("30분 잠금 풀리면 카운터 0으로 리셋 (1단계로 회귀)", () => {
-    // 2단계 진입 + 30분 잠금 발동
     for (let i = 0; i < 5; i++) recordFailure(KEY);
     vi.advanceTimersByTime(TIER1_MS);
     checkLockout(KEY);
@@ -119,12 +154,10 @@ describe("PIN rate limit — 30분 후 완전 초기화", () => {
     vi.advanceTimersByTime(TIER2_MS);
     expect(checkLockout(KEY)).toEqual({ locked: false });
 
-    // 다시 4회 실패해도 잠금 없음 (카운터가 0부터)
     for (let i = 0; i < 4; i++) {
       const r = recordFailure(KEY);
       expect(r.locked).toBe(false);
     }
-    // 5회째에서 다시 1단계 잠금
     const fifth = recordFailure(KEY);
     expect(fifth).toEqual({ locked: true, retryAfterMs: TIER1_MS });
   });
@@ -139,7 +172,6 @@ describe("PIN rate limit — 다중 워커 격리", () => {
     expect(checkLockout(A).locked).toBe(true);
     expect(checkLockout(B).locked).toBe(false);
 
-    // B는 정상 카운팅
     expect(recordFailure(B)).toEqual({ locked: false, remainingAttempts: MAX - 1 });
   });
 });
@@ -148,11 +180,10 @@ describe("PIN rate limit — 인증 성공 처리", () => {
   test("잠금 풀린 직후 성공하면 카운터 완전 초기화", () => {
     for (let i = 0; i < 5; i++) recordFailure(KEY);
     vi.advanceTimersByTime(TIER1_MS);
-    checkLockout(KEY); // 단계 진행
+    checkLockout(KEY);
 
     recordSuccess(KEY);
 
-    // 다시 실패해도 1단계부터
     expect(recordFailure(KEY)).toEqual({ locked: false, remainingAttempts: MAX - 1 });
   });
 });

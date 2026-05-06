@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const lock = checkLockout(workerId);
+    const lock = await checkLockout(workerId);
     if (lock.locked) {
       return NextResponse.json(
         { error: lockoutMessage(lock.retryAfterMs, "PIN 입력이 잠겼습니다.") },
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     const worker = await verifyWorkerPin(workerId, pin);
     if (!worker) {
-      const result = recordFailure(workerId);
+      const result = await recordFailure(workerId);
       if (result.locked) {
         return NextResponse.json(
           {
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    recordSuccess(workerId);
+    await recordSuccess(workerId);
     return NextResponse.json({ worker });
   } catch (e) {
     const message = e instanceof Error ? e.message : "인증 처리 실패";

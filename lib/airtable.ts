@@ -6,6 +6,10 @@ import "server-only";
 // 서버에서만 실행 가능하며, API 키 등 민감한 정보를 안전하게 처리합니다.
 // ─────────────────────────────────────────────────────────────────────────────
 import { AIRTABLE_TABLE, WORKER_FIELDS } from "@/lib/airtable-schema";
+import { hashPin, isHashedPin, verifyHashedPin } from "@/lib/pin-hash";
+import { log, logWarn } from "@/lib/logger";
+
+const PIN_HASH_FIELD = "pin_hash";
 
 // Airtable REST API 기본 URL
 const API = "https://api.airtable.com/v0";
@@ -318,12 +322,34 @@ export async function verifyWorkerPin(
     return null; // 비활성화된 직원
   }
 
-  // PIN 번호 비교 (4자리로 정규화 후 비교)
-  const stored = normalizePin4(fields[WORKER_FIELDS.pin]);
+  // PIN 검증: 해시 우선, 평문 fallback (자동 점진 마이그레이션)
   const normalizedPin = normalizePin4(pin);
-  if (!stored || stored !== normalizedPin) {
-    return null; // PIN 불일치
+  const storedHashRaw = String(fields[PIN_HASH_FIELD] ?? "").trim();
+  let matched = false;
+
+  if (storedHashRaw && isHashedPin(storedHashRaw)) {
+    // 해시 검증 (timing-safe)
+    matched = await verifyHashedPin(normalizedPin, storedHashRaw);
+  } else {
+    // legacy 평문 검증 + 일치 시 자동 해시 마이그레이션
+    const storedPlain = normalizePin4(fields[WORKER_FIELDS.pin]);
+    if (storedPlain && storedPlain === normalizedPin) {
+      matched = true;
+      // 비동기 백그라운드 마이그레이션 — 응답을 막지 않음
+      void hashPin(normalizedPin)
+        .then((newHash) =>
+          patchAirtableRecord(table, recordId, { [PIN_HASH_FIELD]: newHash }),
+        )
+        .then(() => {
+          log("[verifyWorkerPin] PIN 자동 해시화 완료:", recordId);
+        })
+        .catch((e) => {
+          logWarn("[verifyWorkerPin] PIN 자동 해시화 실패:", recordId, e);
+        });
+    }
   }
+
+  if (!matched) return null;
 
   // 역할(role) 확인: ADMIN, MASTER, WORKER 세 가지 중 하나 (알 수 없으면 기본값 WORKER)
   const name = String(fields[WORKER_FIELDS.name] ?? "").trim();
