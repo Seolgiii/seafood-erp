@@ -1,7 +1,9 @@
 ﻿import { NextResponse } from "next/server";
 import Airtable from "airtable";
+import { withIdempotency } from "@/lib/idempotency";
 
 export async function POST(request: Request) {
+  return withIdempotency(request, async () => {
   const pat = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
 
@@ -68,4 +70,5 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+  });
 }

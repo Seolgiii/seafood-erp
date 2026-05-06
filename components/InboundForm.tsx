@@ -131,9 +131,13 @@ export function InboundForm() {
         payload.memo = memoTrim.trim();
       }
 
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch("/api/inbound-create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify(payload),
       });
       const data = (await res.json()) as {

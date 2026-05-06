@@ -89,9 +89,13 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
     setSubmitting(true);
     setSubmitErr(null);
     try {
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch("/api/outbound-request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           workerRecordId: session.workerId,
           lotRecordId: card.recordId,

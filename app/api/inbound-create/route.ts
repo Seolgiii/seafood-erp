@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createInboundLotAndTxn } from "@/lib/inbound-create";
+import { withIdempotency } from "@/lib/idempotency";
 
 function isRecordId(s: string): boolean {
   return /^rec[a-zA-Z0-9]+$/.test(s);
 }
 
 export async function POST(request: Request) {
+  return withIdempotency(request, async () => {
   try {
     const body = (await request.json()) as {
       workerRecordId?: string;
@@ -90,5 +92,6 @@ export async function POST(request: Request) {
       e instanceof Error ? e.message : "Inbound LOT create failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+  });
 }
 

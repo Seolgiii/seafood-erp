@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createOutboundPendingRecord } from "@/lib/outbound-airtable";
+import { withIdempotency } from "@/lib/idempotency";
 
 function isRecordId(s: string): boolean {
   return /^rec[a-zA-Z0-9]+$/.test(s);
 }
 
 export async function POST(request: Request) {
+  return withIdempotency(request, async () => {
   try {
     const body = (await request.json()) as {
       workerRecordId?: string;
@@ -54,4 +56,5 @@ export async function POST(request: Request) {
     const message = e instanceof Error ? e.message : "Create failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+  });
 }
