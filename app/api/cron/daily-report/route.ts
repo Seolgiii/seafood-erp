@@ -56,11 +56,20 @@ export async function GET(request: Request) {
 
   try {
     const report = await buildDailyReport(threshold);
+    const totalPending =
+      report.pending.yesterdayTotal + report.pending.olderTotal;
     log("[cron/daily-report] 보고서 생성:", {
       date: report.date,
-      totalPending: report.totalPending,
+      yesterdayPending: report.pending.yesterdayTotal,
+      olderPending: report.pending.olderTotal,
+      totalPending,
       thresholdExceeded: report.thresholdExceeded,
-      staleCount: report.staleCount,
+      staleCount: report.pending.staleCount,
+      yesterdayInbound: report.yesterday.inbound.length,
+      yesterdayOutbound: report.yesterday.outbound.length,
+      yesterdayTransfer: report.yesterday.transfer.length,
+      yesterdayExpenseCount: report.yesterday.expense.count,
+      profitEstimated: report.profit.estimated,
     });
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
@@ -83,9 +92,12 @@ export async function GET(request: Request) {
       emailId: result.id,
       report: {
         date: report.date,
-        totalPending: report.totalPending,
+        totalPending,
+        yesterdayPending: report.pending.yesterdayTotal,
+        olderPending: report.pending.olderTotal,
         thresholdExceeded: report.thresholdExceeded,
-        staleCount: report.staleCount,
+        staleCount: report.pending.staleCount,
+        profitEstimated: report.profit.estimated,
       },
     });
   } catch (e) {
