@@ -21,3 +21,4 @@ export * from "./outbound";
 export * from "./expense";
 export * from "./storage";
 export * from "./supplier";
+export * from "./transfer";

@@ -6,6 +6,7 @@ import { getStorageCostForLot } from "@/lib/storage-cost";
 import { AuthError, requireWorker } from "@/lib/server-auth";
 import { calculateTransferPurchasePrice } from "@/lib/cost-calc";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
+import { TransferFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -287,6 +288,16 @@ export async function approveTransfer(
   // 1. 재고 이동 레코드 조회
   const tfFields = await fetchRecord("재고 이동", transferRecordId);
   if (!tfFields) return { success: false, message: "재고 이동 레코드를 찾을 수 없습니다." };
+
+  // zod 검증 (모니터링 모드)
+  const tfParsed = TransferFieldsSchema.safeParse(tfFields);
+  if (!tfParsed.success) {
+    reportSchemaIssue(
+      "approveTransfer:재고 이동",
+      transferRecordId,
+      tfParsed.error,
+    );
+  }
 
   // 중복 승인 방지
   if (String(tfFields["승인상태"] ?? "") === "승인 완료") return { success: true };

@@ -19,6 +19,7 @@ import {
   ExpenseRecordSchema,
   InboundRecordSchema,
   OutboundRecordSchema,
+  TransferRecordSchema,
   reportSchemaIssue,
 } from "@/lib/schemas";
 import { z } from "zod";
@@ -381,7 +382,10 @@ export async function getMyRequests(
   if (!expenseCheck.success) {
     reportSchemaIssue("getMyRequests:지출결의", undefined, expenseCheck.error);
   }
-  // 재고 이동(TRANSFER)은 별도 스키마 파일이 없어 skip — 향후 필요시 추가
+  const transferCheck = z.array(TransferRecordSchema).safeParse(transferRaw);
+  if (!transferCheck.success) {
+    reportSchemaIssue("getMyRequests:재고 이동", undefined, transferCheck.error);
+  }
 
   // 코드 레벨 이중 필터: Airtable 쿼리 필터가 불안정한 경우 대비
   const cutoff = new Date();
