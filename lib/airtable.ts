@@ -8,6 +8,7 @@ import "server-only";
 import { AIRTABLE_TABLE, WORKER_FIELDS } from "@/lib/airtable-schema";
 import { hashPin, isHashedPin, verifyHashedPin } from "@/lib/pin-hash";
 import { log, logWarn } from "@/lib/logger";
+import { WorkerFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
 
 const PIN_HASH_FIELD = "pin_hash";
 
@@ -311,6 +312,13 @@ export async function verifyWorkerPin(
   );
 
   const fields = data.fields;
+
+  // zod 검증 (모니터링 모드 — 실패해도 기존 흐름 그대로 진행)
+  const parsed = WorkerFieldsSchema.safeParse(fields);
+  if (!parsed.success) {
+    reportSchemaIssue("verifyWorkerPin", recordId, parsed.error);
+  }
+
   // 활성화 여부 확인 (비활성화된 직원은 로그인 불가)
   const active = fields[WORKER_FIELDS.active];
   const activeOk =

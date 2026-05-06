@@ -26,6 +26,12 @@ import {
 } from "@/lib/generate-pdf.server";
 import { AuthError, requireAdmin } from "@/lib/server-auth";
 import { calculateOutboundCost } from "@/lib/cost-calc";
+import {
+  InboundFieldsSchema,
+  LotFieldsSchema,
+  OutboundFieldsSchema,
+  reportSchemaIssue,
+} from "@/lib/schemas";
 
 // Airtable 접속에 필요한 인증 키와 데이터베이스 ID (환경변수에서 읽어옴)
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -316,6 +322,16 @@ async function createLotOnInboundApproval(
     return { success: false, message: "입고 관리 레코드를 찾을 수 없습니다." };
   }
 
+  // zod 검증 (모니터링 모드)
+  const inboundParsed = InboundFieldsSchema.safeParse(inboundFields);
+  if (!inboundParsed.success) {
+    reportSchemaIssue(
+      "createLotOnInboundApproval:입고 관리",
+      inboundRecordId,
+      inboundParsed.error,
+    );
+  }
+
   // 중복 승인 방지 (이미 승인 완료된 건은 재처리하지 않음)
   const currentStatus = String(inboundFields["승인상태"] ?? "").trim();
   if (currentStatus === "승인 완료") {
@@ -352,6 +368,16 @@ async function createLotOnInboundApproval(
   const lotRecord = lotQueryData.records?.[0];
   if (!lotRecord?.id) {
     return { success: false, message: `LOT별 재고 레코드를 찾을 수 없습니다. (LOT번호: ${lotNumber})` };
+  }
+
+  // zod 검증 — LOT 레코드 (모니터링 모드)
+  const lotParsed = LotFieldsSchema.safeParse(lotRecord.fields);
+  if (!lotParsed.success) {
+    reportSchemaIssue(
+      "createLotOnInboundApproval:LOT별 재고",
+      lotRecord.id,
+      lotParsed.error,
+    );
   }
 
   // 3. 재고수량 + 입고자를 실제 값으로 PATCH (0 → 실제 입고수량, 입고자 링크 설정)
@@ -471,6 +497,16 @@ async function deductStockOnOutboundApproval(
   const outFields = await fetchRecord("출고 관리", outboundRecordId);
   if (!outFields) {
     return { success: false, message: "출고 레코드를 찾을 수 없습니다." };
+  }
+
+  // zod 검증 (모니터링 모드)
+  const outParsed = OutboundFieldsSchema.safeParse(outFields);
+  if (!outParsed.success) {
+    reportSchemaIssue(
+      "deductStockOnOutboundApproval:출고 관리",
+      outboundRecordId,
+      outParsed.error,
+    );
   }
 
   // 멱등 가드: 출고시점 판매원가가 양수로 채워져 있으면 이미 차감 완료된 것으로 간주

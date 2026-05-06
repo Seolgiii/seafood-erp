@@ -15,6 +15,13 @@ import { revalidatePath } from "next/cache";
 import { getWorkersTablePath, getProductsTablePath } from "@/lib/airtable";
 import { WORKER_FIELDS, PRODUCT_FIELDS } from "@/lib/airtable-schema";
 import { AuthError, requireWorker } from "@/lib/server-auth";
+import {
+  ExpenseRecordSchema,
+  InboundRecordSchema,
+  OutboundRecordSchema,
+  reportSchemaIssue,
+} from "@/lib/schemas";
+import { z } from "zod";
 
 /** 입고/출고: 작업자 링크 필드 후보(첫 번째로 rec id가 나오는 필드만 사용) */
 const WORKER_LINK_FIELD_CANDIDATES = ["작업자"] as const;
@@ -359,6 +366,22 @@ export async function getMyRequests(
     fetchAirtableRecords("지출결의", expenseFilter),
     fetchAirtableRecords("재고 이동", transferFilter, "이동일"),
   ]);
+
+  // zod 검증 (모니터링 모드 — 실패해도 기존 흐름 그대로)
+  // 배열 단위로 한 번 safeParse — 실패 시 첫 issue만 로그
+  const inboundCheck = z.array(InboundRecordSchema).safeParse(inboundRaw);
+  if (!inboundCheck.success) {
+    reportSchemaIssue("getMyRequests:입고 관리", undefined, inboundCheck.error);
+  }
+  const outboundCheck = z.array(OutboundRecordSchema).safeParse(outboundRaw);
+  if (!outboundCheck.success) {
+    reportSchemaIssue("getMyRequests:출고 관리", undefined, outboundCheck.error);
+  }
+  const expenseCheck = z.array(ExpenseRecordSchema).safeParse(expenseRaw);
+  if (!expenseCheck.success) {
+    reportSchemaIssue("getMyRequests:지출결의", undefined, expenseCheck.error);
+  }
+  // 재고 이동(TRANSFER)은 별도 스키마 파일이 없어 skip — 향후 필요시 추가
 
   // 코드 레벨 이중 필터: Airtable 쿼리 필터가 불안정한 경우 대비
   const cutoff = new Date();

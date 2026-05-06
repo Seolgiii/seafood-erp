@@ -13,6 +13,7 @@ import "server-only";
 
 import { fetchAirtable, tablePathSegment } from "@/lib/airtable";
 import { AIRTABLE_TABLE, STORAGE_COST_FIELDS } from "@/lib/airtable-schema";
+import { StorageCostFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,12 @@ export async function getStorageCostForLot(
   });
 
   const f = records[0].fields;
+
+  // zod 검증 (모니터링 모드)
+  const parsed = StorageCostFieldsSchema.safeParse(f);
+  if (!parsed.success) {
+    reportSchemaIssue("getStorageCostForLot", records[0].id, parsed.error);
+  }
   return {
     refrigerationFee: toNum(f[SC.refrigerationFee]),
     inOutFee: toNum(f[SC.inOutFee]),
