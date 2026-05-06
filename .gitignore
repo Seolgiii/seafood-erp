@@ -6,7 +6,8 @@ lib/fonts-base64.ts
 .env
 .next
 node_modules
-.claude
+.claude/*
+!.claude/commands/
 tsconfig.tsbuildinfo
 .DS_Store
 ._*.env*.local
