@@ -386,6 +386,77 @@ async function createLotOnInboundApproval(
 }
 
 /**
+ * 입고 승인을 반려로 되돌릴 때 호출 — 승인 시 반영했던 LOT별 재고 수량을 0으로
+ * 복원하고 보관처 비용 필드를 클리어합니다.
+ *
+ * LOT별 재고 레코드는 삭제하지 않고 soft-delete(재고수량=0) 처리합니다.
+ *  - 품목마스터.LOT별 재고 / 입고 관리.LOT번호 등 다른 레코드의 참조를 보존
+ *  - 잘못된 반려 시 다시 승인 처리 가능 (createLotOnInboundApproval 재실행 시 복원됨)
+ *  - 검색 화면(searchLotByKeyword)은 `재고수량 > 0` 필터로 자동 제외
+ */
+async function revertLotOnInboundReject(
+  inboundRecordId: string,
+): Promise<{ success: boolean; message?: string }> {
+  const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
+  if (!inboundFields) {
+    return { success: false, message: "입고 관리 레코드를 찾을 수 없습니다." };
+  }
+
+  const lotNumber = String(inboundFields["LOT번호"] ?? "").trim();
+  if (!lotNumber) {
+    // LOT번호가 없으면 LOT 레코드도 없음 (예: 신청 직후 즉시 반려) → 무처리
+    log("[revertLotOnInboundReject] LOT번호 없음 — 처리 생략:", inboundRecordId);
+    return { success: true };
+  }
+
+  const formula = encodeURIComponent(`{LOT번호}="${lotNumber}"`);
+  const lotQueryRes = await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/LOT별%20재고?filterByFormula=${formula}&maxRecords=1`,
+    {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
+      next: { revalidate: 0 },
+    },
+  );
+  if (!lotQueryRes.ok) {
+    const body = await lotQueryRes.text().catch(() => "");
+    logError(
+      "[INTEGRITY-ALERT][revertLotOnInboundReject] LOT별 재고 조회 실패 — 수동 정합 확인 필요:",
+      { inboundRecordId, lotNumber, status: lotQueryRes.status, body },
+    );
+    return { success: false, message: "LOT별 재고 조회에 실패했습니다." };
+  }
+  const lotQueryData = await lotQueryRes.json();
+  const lotRecord = lotQueryData.records?.[0];
+  if (!lotRecord?.id) {
+    // LOT 레코드 없음 — 이미 정리됐거나 처음부터 없었음 → 무처리
+    log("[revertLotOnInboundReject] LOT 레코드 없음 — 처리 생략:", { inboundRecordId, lotNumber });
+    return { success: true };
+  }
+
+  // 재고수량 0 + 보관처 비용 필드 클리어 (Airtable number 필드는 null로 비움)
+  const ok = await patchRecord("LOT별 재고", lotRecord.id, {
+    재고수량: 0,
+    냉장료단가: null,
+    입출고비: null,
+    노조비: null,
+  });
+  if (!ok) {
+    logError(
+      "[INTEGRITY-ALERT][revertLotOnInboundReject] LOT 재고 0 PATCH 실패 — 수동 정합 확인 필요:",
+      { inboundRecordId, lotNumber, lotRecordId: lotRecord.id },
+    );
+    return { success: false, message: "LOT 재고 복원에 실패했습니다." };
+  }
+
+  log("[revertLotOnInboundReject] LOT 재고 0 복원:", {
+    inboundRecordId,
+    lotNumber,
+    lotRecordId: lotRecord.id,
+  });
+  return { success: true };
+}
+
+/**
  * 출고 승인 시 입고 관리.잔여수량 및 LOT별 재고.재고수량 차감
  *
  * 관리자가 출고를 승인하는 순간 실제 재고에서 출고 수량만큼 차감됩니다.
@@ -496,14 +567,145 @@ async function deductStockOnOutboundApproval(
 }
 
 /**
+ * 출고 승인을 반려로 되돌릴 때 호출 — 승인 시 차감했던 입고 관리.잔여수량과
+ * LOT별 재고.재고수량을 복원하고 출고시점 비용 필드를 클리어합니다.
+ *
+ * 입고 관리 복구가 성공한 후 LOT 복구가 실패할 수 있으므로, 각 단계별 결과를
+ * `[INTEGRITY-ALERT]` 로그로 명시 — 운영자가 grep으로 즉시 추적 가능합니다.
+ */
+async function restoreStockOnOutboundReject(
+  outboundRecordId: string,
+): Promise<{ success: boolean; message?: string }> {
+  const outFields = await fetchRecord("출고 관리", outboundRecordId);
+  if (!outFields) {
+    return { success: false, message: "출고 레코드를 찾을 수 없습니다." };
+  }
+
+  const outQty = Number(outFields["출고수량"]);
+  if (!Number.isFinite(outQty) || outQty <= 0) {
+    return { success: false, message: "출고 수량을 확인할 수 없습니다." };
+  }
+
+  // 입고 관리 링크 (출고 신청 시 저장한 LOT번호 link 필드 = 입고 관리 record ID)
+  const rawLotLink = outFields["LOT번호"];
+  const inboundRecordId =
+    Array.isArray(rawLotLink) && typeof rawLotLink[0] === "string" && /^rec/.test(rawLotLink[0])
+      ? rawLotLink[0]
+      : null;
+  // LOT별 재고 레코드 ID (출고 신청 시 별도 저장)
+  const lotInventoryRecordId = String(outFields["LOT재고레코드ID"] ?? "").trim();
+
+  // 1. 입고 관리.잔여수량 복구 (+ outQty)
+  let inboundRestored = false;
+  if (inboundRecordId) {
+    const inboundFields = await fetchRecord("입고 관리", inboundRecordId);
+    if (inboundFields) {
+      const currentRemain = Number(inboundFields["잔여수량"]);
+      if (Number.isFinite(currentRemain)) {
+        const ok = await patchRecord("입고 관리", inboundRecordId, {
+          잔여수량: currentRemain + outQty,
+        });
+        if (!ok) {
+          logError(
+            "[INTEGRITY-ALERT][restoreStockOnOutboundReject] 입고 관리 잔여수량 복구 PATCH 실패 — 수동 정합 확인 필요:",
+            { outboundRecordId, inboundRecordId, outQty, currentRemain },
+          );
+          return { success: false, message: "입고 관리 잔여수량 복구에 실패했습니다." };
+        }
+        inboundRestored = true;
+      } else {
+        logWarn(
+          "[restoreStockOnOutboundReject] 잔여수량을 숫자로 읽을 수 없음 — 입고 복구 생략:",
+          { outboundRecordId, inboundRecordId, raw: inboundFields["잔여수량"] },
+        );
+      }
+    } else {
+      logWarn(
+        "[restoreStockOnOutboundReject] 입고 관리 레코드 없음 — 입고 복구 생략:",
+        { outboundRecordId, inboundRecordId },
+      );
+    }
+  } else {
+    logWarn(
+      "[restoreStockOnOutboundReject] 입고 관리 링크 없음 — 잔여수량 복구 생략:",
+      outboundRecordId,
+    );
+  }
+
+  // 2. LOT별 재고.재고수량 복구 (+ outQty)
+  if (lotInventoryRecordId && /^rec/.test(lotInventoryRecordId)) {
+    const lotFields = await fetchRecord("LOT별 재고", lotInventoryRecordId);
+    if (lotFields) {
+      const rawQty = lotFields["재고수량"];
+      const currentLotQty = Number(Array.isArray(rawQty) ? rawQty[0] : rawQty) || 0;
+      const ok = await patchRecord("LOT별 재고", lotInventoryRecordId, {
+        재고수량: currentLotQty + outQty,
+      });
+      if (!ok) {
+        logError(
+          "[INTEGRITY-ALERT][restoreStockOnOutboundReject] LOT 재고 복구 PATCH 실패 — 수동 정합 확인 필요:",
+          {
+            outboundRecordId,
+            lotInventoryRecordId,
+            outQty,
+            currentLotQty,
+            inboundRestored,
+            note: inboundRestored
+              ? "입고 관리 잔여수량은 이미 복구됨 — LOT 재고만 수동 +outQty 필요"
+              : "입고/LOT 모두 미복구 상태",
+          },
+        );
+        return { success: false, message: "LOT 재고 복구에 실패했습니다." };
+      }
+    } else {
+      logWarn(
+        "[restoreStockOnOutboundReject] LOT 재고 레코드 없음 — LOT 복구 생략:",
+        { outboundRecordId, lotInventoryRecordId },
+      );
+    }
+  } else {
+    logWarn(
+      "[restoreStockOnOutboundReject] LOT재고레코드ID 없음 — LOT 재고 복구 생략:",
+      outboundRecordId,
+    );
+  }
+
+  // 3. 출고시점 비용 7개 필드 클리어 (반려된 출고가 손익 보고서에 잡히지 않도록)
+  const clearOk = await patchRecord("출고 관리", outboundRecordId, {
+    "출고시점 단가": null,
+    "출고시점 냉장료": null,
+    "출고시점 입출고비": null,
+    "출고시점 노조비": null,
+    "출고시점 판매원가": null,
+    "출고시점 판매금액": null,
+    "출고시점 손익": null,
+  });
+  if (!clearOk) {
+    logWarn(
+      "[restoreStockOnOutboundReject] 출고시점 비용 클리어 실패 (재고는 복구됨) — 수동 확인 권장:",
+      outboundRecordId,
+    );
+  }
+
+  log("[restoreStockOnOutboundReject] 재고 복구 완료:", {
+    outboundRecordId,
+    inboundRecordId,
+    lotInventoryRecordId,
+    outQty,
+  });
+  return { success: true };
+}
+
+/**
  * 승인 상태 업데이트 (승인 완료 / 최종 승인 대기 / 반려)
  *
  * 관리자 대시보드에서 "승인" 또는 "반려" 버튼을 누르면 이 함수가 호출됩니다.
  * 처리 순서:
  *   1. 입고 승인이면 → LOT 재고수량 반영
  *   2. 출고 승인이면 → 재고 차감
- *   3. Airtable 승인상태 필드 업데이트
- *   4. 승인 완료 시 → PDF 자동 생성 및 저장 (백그라운드 실행, 실패해도 승인에 영향 없음)
+ *   3. 반려 처리 시 (이미 승인 완료 상태) → 재고 원상 복구
+ *   4. Airtable 승인상태 필드 업데이트
+ *   5. 승인 완료 시 → PDF 자동 생성 및 저장 (백그라운드 실행, 실패해도 승인에 영향 없음)
  */
 export async function updateApprovalStatus(
   adminWorkerId: string,
@@ -536,7 +738,35 @@ export async function updateApprovalStatus(
     return { success: false, message: "잘못된 유형입니다." };
   }
 
+  // 승인 완료 처리 시 멱등성 가드 + 일부 type 차단
+  // (newStatus === "승인 완료" 인 모든 케이스에 우선 적용)
+  if (newStatus === "승인 완료") {
+    const currentRecord = await fetchRecord(tableName, recordId);
+    const currentStatus = String(currentRecord?.["승인상태"] ?? "").trim();
+
+    if (currentStatus === "승인 완료") {
+      // 멱등 처리: 이미 승인 완료된 건은 재고 재처리 차단
+      // (반려 후 재승인 → 다시 승인 클릭 같은 중복 입력 방어)
+      log("[updateApprovalStatus] 이미 승인 완료 — 중복 처리 생략:", { type, recordId });
+      return { success: true };
+    }
+
+    // TRANSFER 반려 → 승인 재변경은 LOT 중복 생성 위험으로 차단 (수동 재신청 유도)
+    if (currentStatus === "반려" && type === "TRANSFER") {
+      logWarn(
+        "[updateApprovalStatus] TRANSFER 반려 → 승인 재변경 차단:",
+        recordId,
+      );
+      return {
+        success: false,
+        message:
+          "재고 이동은 반려 후 자동 재승인이 지원되지 않습니다. 새로 신청해주세요.",
+      };
+    }
+  }
+
   // 입고 승인 시 LOT별 재고 생성 (상태 업데이트 전에 먼저 재고 반영)
+  // 반려 → 승인 재변경 케이스도 동일한 함수가 재사용되어 LOT 재고를 자동 복원합니다.
   if (type === "INBOUND" && newStatus === "승인 완료") {
     const createResult = await createLotOnInboundApproval(recordId);
     if (!createResult.success) {
@@ -557,6 +787,38 @@ export async function updateApprovalStatus(
     const transferResult = await approveTransfer(recordId);
     if (!transferResult.success) {
       return { success: false, message: transferResult.message };
+    }
+  }
+
+  // 반려 처리: 이미 승인 완료된 건이면 재고를 원상 복구
+  // (승인 대기 / 최종 승인 대기 → 반려는 재고 미반영 상태이므로 추가 처리 불필요)
+  if (newStatus === "반려") {
+    const currentRecord = await fetchRecord(tableName, recordId);
+    const currentStatus = String(currentRecord?.["승인상태"] ?? "").trim();
+
+    if (currentStatus === "반려") {
+      // 멱등 처리: 이미 반려된 건은 재고 처리 생략 (PATCH는 그대로 진행해 사유만 갱신)
+      log("[updateApprovalStatus] 이미 반려 상태 — 재고 처리 생략:", { type, recordId });
+    } else if (currentStatus === "승인 완료") {
+      if (type === "INBOUND") {
+        const revertResult = await revertLotOnInboundReject(recordId);
+        if (!revertResult.success) {
+          return { success: false, message: revertResult.message };
+        }
+      } else if (type === "OUTBOUND") {
+        const restoreResult = await restoreStockOnOutboundReject(recordId);
+        if (!restoreResult.success) {
+          return { success: false, message: restoreResult.message };
+        }
+      } else if (type === "TRANSFER") {
+        // 재고 이동 반려는 새 LOT 생성 + 원본 차감을 모두 되돌려야 하므로 위험도가 높음.
+        // 자동 복구는 미구현 — 운영자가 인지할 수 있도록 명시 로그만 남김.
+        logError(
+          "[INTEGRITY-ALERT][updateApprovalStatus] TRANSFER 승인 완료 → 반려 — 자동 재고 복구 미구현, 수동 보정 필요:",
+          { recordId, rejectReason },
+        );
+      }
+      // EXPENSE: 재고 영향 없음 (상태만 변경)
     }
   }
 

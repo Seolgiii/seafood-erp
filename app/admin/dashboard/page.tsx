@@ -16,6 +16,7 @@ const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
   { key: "DONE", label: "완료" },
 ];
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
+import CompletedItemActionSheet from "@/app/components/CompletedItemActionSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
 import type { RequestItem } from "@/app/actions/my-requests";
 import { readSession, isSessionExpired } from "@/lib/session";
@@ -65,6 +66,8 @@ export default function AdminDashboardPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RequestItem | null>(null);
+  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+  const [actionSheetItem, setActionSheetItem] = useState<RequestItem | null>(null);
 
   useEffect(() => {
     const session = readSession();
@@ -121,7 +124,10 @@ export default function AdminDashboardPage() {
   const totalPending = items.filter(isItemPending).length;
   const totalCompleted = items.length - totalPending;
 
-  const handleApprove = async (item: RequestItem) => {
+  const handleApprove = async (
+    item: RequestItem,
+    opts?: { skipConfirm?: boolean },
+  ) => {
     if (processingIds.current.has(item.id)) return;
 
     const session = readSession();
@@ -130,13 +136,18 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    if (!window.confirm("해당 건을 승인하시겠습니까?")) return;
+    // 액션 시트에서 호출되는 경우(skipConfirm) 사용자가 이미 명시적으로 클릭한 것이므로 confirm 생략
+    if (!opts?.skipConfirm && !window.confirm("해당 건을 승인하시겠습니까?")) return;
 
     processingIds.current.add(item.id);
     setUiOverrides((prev) => ({ ...prev, [item.id]: "PROCESSING" }));
 
+    // EXPENSE 100만원 분기: "승인 대기"뿐 아니라 "반려" → 재승인 케이스도 동일 정책 적용
     let nextStatus: string;
-    if (item.type === "EXPENSE" && item.status === "승인 대기") {
+    if (
+      item.type === "EXPENSE" &&
+      (item.status === "승인 대기" || item.status === "반려")
+    ) {
       const amount = Number(item.raw["금액"] ?? 0);
       if (amount < 1_000_000) {
         // 100만원 미만: 권한 무관 바로 승인 완료
@@ -193,10 +204,41 @@ export default function AdminDashboardPage() {
 
     if (result.success) {
       setUiOverrides((prev) => ({ ...prev, [selectedItem.id]: "REJECTED" }));
+      setTimeout(() => loadData(), 1200);
     } else {
       toast(result.message ?? '처리 중 오류가 발생했습니다.');
       loadData();
     }
+  };
+
+  const handleOpenActionSheet = (item: RequestItem) => {
+    setActionSheetItem(item);
+    setIsActionSheetOpen(true);
+  };
+
+  const handleCloseActionSheet = () => {
+    setIsActionSheetOpen(false);
+    // 시트 닫힘 애니메이션 후 item 정리
+    setTimeout(() => setActionSheetItem(null), 200);
+  };
+
+  const handleActionSheetRevert = () => {
+    if (!actionSheetItem) return;
+    const target = actionSheetItem;
+    setIsActionSheetOpen(false);
+    // 액션 시트 닫고 즉시 반려 사유 입력 시트로 전환
+    setSelectedItem(target);
+    setIsModalOpen(true);
+    setTimeout(() => setActionSheetItem(null), 200);
+  };
+
+  const handleActionSheetApprove = () => {
+    if (!actionSheetItem) return;
+    const target = actionSheetItem;
+    setIsActionSheetOpen(false);
+    // 액션 시트 클릭이 명시적 confirm 역할을 하므로 추가 confirm 생략
+    void handleApprove(target, { skipConfirm: true });
+    setTimeout(() => setActionSheetItem(null), 200);
   };
 
   const badge = (type: string) => TYPE_BADGE[type] ?? { bg: "bg-gray-100 text-gray-700", label: "기타" };
@@ -212,11 +254,39 @@ export default function AdminDashboardPage() {
       uiState === "REJECTED"  ? "반려" :
       item.status;
 
+    // 완료 탭 + (승인 완료 || 반려) + ADMIN/MASTER + 처리 중이 아닐 때만 카드 클릭 가능
+    // — 승인 완료 → 반려, 반려 → 승인 양방향 변경 진입점
+    const canChangeStatus =
+      isDoneTab &&
+      (item.status === "승인 완료" || item.status === "반려") &&
+      !uiState &&
+      (role === "ADMIN" || role === "MASTER");
+
+    const baseClass = isExpense
+      ? "bg-white p-5 rounded-[24px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-3 animate-fade-in"
+      : "bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-1";
+    const interactiveClass = canChangeStatus
+      ? " cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
+      : "";
+
     return (
-      <div key={item.id} className={isExpense
-        ? "bg-white p-5 rounded-[24px] shadow-[0_8px_24px_rgba(149,157,165,0.08)] flex flex-col gap-3 animate-fade-in"
-        : "bg-white p-3.5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-1"
-      }>
+      <div
+        key={item.id}
+        className={baseClass + interactiveClass}
+        onClick={canChangeStatus ? () => handleOpenActionSheet(item) : undefined}
+        role={canChangeStatus ? "button" : undefined}
+        tabIndex={canChangeStatus ? 0 : undefined}
+        onKeyDown={
+          canChangeStatus
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleOpenActionSheet(item);
+                }
+              }
+            : undefined
+        }
+      >
         {isExpense ? (
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
@@ -439,6 +509,14 @@ export default function AdminDashboardPage() {
           requesterName={selectedItem.requester}
         />
       )}
+
+      <CompletedItemActionSheet
+        item={actionSheetItem}
+        isOpen={isActionSheetOpen}
+        onClose={handleCloseActionSheet}
+        onRevertToReject={handleActionSheetRevert}
+        onChangeToApprove={handleActionSheetApprove}
+      />
 
       {/* 하단 탭바 */}
       <BottomTabBar<AdminTabKey>
