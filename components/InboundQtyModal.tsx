@@ -4,6 +4,7 @@ import type { LotSearchCard } from "@/lib/inventory-types";
 import { fromGroupedIntegerInput } from "@/lib/number-format";
 import { readSession, touchSession } from "@/lib/session";
 import { defaultInputMode } from "@/lib/shipment-plan";
+import { toast } from "@/lib/toast";
 import { useEffect, useMemo, useState } from "react";
 
 type Props = {
@@ -41,13 +42,13 @@ export function InboundQtyModal({ card, open, onClose }: Props) {
     if (!session) {
       const m = "로그인이 필요합니다";
       setErr(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
     if (!unitLabel) {
       const m = "기준단위(박스) 라벨이 없어 입고를 처리할 수 없습니다.";
       setErr(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
 
@@ -67,7 +68,7 @@ export function InboundQtyModal({ card, open, onClose }: Props) {
       if (!res.ok) {
         const m = data.error ?? "입고 등록 실패";
         setErr(m);
-        window.alert(m);
+        toast(m, "error");
         return;
       }
       touchSession();
@@ -76,7 +77,7 @@ export function InboundQtyModal({ card, open, onClose }: Props) {
     } catch {
       const m = "네트워크 오류";
       setErr(m);
-      window.alert(m);
+      toast(m, "error");
     } finally {
       setSubmitting(false);
     }

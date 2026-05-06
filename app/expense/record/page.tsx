@@ -14,6 +14,7 @@ import {
   fromGroupedQtyInputAllowDecimal,
 } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 const DATE_ALERT =
   '날짜 형식이 올바르지 않아 오늘 날짜로 설정했습니다.';
@@ -70,7 +71,7 @@ export default function InventoryRecordPage() {
     const p = tryParseInboundDateInput(trimmed);
     if (p) setBizDateInput(p.slash);
     else {
-      window.alert(DATE_ALERT);
+      toast(DATE_ALERT, 'info');
       setBizDateInput(getSeoulTodaySlash());
     }
   }, [bizDateInput]);
@@ -87,7 +88,7 @@ export default function InventoryRecordPage() {
 
     const dateIso = resolveBizDateIso();
     if (!dateIso) {
-      window.alert('입고 일자를 YYYY/MM/DD 형식으로 입력해 주세요.');
+      toast('입고 일자를 YYYY/MM/DD 형식으로 입력해 주세요.', 'error');
       return;
     }
 
@@ -96,15 +97,15 @@ export default function InventoryRecordPage() {
     const totalPrice = fromGroupedIntegerInput(formData.totalPrice).value;
 
     if (!Number.isFinite(spec) || spec <= 0) {
-      window.alert('규격(kg)을 확인해 주세요.');
+      toast('규격(kg)을 확인해 주세요.', 'error');
       return;
     }
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      window.alert('수량(BOX)은 1 이상이어야 합니다.');
+      toast('수량(BOX)은 1 이상이어야 합니다.', 'error');
       return;
     }
     if (!Number.isFinite(totalPrice) || totalPrice < 0) {
-      window.alert('수매가를 확인해 주세요.');
+      toast('수매가를 확인해 주세요.', 'error');
       return;
     }
 
@@ -118,10 +119,10 @@ export default function InventoryRecordPage() {
       totalPrice,
     });
     if (result.success) {
-      alert('입고 등록 완료!');
+      toast('입고 등록 완료!', 'success');
       router.push('/');
     } else {
-      alert(`저장 실패: ${'message' in result ? result.message : ''}`);
+      toast(`저장 실패: ${'message' in result ? result.message : ''}`, 'error');
     }
     setIsSubmitting(false);
   };

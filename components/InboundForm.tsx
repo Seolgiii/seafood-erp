@@ -11,6 +11,7 @@ import {
   fromGroupedOptionalIntInput,
 } from "@/lib/number-format";
 import { readSession, touchSession } from "@/lib/session";
+import { toast } from "@/lib/toast";
 
 const inputClass =
   "min-h-[2.85rem] w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base leading-normal md:min-h-[3.1rem] md:px-3.5 md:py-3 md:text-lg";
@@ -48,7 +49,7 @@ function syncDateFromRawInput(
     setSlash(p.slash);
     return p.iso;
   }
-  if (showAlert) window.alert(DATE_ALERT);
+  if (showAlert) toast(DATE_ALERT, "info");
   const slash = getSeoulTodaySlash();
   const iso = getSeoulTodayISO();
   setSlash(slash);
@@ -81,7 +82,7 @@ export function InboundForm() {
     if (!session) {
       const m = "로그인이 필요합니다";
       setError(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
     const effectiveIso = syncDateFromRawInput(
@@ -92,20 +93,20 @@ export function InboundForm() {
     if (!productName.trim()) {
       const m = "품목명을 입력하세요";
       setError(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
     if (!effectiveIso || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveIso)) {
       const m = "입고일을 확인하세요";
       setError(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
     const n = fromGroupedIntegerInput(qtyBoxesDisplay).value;
     if (!Number.isFinite(n) || n <= 0) {
       const m = "입고 수량(박스)은 1 이상이어야 합니다";
       setError(m);
-      window.alert(m);
+      toast(m, "error");
       return;
     }
 
@@ -148,7 +149,7 @@ export function InboundForm() {
       if (!res.ok || !data.ok) {
         const m = data.error ?? "입고 생성에 실패했습니다";
         setError(m);
-        window.alert(m);
+        toast(m, "error");
         return;
       }
       touchSession();
@@ -156,14 +157,14 @@ export function InboundForm() {
         ? `입고가 완료되었습니다. LOT: ${data.lotNumber}`
         : "입고가 완료되었습니다";
       setOk(msg);
-      window.alert(msg);
+      toast(msg, "success");
       setQtyBoxesDisplay("");
       setPurchasePriceDisplay("");
       setMemo("");
     } catch {
       const m = "입고 처리 중 네트워크 오류가 발생했습니다";
       setError(m);
-      window.alert(m);
+      toast(m, "error");
     } finally {
       setSubmitting(false);
     }

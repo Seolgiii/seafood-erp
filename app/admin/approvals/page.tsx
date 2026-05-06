@@ -10,6 +10,7 @@ import {
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { readSession } from '@/lib/session';
+import { toast } from '@/lib/toast';
 
 export default function Home() {
   const [workerName, setWorkerName] = useState('');
@@ -22,7 +23,7 @@ export default function Home() {
   // 로그아웃 더블 확인 방어 로직
   const handleLogout = () => {
     if (window.confirm("정말 로그아웃 하시겠습니까?")) {
-      alert("로그아웃 되었습니다.");
+      toast("로그아웃 되었습니다.", "success");
       // 실제 로그인 연동 시 라우팅 추가 필요
     }
   };

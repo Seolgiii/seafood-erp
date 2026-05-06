@@ -15,6 +15,7 @@ import {
 } from "@/lib/shipment-plan";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast as showToast } from "@/lib/toast";
 
 type Props = {
   card: LotSearchCard | null;
@@ -108,13 +109,13 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
       if (!res.ok) {
         const m = data.error ?? "등록 실패";
         setSubmitErr(m);
-        window.alert(m);
+        showToast(m, "error");
         return;
       }
       if (!data.id) {
         const m = "출고 요청 ID를 찾지 못했습니다";
         setSubmitErr(m);
-        window.alert(m);
+        showToast(m, "error");
         return;
       }
       const completeRes = await fetch("/api/outbound-complete", {
@@ -129,7 +130,7 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
       if (!completeRes.ok) {
         const m = completeData.error ?? "출고 확정 실패";
         setSubmitErr(m);
-        window.alert(m);
+        showToast(m, "error");
         return;
       }
       touchSession();
@@ -142,7 +143,7 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
     } catch {
       const m = "네트워크 오류";
       setSubmitErr(m);
-      window.alert(m);
+      showToast(m, "error");
     } finally {
       setSubmitting(false);
     }
