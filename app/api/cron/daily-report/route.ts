@@ -22,7 +22,6 @@ import { log, logError, logWarn } from "@/lib/logger";
  *   - RESEND_API_KEY (필수): Resend API 키
  *   - ALERT_THRESHOLD (선택, 기본 10): 강조 표시 임계값
  *   - ALERT_EMAIL_FROM (선택): 발송자, 기본 "SEAERP <onboarding@resend.dev>"
- *   - NEXT_PUBLIC_BASE_URL (선택): 보고서 내 대시보드 링크 base
  */
 export async function GET(request: Request) {
   // ── Vercel cron 인증 ──
@@ -72,9 +71,7 @@ export async function GET(request: Request) {
       profitEstimated: report.profit.estimated,
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-    const dashboardUrl = baseUrl ? `${baseUrl}/admin/dashboard` : undefined;
-    const html = buildReportHtml(report, dashboardUrl);
+    const html = buildReportHtml(report);
     const subject = buildReportSubject(report);
 
     const result = await sendEmail({ to, subject, html });
