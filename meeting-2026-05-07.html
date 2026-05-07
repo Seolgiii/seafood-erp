@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEAERP 시스템 소개 + 운영 회의 — 2026.05.07</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+    color: #191F28;
+    background: #F2F4F6;
+    font-size: 15px;
+    line-height: 1.7;
+    padding: 32px 16px 80px;
+  }
+  .container { max-width: 920px; margin: 0 auto; }
+
+  /* Header */
+  .meeting-header {
+    background: linear-gradient(135deg, #3182F6 0%, #1B64DA 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 40px 44px;
+    margin-bottom: 28px;
+    box-shadow: 0 4px 16px rgba(49, 130, 246, 0.25);
+  }
+  .meeting-header .label {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+  .meeting-header h1 {
+    font-size: 30px;
+    margin: 0 0 10px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.3;
+  }
+  .meeting-header .subtitle {
+    font-size: 15px;
+    opacity: 0.92;
+    margin: 0;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+  }
+  .meta-item .meta-label {
+    font-size: 11px;
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .meta-item .meta-value { font-size: 14px; font-weight: 600; }
+
+  /* TOC */
+  .toc {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .toc h3 {
+    margin: 0 0 14px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px 24px;
+  }
+  .toc a {
+    display: block;
+    padding: 6px 0;
+    color: #191F28;
+    text-decoration: none;
+    font-size: 14px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .toc a:hover { color: #3182F6; }
+  .toc a .num {
+    color: #9ca3af;
+    font-weight: 700;
+    margin-right: 8px;
+    font-size: 12px;
+  }
+
+  /* Card */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 32px 36px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card.dark {
+    background: linear-gradient(135deg, #191F28 0%, #2c3441 100%);
+    color: #fff;
+  }
+  .card.dark h2 { color: #fff; }
+  .card.dark h2 .num { background: #fff; color: #191F28; }
+
+  /* Part separator */
+  .part-divider {
+    margin: 36px 0 20px;
+    text-align: center;
+    position: relative;
+  }
+  .part-divider::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 1px; background: #d1d5db;
+  }
+  .part-divider .part-label {
+    display: inline-block;
+    background: #F2F4F6;
+    padding: 0 18px;
+    position: relative;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Headings */
+  h2 {
+    font-size: 22px;
+    margin: 0 0 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    background: #191F28;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  h3 {
+    font-size: 16px;
+    margin: 26px 0 12px;
+    font-weight: 700;
+    color: #191F28;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h4 {
+    font-size: 14px;
+    margin: 18px 0 6px;
+    font-weight: 700;
+    color: #4b5563;
+  }
+  p { margin: 8px 0; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
+  .badge.critical { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .badge.high { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+  .badge.medium { background: #fefce8; color: #a16207; border: 1px solid #fde68a; }
+  .badge.low { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge.info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+  /* Lists */
+  ul, ol { padding-left: 22px; margin: 8px 0; }
+  ul li, ol li { margin-bottom: 6px; }
+  ul li::marker { color: #9ca3af; }
+
+  /* Glossary cards */
+  .glossary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .glossary-card {
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+  }
+  .glossary-card .term {
+    font-size: 14px;
+    font-weight: 800;
+    color: #3182F6;
+    margin-bottom: 4px;
+  }
+  .glossary-card .def {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+
+  /* Flow steps */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    padding: 18px;
+    background: #f9fafb;
+    border-radius: 10px;
+  }
+  .flow-step {
+    flex: 1;
+    min-width: 140px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    position: relative;
+  }
+  .flow-step .step-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .flow-step .step-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #191F28;
+    margin: 2px 0 4px;
+  }
+  .flow-step .step-desc {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+  .flow-step::after {
+    content: '→';
+    position: absolute;
+    right: -14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 16px;
+    font-weight: 700;
+    z-index: 1;
+  }
+  .flow-step:last-child::after { content: ''; }
+
+  /* Feature card */
+  .feature-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    background: #fff;
+  }
+  .feature-card .feature-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #191F28;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .feature-card .feature-title .icon {
+    width: 32px;
+    height: 32px;
+    background: #eff6ff;
+    color: #3182F6;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .feature-card .what {
+    font-size: 14px;
+    color: #4b5563;
+    margin: 0 0 14px;
+    padding-left: 42px;
+  }
+  .feature-card .detail-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 6px 16px;
+    margin-top: 8px;
+    font-size: 13px;
+    padding-left: 42px;
+  }
+  .feature-card .detail-grid dt {
+    font-weight: 700;
+    color: #6b7280;
+  }
+  .feature-card .detail-grid dd {
+    margin: 0;
+    color: #374151;
+  }
+
+  /* Topic for discussion */
+  .topic {
+    border-left: 4px solid #3182F6;
+    background: #f9fafb;
+    border-radius: 0 12px 12px 0;
+    padding: 20px 24px;
+    margin: 18px 0;
+  }
+  .topic .topic-num {
+    display: inline-block;
+    background: #3182F6;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .topic h3 {
+    margin: 4px 0 12px;
+    font-size: 18px;
+    color: #191F28;
+  }
+  .topic .why {
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+  }
+  .topic .why strong { color: #191F28; }
+  .topic .decisions {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 12px;
+  }
+  .topic .decisions .label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #b45309;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .topic .decisions ul { margin: 4px 0 0; }
+
+  /* Inline highlight */
+  .hl {
+    background: #fef3c7;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  /* Quote-like callout */
+  .callout {
+    background: #eff6ff;
+    border-left: 3px solid #3182F6;
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 12px 0;
+    font-size: 14px;
+    color: #1e40af;
+  }
+  .callout strong { color: #191F28; }
+
+  /* Decision area */
+  .decision-area {
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 18px;
+    margin: 8px 0 16px;
+    min-height: 70px;
+  }
+  .decision-area .placeholder {
+    color: #9ca3af;
+    font-style: italic;
+    font-size: 13px;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 12px;
+    margin-top: 40px;
+    padding: 20px 0;
+  }
+
+  /* Print */
+  @media print {
+    @page { size: A4; margin: 12mm 14mm; }
+
+    body {
+      background: #fff;
+      padding: 0;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    .container { max-width: 100%; }
+
+    /* 그림자 제거 */
+    .card, .meeting-header, .toc { box-shadow: none; }
+
+    /* ── 페이지 1: 헤더 + 목차 한 화면에 ── */
+    .meeting-header {
+      padding: 22px 26px;
+      margin-bottom: 14px;
+      background: #3182F6 !important;
+      color: #fff !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid-page;
+    }
+    .meeting-header .label { font-size: 10px; padding: 3px 10px; margin-bottom: 8px; }
+    .meeting-header h1 { font-size: 20px; margin: 0 0 6px; }
+    .meeting-header .subtitle { font-size: 12px; }
+    .meta-grid { margin-top: 14px; padding-top: 12px; gap: 10px; }
+    .meta-item .meta-label { font-size: 9px; }
+    .meta-item .meta-value { font-size: 12px; }
+
+    .toc {
+      padding: 14px 22px;
+      margin-bottom: 0;
+      page-break-inside: avoid;
+      page-break-before: avoid;
+      break-before: avoid-page;
+    }
+    .toc h3 { font-size: 11px; margin: 0 0 10px; }
+    .toc-grid { gap: 2px 18px; }
+    .toc a { padding: 2px 0; font-size: 11px; border-bottom: none; }
+    .toc a .num { font-size: 10px; }
+
+    /* ── 각 Part는 새 페이지에서 시작 ── */
+    .part-divider {
+      page-break-before: always;
+      break-before: page;
+      margin: 0 0 14px;
+    }
+    .part-divider::before { display: none; }
+    .part-divider .part-label {
+      background: #fff;
+      font-size: 10px;
+      padding: 0;
+    }
+
+    /* 결정 사항도 새 페이지 */
+    #decisions { page-break-before: always; break-before: page; }
+
+    /* ── 카드 일반 ── */
+    .card {
+      padding: 18px 24px;
+      margin-bottom: 12px;
+    }
+
+    /* ── 헤딩이 페이지 끝에 외롭게 남지 않도록 ── */
+    h2 { page-break-after: avoid; break-after: avoid-page; font-size: 16px; margin: 0 0 12px; }
+    h3 { page-break-after: avoid; break-after: avoid-page; font-size: 13px; margin: 18px 0 8px; }
+    h4 { page-break-after: avoid; break-after: avoid-page; font-size: 12px; margin: 12px 0 4px; }
+
+    /* ── 단위 박스가 중간에 끊기지 않도록 ── */
+    .feature-card,
+    .topic,
+    .glossary-card,
+    .flow-step,
+    .callout,
+    .decision-area,
+    .topic .why,
+    .topic .decisions {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* 흐름 도식 */
+    .flow {
+      padding: 14px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .flow-step .step-label { font-size: 9px; }
+    .flow-step .step-name { font-size: 12px; }
+    .flow-step .step-desc { font-size: 10px; }
+
+    /* 글로서리 카드 컴팩트 */
+    .glossary-grid { gap: 8px; }
+    .glossary-card { padding: 10px 12px; }
+    .glossary-card .term { font-size: 12px; }
+    .glossary-card .def { font-size: 11px; }
+
+    /* 의제 카드 컴팩트 */
+    .topic { padding: 14px 18px; margin: 12px 0; }
+    .topic h3 { font-size: 14px; }
+    .topic .why, .topic .decisions { padding: 10px 12px; font-size: 11px; }
+
+    /* 기능 카드 컴팩트 */
+    .feature-card { padding: 14px 18px; margin: 12px 0; }
+    .feature-card .feature-title { font-size: 14px; }
+    .feature-card .what { font-size: 12px; }
+    .feature-card .detail-grid { font-size: 11px; gap: 4px 14px; }
+
+    .footer { margin-top: 14px; padding: 8px 0; }
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    body { padding: 16px 12px 40px; font-size: 14px; }
+    .meeting-header { padding: 28px 22px; }
+    .meeting-header h1 { font-size: 22px; }
+    .card { padding: 22px 20px; }
+    .flow { flex-direction: column; }
+    .flow-step::after { content: '↓'; right: 50%; top: auto; bottom: -16px; transform: translateX(50%); }
+    .feature-card .what,
+    .feature-card .detail-grid { padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="meeting-header">
+    <span class="label">📋 첫 운영 회의</span>
+    <h1>SEAERP 시스템 소개 + 운영 결정 사항 회의</h1>
+    <p class="subtitle">시스템을 처음 보는 팀원도 이해할 수 있도록 — 무엇을 만들었고, 무엇을 함께 결정해야 하는지</p>
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">일자</div>
+        <div class="meta-value">2026.05.07 (목)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">예상 소요</div>
+        <div class="meta-value">90~120분</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">목적</div>
+        <div class="meta-value">테스트 운영 시작 합의</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">참석</div>
+        <div class="meta-value">전체 팀</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOC -->
+  <nav class="toc">
+    <h3>목차</h3>
+    <div class="toc-grid">
+      <div>
+        <a href="#part-a"><span class="num">A.</span> 시스템 소개 (15분)</a>
+        <a href="#a-what">A.1 SEAERP가 무엇인가</a>
+        <a href="#a-flow">A.2 데이터의 흐름</a>
+        <a href="#a-glossary">A.3 핵심 용어 사전</a>
+        <a href="#a-day">A.4 하루의 흐름</a>
+      </div>
+      <div>
+        <a href="#part-b"><span class="num">B.</span> 기능 설명서 (30분)</a>
+        <a href="#b-inbound">B.1 입고 (들어오는 재고)</a>
+        <a href="#b-outbound">B.2 출고 (나가는 재고)</a>
+        <a href="#b-transfer">B.3 재고 이동</a>
+        <a href="#b-expense">B.4 지출결의</a>
+        <a href="#b-approval">B.5 결재 시스템</a>
+        <a href="#b-search">B.6 재고 조회</a>
+        <a href="#b-report">B.7 일일 정산 메일</a>
+        <a href="#b-master">B.8 마스터 데이터</a>
+        <a href="#b-worker">B.9 작업자 / PIN</a>
+      </div>
+      <div>
+        <a href="#part-c"><span class="num">C.</span> 운영 결정 의제 (60분)</a>
+        <a href="#c-1">C.1 마스터 데이터 확정</a>
+        <a href="#c-2">C.2 보관처 운영 정책</a>
+        <a href="#c-3">C.3 보관처 비용 이력</a>
+        <a href="#c-4">C.4 매입처 마스터</a>
+        <a href="#c-5">C.5 품목마스터 / 갈치</a>
+        <a href="#c-6">C.6 결재 정책</a>
+        <a href="#c-7">C.7 작업자 / PIN 운영</a>
+        <a href="#c-8">C.8 데이터 점검 책임</a>
+        <a href="#c-9">C.9 일일 보고서 운영</a>
+        <a href="#c-10">C.10 향후 우선순위</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- PART A: 시스템 소개                                    -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <div class="part-divider">
+    <span class="part-label">Part A — 시스템 소개</span>
+  </div>
+
+  <section class="card" id="part-a">
+
+    <h2 id="a-what"><span class="num">A.1</span> SEAERP가 무엇인가</h2>
+    <p><strong>SEAERP는 수산물 입출고 · 재고 · 비용을 관리하는 자체 ERP 시스템입니다.</strong></p>
+    <p>핵심은 <span class="hl">LOT 단위로 재고를 추적하고, 출고 시점에 그 LOT에 들어간 모든 비용을 합산해 손익을 자동으로 계산</span>하는 것. 매입처에서 들여온 수산물이 어디 보관됐고, 얼마에 사서 얼마에 팔렸고, 그 사이에 든 보관 비용이 얼마인지 — 이걸 LOT 하나하나 단위로 따라갈 수 있게 만든 시스템입니다.</p>
+    <div class="callout">
+      <strong>왜 만들었나</strong> — 수기/엑셀로는 LOT별 비용 추적과 손익 계산이 너무 번거롭고, 누락이 잦았음. 작업자가 핸드폰에서 입출고 신청하고, 관리자가 결재만 누르면 재고가 자동 차감되고 손익까지 계산되는 흐름이 목표.
+    </div>
+
+    <h2 id="a-flow"><span class="num">A.2</span> 데이터의 흐름</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="step-label">Step 1</div>
+        <div class="step-name">매입처</div>
+        <div class="step-desc">수산물을 사오는 거래처</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-label">Step 2</div>
+        <div class="step-name">입고 신청 → 승인</div>
+        <div class="step-desc">LOT 자동 생성, 보관처 비용 적용</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-label">Step 3</div>
+        <div class="step-name">보관처</div>
+        <div class="step-desc">냉동창고 등에서 보관, 보관일수만큼 냉장료 누적</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-label">Step 4</div>
+        <div class="step-name">출고 신청 → 승인</div>
+        <div class="step-desc">재고 차감, 출고시점 비용 7개 필드 스냅샷, 손익 계산</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-label">Step 5</div>
+        <div class="step-name">거래처 (출고)</div>
+        <div class="step-desc">판매 완료, 손익 확정</div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#6b7280;margin-top:8px;">중간에 보관처를 바꾸고 싶으면 <strong>재고 이동</strong>으로 처리. 회사 운영비는 별도 <strong>지출결의</strong>로 관리.</p>
+
+    <h2 id="a-glossary"><span class="num">A.3</span> 핵심 용어 사전</h2>
+    <p style="color:#6b7280;">이 단어들이 회의 중 계속 나옵니다. 미리 한 번 보고 가시면 좋습니다.</p>
+    <div class="glossary-grid">
+      <div class="glossary-card">
+        <div class="term">LOT</div>
+        <div class="def">한 번에 들여온 동일한 품목·규격의 재고 묶음. 모든 추적의 기본 단위.<br><span style="color:#9ca3af;">예: 260507-MC1-11-26-0042</span></div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">LOT번호</div>
+        <div class="def">YYMMDD-품목코드-규격-미수-일련번호 형식. 입고 승인 시 자동 생성.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">보관처</div>
+        <div class="def">재고를 보관하는 창고/위치. 보관처마다 냉장료·입출고비·노조비가 다름.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">매입처</div>
+        <div class="def">수산물을 사오는 거래처.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">미수</div>
+        <div class="def">평균 마릿수. 1박스에 평균 몇 마리가 들어있는지를 나타내는 숫자. 품목·규격마다 다름.<br><span style="color:#9ca3af;">예: "26"이면 1박스에 평균 26마리</span></div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">박스</div>
+        <div class="def">기본 거래 단위. 입고/출고 모두 박스 수로 처리.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">잔여수량</div>
+        <div class="def">현재 LOT에서 더 출고할 수 있는 박스 수. 출고 승인 시 자동 차감.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">결재</div>
+        <div class="def">신청을 승인 또는 반려하는 작업. 승인 시 재고/비용 자동 처리.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">수매가</div>
+        <div class="def">매입처에서 수산물을 사올 때 지불한 박스당 가격. LOT별로 저장.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">판매원가</div>
+        <div class="def">출고 시점의 단가 + 누적냉장료 + 입출고비 + 노조비 합산. 손익 계산의 기준.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">손익</div>
+        <div class="def">판매금액 − 판매원가. 출고 승인 시점에 자동 계산되어 출고 관리에 저장.</div>
+      </div>
+      <div class="glossary-card">
+        <div class="term">PIN</div>
+        <div class="def">작업자별 4자리 비밀번호. 로그인 시 사용.</div>
+      </div>
+    </div>
+
+    <h2 id="a-day"><span class="num">A.4</span> 하루의 흐름</h2>
+    <div class="callout">
+      <strong>아침 09:00</strong> — 관리자에게 일일 정산 메일 도착 (어제 처리분 + 결재 대기 알림)
+    </div>
+    <ol>
+      <li><strong>작업자</strong> — 핸드폰으로 SEAERP 접속, PIN으로 로그인. 들어온 수산물은 입고 신청, 나갈 수산물은 출고 신청, 보관처 옮길 건 이동 신청.</li>
+      <li><strong>관리자</strong> — 결재 수신함에서 신청 건 확인 후 승인 또는 반려. 100만원 미만 지출은 ADMIN이 즉시 승인 가능, 100만원 이상은 MASTER 권한 필요.</li>
+      <li><strong>승인 즉시 자동 처리</strong> — LOT 생성 / 재고 차감 / 비용 적용 / 손익 계산 / PDF 생성 모두 자동.</li>
+      <li><strong>잘못 결재한 경우</strong> — 완료 탭에서 카드 클릭해 승인 ↔ 반려 토글 가능. 재고도 자동 복구됨.</li>
+      <li><strong>저녁/익일 09:00</strong> — 일일 정산 메일에서 어제 흐름 + 손익 한눈에 확인.</li>
+    </ol>
+
+  </section>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- PART B: 기능 설명서                                    -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <div class="part-divider">
+    <span class="part-label">Part B — 기능 설명서</span>
+  </div>
+
+  <section class="card" id="part-b">
+    <p style="color:#6b7280;margin-top:0;">현재 시스템에 구현된 기능을 하나씩. 각 기능의 <strong>"무엇을 한다 → 어떻게 사용한다 → 자동으로 처리되는 부분"</strong> 순서로 정리.</p>
+
+    <!-- B.1 입고 -->
+    <div class="feature-card" id="b-inbound">
+      <div class="feature-title">
+        <span class="icon">📥</span>
+        B.1 입고 (들어오는 재고)
+      </div>
+      <p class="what">매입처에서 수산물을 사와서 회사 보관처에 들이는 작업.</p>
+      <dl class="detail-grid">
+        <dt>누가</dt><dd>작업자가 신청, 관리자가 승인</dd>
+        <dt>입력 정보</dt><dd>매입처, 매입자, 선박명, 품목, 규격, 미수, 박스 수, 보관처, 수매가, 입고일</dd>
+        <dt>승인 시 자동</dt><dd>LOT번호 자동 생성 / 보관처 비용 자동 적용 (냉장료·입출고비·노조비) / 입고증 PDF 자동 발행</dd>
+        <dt>반려 시 자동</dt><dd>LOT 재고수량을 0으로 (LOT 자체는 보존) / 비용 필드 클리어</dd>
+        <dt>특이사항</dt><dd>승인 ↔ 반려 양방향 변경 가능 — 재승인하면 모든 데이터 자동 복원</dd>
+      </dl>
+    </div>
+
+    <!-- B.2 출고 -->
+    <div class="feature-card" id="b-outbound">
+      <div class="feature-title">
+        <span class="icon">📤</span>
+        B.2 출고 (나가는 재고)
+      </div>
+      <p class="what">보관 중인 재고를 거래처로 판매 출하하는 작업.</p>
+      <dl class="detail-grid">
+        <dt>누가</dt><dd>작업자가 신청, 관리자가 승인</dd>
+        <dt>검색 방식</dt><dd>LOT번호 또는 품목명으로 검색 → 다건 카트에 담아 묶음 신청</dd>
+        <dt>입력 정보</dt><dd>출고일, 거래처, LOT별 박스 수, 판매가</dd>
+        <dt>승인 시 자동</dt><dd>LOT 재고 차감 / 잔여수량 차감 / <strong>출고시점 비용 7개 스냅샷 저장</strong> (단가/냉장료/보관일수/입출고비/노조비/판매원가/손익) / 출고증 PDF</dd>
+        <dt>반려 시 자동</dt><dd>잔여수량 +복구 / LOT 재고 +복구 / 비용 7개 클리어</dd>
+        <dt>왜 스냅샷?</dt><dd>출고한 후에 보관처 비용이 바뀌어도 그 출고 건의 손익은 그대로 보존되어야 하기 때문</dd>
+      </dl>
+    </div>
+
+    <!-- B.3 이동 -->
+    <div class="feature-card" id="b-transfer">
+      <div class="feature-title">
+        <span class="icon">🔄</span>
+        B.3 재고 이동 (보관처 변경)
+      </div>
+      <p class="what">한 보관처에 있던 재고 일부를 다른 보관처로 옮기는 작업.</p>
+      <dl class="detail-grid">
+        <dt>누가</dt><dd>작업자가 신청, 관리자가 승인</dd>
+        <dt>입력 정보</dt><dd>원본 LOT, 이동 후 보관처, 이동 박스 수</dd>
+        <dt>승인 시 자동</dt><dd>새 입고관리/LOT 자동 생성 (이동분, 비고="재고 이동") / 원본 LOT 차감 / 새 LOT의 수매가는 비례 계산 (원본 비용 × 이동수량/원본 재고수량)</dd>
+        <dt>주의사항</dt><dd><span class="badge medium">미구현</span> 반려 자동 복구는 LOT 중복 생성 위험으로 미구현. 발생 시 관리자가 수동 보정 필요. 사용 빈도 낮으므로 의도된 결정.</dd>
+      </dl>
+    </div>
+
+    <!-- B.4 지출 -->
+    <div class="feature-card" id="b-expense">
+      <div class="feature-title">
+        <span class="icon">💸</span>
+        B.4 지출결의
+      </div>
+      <p class="what">회사 운영비/잡비 등을 결재로 처리.</p>
+      <dl class="detail-grid">
+        <dt>누가</dt><dd>작업자가 신청, 관리자(ADMIN/MASTER)가 승인</dd>
+        <dt>입력 정보</dt><dd>지출일, 계정과목, 금액, 사용 내역, 영수증 (사진 업로드)</dd>
+        <dt>권한 분리</dt><dd><strong>100만원 미만</strong> → ADMIN(관리자) 승인 가능<br><strong>100만원 이상</strong> → MASTER(전결권자) 승인 가능</dd>
+        <dt>승인 시 자동</dt><dd>지출결의서 PDF 자동 발행</dd>
+      </dl>
+    </div>
+
+    <!-- B.5 결재 -->
+    <div class="feature-card" id="b-approval">
+      <div class="feature-title">
+        <span class="icon">✅</span>
+        B.5 결재 시스템
+      </div>
+      <p class="what">신청 건을 검토해 승인 또는 반려하는 통합 도구.</p>
+      <dl class="detail-grid">
+        <dt>화면 구성</dt><dd>결재 수신함 = "펜딩(처리 대기)" / "완료(최근 2주)" 탭</dd>
+        <dt>처리 방식</dt><dd>카드 클릭 → 액션 시트 → 승인 또는 반려<br>반려 시 사유 입력 필수</dd>
+        <dt>양방향 변경</dt><dd>완료 탭에서도 카드 클릭 → 승인을 반려로, 반려를 승인으로 토글 가능. 재고/비용 자동 복구.</dd>
+        <dt>안전장치</dt><dd>100만원 권한은 서버에서 한 번 더 검증 (브라우저 우회 차단)</dd>
+      </dl>
+    </div>
+
+    <!-- B.6 재고 조회 -->
+    <div class="feature-card" id="b-search">
+      <div class="feature-title">
+        <span class="icon">🔍</span>
+        B.6 재고 조회
+      </div>
+      <p class="what">현재 보관 중인 재고를 검색하고, 묶음 출고/이동까지 한 번에.</p>
+      <dl class="detail-grid">
+        <dt>3단계 흐름</dt><dd>① 조건 검색 (품목/규격/보관처) → ② LOT별 수량 선택 → ③ 견적 요약 후 출고/이동 신청</dd>
+        <dt>편의 기능</dt><dd>QR 스캔으로 LOT 즉시 추가 / 검색 조건 URL 동기화로 새로고침해도 결과 유지 / 풀수량 체크박스</dd>
+        <dt>위치</dt><dd>출고 페이지·이동 페이지 헤더 우상단 QR 미니버튼</dd>
+      </dl>
+    </div>
+
+    <!-- B.7 일일 정산 -->
+    <div class="feature-card" id="b-report">
+      <div class="feature-title">
+        <span class="icon">📧</span>
+        B.7 일일 정산 메일
+      </div>
+      <p class="what">매일 아침 09:00에 어제 처리분과 결재 대기 현황을 이메일로 자동 발송.</p>
+      <dl class="detail-grid">
+        <dt>수신자</dt><dd>관리자 (ALERT_EMAIL_TO 환경변수에 등록된 주소)</dd>
+        <dt>포함 내용</dt><dd>어제 승인된 입고/출고/이동/지출 상세 표 / 손익 추정 (출고가 합 − 입고가 합 − 지출 합) / 결재 대기 (어제 신청 미결 / 그 외 누적, 24h 미처리는 강조)</dd>
+        <dt>발송 시각</dt><dd>매일 09:00 KST (Vercel 자동 cron)</dd>
+        <dt>현재 이슈</dt><dd><span class="badge high">테스트 중</span> 도메인 mismatch로 본문 링크 제거 후 재배포 완료. 5/8 아침 도착 여부 확인 필요.</dd>
+      </dl>
+    </div>
+
+    <!-- B.8 마스터 데이터 -->
+    <div class="feature-card" id="b-master">
+      <div class="feature-title">
+        <span class="icon">🗃️</span>
+        B.8 마스터 데이터 (시스템의 뼈대)
+      </div>
+      <p class="what">입고/출고/이동/지출이 모두 참조하는 기준 데이터. 마스터가 정확하지 않으면 모든 흐름이 어긋남.</p>
+      <dl class="detail-grid">
+        <dt>품목마스터</dt><dd>품목명 + 품목코드. <strong>LOT번호 생성에 필수</strong> (코드 없으면 LOT번호 생성 안 됨)</dd>
+        <dt>보관처 마스터</dt><dd>보관처명 + 위치. 입고 시 선택 가능한 보관처 목록의 원본</dd>
+        <dt>매입처 마스터</dt><dd>매입처 정보. 입고 시 자동완성 등에 사용</dd>
+        <dt>보관처 비용 이력</dt><dd>보관처별·시기별 냉장료/입출고비/노조비. 입고일 기준으로 자동 적용</dd>
+        <dt>작업자</dt><dd>직원 정보 + PIN + 권한 (작업자/관리자/마스터)</dd>
+        <dt>선박 정보 마스터</dt><dd><span class="badge low">예정</span> 매입 시 선박명 추적용 (현재 자유 입력)</dd>
+      </dl>
+    </div>
+
+    <!-- B.9 작업자 -->
+    <div class="feature-card" id="b-worker">
+      <div class="feature-title">
+        <span class="icon">👤</span>
+        B.9 작업자 / PIN / 권한
+      </div>
+      <dl class="detail-grid">
+        <dt>로그인</dt><dd>작업자 카드 선택 → 4자리 PIN 입력</dd>
+        <dt>권한 단계</dt><dd><strong>작업자</strong> (신청만) / <strong>관리자</strong> (승인 + 100만원 미만 지출) / <strong>마스터</strong> (모두)</dd>
+        <dt>PIN 보안</dt><dd>scrypt 해시 저장 (평문 노출 0). 5회 틀리면 5분 잠김, 다시 5회 틀리면 30분 잠김</dd>
+        <dt>자동 로그아웃</dt><dd>일정 시간 후 자동 로그아웃 — <strong>5분 전 상단 배너로 사전 경고</strong>, "로그인 연장" 버튼 제공 (1분 이하 시 빨간 강조)</dd>
+      </dl>
+    </div>
+
+  </section>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- PART C: 운영 결정 의제                                  -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <div class="part-divider">
+    <span class="part-label">Part C — 운영 결정 의제</span>
+  </div>
+
+  <section class="card" id="part-c">
+    <p style="margin-top:0;color:#6b7280;">시스템 자체보다 <strong>"우리가 어떻게 운영할 것인가"</strong>에 대한 의사결정 항목들. 각 의제마다 <span style="color:#3182F6;font-weight:700;">왜 결정해야 하는지</span> + <span style="color:#b45309;font-weight:700;">무엇을 결정할지</span>를 분리해서 정리.</p>
+
+    <!-- C.1 -->
+    <div class="topic" id="c-1">
+      <span class="topic-num">의제 1</span>
+      <h3>마스터 데이터 — 왜 지금 확정해야 하는가</h3>
+      <div class="why">
+        <strong>현재 상황</strong>: 갈치 품목코드가 미정이어서 갈치 입고 16건의 LOT번호가 생성되지 않은 채 누적되어 있음. 200건 가량 옛 LOT에 보관처 비용이 누락된 상태일 가능성도 있음.
+        <p style="margin:8px 0 0;"><strong>왜 확정해야 하는가</strong>:</p>
+        <ul style="margin:4px 0 0;">
+          <li>품목코드가 없으면 LOT번호 생성이 안 되어 추적 불가</li>
+          <li>보관처 비용이 누락된 LOT는 출고 시 손익 계산이 부정확 (특정 비용이 0으로 처리됨)</li>
+          <li>운영 시작 후엔 매일 데이터가 쌓여서 "잘못된 시작값" 보정이 점점 어려워짐 — 지금이 cleanup 적기</li>
+        </ul>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li>운영에 사용할 <strong>품목 리스트 확정</strong> — 현재 품목마스터에 등록된 것 외에 추가/삭제할 품목?</li>
+          <li><strong>품목코드 체계</strong> — 현재 "MC1" 같은 약어. 갈치는 어떤 코드로? 누가 결정?</li>
+          <li><strong>신규 품목 등록 절차</strong> — 작업자가 자유 입력 가능 vs 사전 마스터 등록만 허용?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.2 -->
+    <div class="topic" id="c-2">
+      <span class="topic-num">의제 2</span>
+      <h3>보관처 운영 정책</h3>
+      <div class="why">
+        <strong>현재 상황</strong>: 보관처 비용 이력이 7~9건만 입력되어 있는 상태. 실제 회사가 거래하는 보관처가 정확히 몇 개인지, 비용 이력 누락이 얼마나 되는지 불명확.
+        <p style="margin:8px 0 0;"><strong>왜 정리해야 하는가</strong>:</p>
+        <ul style="margin:4px 0 0;">
+          <li>비용 이력이 없는 보관처에 입고하면 LOT의 비용 필드가 비어서 → 출고 시 손익 계산 부정확</li>
+          <li>사용 안 하는 보관처가 마스터에 남아있으면 작업자가 잘못 선택할 수 있음</li>
+          <li>보관처별 단가 변경 정책이 불분명하면 "옛날 LOT vs 새 LOT" 구분이 모호해짐</li>
+        </ul>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>실제 사용 보관처 수</strong> — 7~9개가 맞나? 더 많은가? Airtable 직접 확인 필요</li>
+          <li><strong>비활성 보관처 정리</strong> — 사용 안 하는 보관처 마스터에서 비활성/삭제할지</li>
+          <li><strong>비용 단가 변경 정책</strong> — 단가 바뀔 때 누가 비용 이력 행을 새로 추가? 적용시작/종료일은 누가 관리?</li>
+          <li><strong>새 보관처 추가 절차</strong> — 신규 계약 시 ① 마스터 등록 → ② 비용 이력 입력 (이 두 단계 누가 책임?)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.3 -->
+    <div class="topic" id="c-3">
+      <span class="topic-num">의제 3</span>
+      <h3>보관처 비용 이력 정리</h3>
+      <div class="why">
+        <strong>구조 설명</strong>: 보관처 비용 이력은 "냉장료, 입출고비, 노조비 3가지를 기간(시작일~종료일)별로 저장"하는 표. 입고 시 SEAERP가 자동으로 "이 LOT의 입고일에 적용되던 비용은 무엇인가"를 찾아서 LOT에 박아둠.
+        <p style="margin:8px 0 0;"><strong>현재 누락 가능 상태</strong>:</p>
+        <ul style="margin:4px 0 0;">
+          <li>지금 LOT 200건 가량이 보관처 비용이 안 박혀 있을 가능성 (4월 메모)</li>
+          <li>4/27에 보관처 Link 통일 작업 후 일부 자동 해소 가능성 — 미확인</li>
+          <li><strong>동결비</strong>는 코드상 출고 비용 계산에 등장하지만 보관처 비용 이력 표에 컬럼이 없음. 별도로 어디에 입력하는 필드인지 정책 부재.</li>
+        </ul>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>현재 비용 이력 7~9건 vs 실제 필요한 수</strong> — 보관처 × 시기 조합으로 몇 건이 정상?</li>
+          <li><strong>누락 LOT 200건 보정 책임</strong> — 일괄 업데이트 누가? 어떤 기준?</li>
+          <li><strong>동결비 정책</strong> — 별도 마스터 없이 LOT마다 수기 입력? 아니면 새 마스터 만들어서 자동 적용?</li>
+          <li><strong>비용 이력 입력 책임자</strong> — 단가 협상 후 시스템 입력까지 누가 담당?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.4 -->
+    <div class="topic" id="c-4">
+      <span class="topic-num">의제 4</span>
+      <h3>매입처 마스터 운영</h3>
+      <div class="why">
+        <strong>현재</strong>: 매입처가 마스터로 분리되어 있어 입고 시 선택 가능. 매입자/선박명도 함께 추적 가능한 구조.
+        <p style="margin:8px 0 0;">매입처 정보가 정확하지 않으면 추후 거래처 분석(어디서 가장 많이 사오나, 매입처별 평균 단가 등)이 불가.</p>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>현재 등록된 매입처 수</strong> 확인 + 활성/비활성 정리</li>
+          <li><strong>신규 매입처 발생 시 절차</strong> — 사전 등록 강제 vs 입고 시 즉석 등록 허용</li>
+          <li><strong>관리할 매입처 정보 범위</strong> — 이름만? 대표자/연락처/사업자번호도?</li>
+          <li><strong>선박명 마스터화 여부</strong> — 현재 자유 입력. 선박 정보 마스터 도입 시점?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.5 -->
+    <div class="topic" id="c-5">
+      <span class="topic-num">의제 5</span>
+      <h3>품목마스터 — 갈치 사례 처리</h3>
+      <div class="why">
+        <strong>현황</strong>: 갈치 품목코드 미확정 → LOT 16건이 LOT번호 없이 입고됨.
+        <p style="margin:8px 0 0;"><strong>고려 사항</strong>:</p>
+        <ul style="margin:4px 0 0;">
+          <li>이 16건은 출고는 가능하나 LOT번호로 추적이 어려움</li>
+          <li>품목코드 정한 후 16건에 사후 LOT번호 부여 vs 그대로 두기 양자택일</li>
+          <li>이 사례는 "신규 품목 발생 시 즉석 처리 vs 사전 절차" 원칙을 정해두면 재발 방지</li>
+        </ul>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>갈치 품목코드</strong> 확정 (예: GC, GAL 등)</li>
+          <li><strong>16건 사후 처리 방안</strong> — 수기 LOT번호 부여? 비고 마킹 후 그대로?</li>
+          <li><strong>"신규 품목" 등록 표준 절차</strong> — 누가, 어떤 정보로, 어디에 알려야 하나</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.6 -->
+    <div class="topic" id="c-6">
+      <span class="topic-num">의제 6</span>
+      <h3>결재 정책 — 권한 / 임계값 / 양방향 변경</h3>
+      <div class="why">
+        <strong>현재 정책</strong>: 100만원 미만 지출은 ADMIN, 100만원 이상은 MASTER가 즉시 승인 가능. 결재 후에도 양방향 변경(승인↔반려 토글) 가능.
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>100만원 임계값</strong> — 회사 규모에 적정한가? 50만원/200만원 등 다른 기준?</li>
+          <li><strong>MASTER 권한자</strong> — 현재 누가 보유? 부재 시 대체 권한 정책?</li>
+          <li><strong>반려 사유 작성 가이드라인</strong> — 단순 "내용 부적절" 금지, 구체적 사유 강제 등 규칙?</li>
+          <li><strong>양방향 변경 권한 범위</strong> — 모든 관리자 가능 vs 마스터만 가능? (실수 시 데이터 의도와 다르게 변경됨)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.7 -->
+    <div class="topic" id="c-7">
+      <span class="topic-num">의제 7</span>
+      <h3>작업자 / PIN 운영 정책</h3>
+      <div class="why">
+        <strong>보안 기능</strong>: PIN scrypt 해시화 + 5회 실패 시 5분 잠금, 다시 5회 시 30분 잠금. 자동 로그아웃 5분 전 경고 배너.
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>신규 작업자 등록 절차</strong> — PIN 발급은 누가? 권한 부여 기준은?</li>
+          <li><strong>퇴사 작업자 처리</strong> — Airtable에서 비활성 vs 완전 삭제? (과거 신청 기록 보존 위해 비활성 권장)</li>
+          <li><strong>PIN 분실/잠금 대응</strong> — 30분 기다림 vs 관리자가 즉시 잠금 해제? 잠금 해제는 누가?</li>
+          <li><strong>PIN 정기 변경</strong> — 현재 변경 정책 없음. 도입 여부?</li>
+          <li><strong>PIN 잠금 안내</strong> — 작업자에게 "5회 실패 시 잠금"을 어떻게 사전 안내?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.8 -->
+    <div class="topic" id="c-8">
+      <span class="topic-num">의제 8</span>
+      <h3>데이터 정합성 점검 책임</h3>
+      <div class="why">
+        <strong>왜 필요한가</strong>: 시스템이 자동으로 처리하지만 100% 보장은 아님. 결재 처리 중 일시적 네트워크 오류, 동시 작업으로 인한 충돌 등 드물게 발생. 발생 시 알림이 시스템 로그에 남고, 누군가 보고 수동 보정해야 함.
+        <p style="margin:8px 0 0;">정기 점검 없이 운영하면 작은 오류가 쌓여서 손익 계산이 점점 부정확해지는 위험.</p>
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>일일 점검 담당자</strong> — 매일 누가 시스템 알림 확인? 관리자/마스터?</li>
+          <li><strong>점검 시각</strong> — 일일 보고서 도착(09:00) 후 09:30? 다른 시각?</li>
+          <li><strong>이상 발견 시 대응 채널</strong> — 카톡/슬랙/메일 중 어디로 공유?</li>
+          <li><strong>월간 정기 점검</strong> — Airtable 직접 들여다보면서 LOT 누락/비용 누락 확인하는 루틴 도입?</li>
+          <li><strong>백업 정책</strong> — Airtable 자체 백업 외에 별도 외부 백업 필요한가?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.9 -->
+    <div class="topic" id="c-9">
+      <span class="topic-num">의제 9</span>
+      <h3>일일 보고서 운영</h3>
+      <div class="why">
+        <strong>현재</strong>: 매일 09:00 KST에 어제 처리분 + 결재 대기 + 손익 추정이 이메일로 발송. 5/7 도메인 mismatch 이슈 발견 후 본문 링크 제거하여 deliverability 개선 시도 중.
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것</span>
+        <ul>
+          <li><strong>수신자 추가 여부</strong> — 현재 1명? 마스터까지 포함? 회계 담당까지?</li>
+          <li><strong>도착 안 됐을 때 알아채는 방법</strong> — 받지 못하면 누가 신고? 일주일 안 와도 모를 위험?</li>
+          <li><strong>추가 항목 우선순위</strong> — 반려 건수 / 데이터 누락 LOT 건수 / 잠금 발생 사용자 — 어떤 게 가장 중요?</li>
+          <li><strong>보고서 시간대</strong> — 09:00이 적정한가? 출근 직후 너무 이른가?</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- C.10 -->
+    <div class="topic" id="c-10">
+      <span class="topic-num">의제 10</span>
+      <h3>향후 우선순위 (비즈니스 관점)</h3>
+      <div class="why">
+        현재 SEAERP는 입출고/이동/지출 + 결재 + 보고가 갖춰진 1차 완성 단계. 1~2주 운영 후 다음 단계로 무엇을 우선할지가 회사 운영 효율성에 큰 영향.
+      </div>
+      <div class="decisions">
+        <span class="label">🎯 결정해야 할 것 (1주 운영 후 회고 시 함께)</span>
+        <ul>
+          <li><strong>FIFO 평단가 시스템</strong> — 같은 품목·규격이라도 입고 시기별 평단가 자동 계산. 도입 우선도?</li>
+          <li><strong>부자재 재고 확장</strong> — 포장지, 아이스팩 등도 SEAERP에서 관리?</li>
+          <li><strong>바코드/QR 출고 자동화</strong> — 현재 QR로 LOT 호출까지. 출고 자동 완료까지 확장?</li>
+          <li><strong>팩스 자동 발송</strong> — 거래처에 자동으로 거래명세서 팩스 전송 기능 도입 우선도?</li>
+          <li><strong>기기별 고정 로그인</strong> — 매번 PIN 입력 대신 기기 인증으로 자동 로그인?</li>
+          <li><strong>안정화 vs 신규 기능</strong> — 1주차 발견 이슈 보강 vs 신규 기능 추가 — 어디에 시간 더 쓸지?</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═════════════════════════════════════════════════════ -->
+  <!-- 결정 사항 기록                                          -->
+  <!-- ═════════════════════════════════════════════════════ -->
+  <section class="card" id="decisions">
+    <h2><span class="num">✓</span> 결정 사항 / Follow-up</h2>
+    <p style="color:#6b7280;margin-top:0;">회의 중 합의된 내용을 기록. 누가 무엇을 언제까지 처리할지.</p>
+
+    <h4>의제 1 — 마스터 데이터 확정</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 2 — 보관처 운영 정책</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 3 — 보관처 비용 이력 정리</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 4 — 매입처 마스터</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 5 — 품목마스터 / 갈치</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 6 — 결재 정책</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 7 — 작업자 / PIN 운영</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 8 — 데이터 점검 책임</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 9 — 일일 보고서 운영</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+    <h4>의제 10 — 향후 우선순위</h4>
+    <div class="decision-area"><span class="placeholder">→ 회의 중 작성</span></div>
+
+  </section>
+
+  <p class="footer">
+    SEAERP — 1인 기획/개발 + Claude Code · 2026.05.07 작성<br>
+    이 문서는 시스템을 처음 보는 팀원도 회의 중 자체적으로 따라올 수 있도록 작성됨
+  </p>
+
+</div>
+</body>
+</html>
