@@ -11,3 +11,10 @@ node_modules
 tsconfig.tsbuildinfo
 .DS_Store
 ._*.env*.local
+
+# Obsidian (개인 작업 캐시 - 동기화 충돌 방지)
+obsidian-vault/.obsidian/workspace
+obsidian-vault/.obsidian/workspace.json
+obsidian-vault/.obsidian/cache
+obsidian-vault/.trash/
+obsidian-vault/.obsidian/plugins/*/data.json
