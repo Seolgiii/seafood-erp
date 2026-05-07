@@ -289,7 +289,7 @@ export default function InventoryRecordPage() {
           <section className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-2">
-                <label className="text-[14px] font-bold text-gray-500 ml-1">매입처 (출발)</label>
+                <label className="text-[14px] font-bold text-gray-500 ml-1">매입처</label>
                 <div ref={supplierRef} className="relative">
                   <input
                     type="text"
@@ -312,7 +312,7 @@ export default function InventoryRecordPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-[14px] font-bold text-gray-500 ml-1">보관처 (도착)</label>
+                <label className="text-[14px] font-bold text-gray-500 ml-1">보관처</label>
                 <div ref={storageRef} className="relative">
                   <input
                     type="text"
