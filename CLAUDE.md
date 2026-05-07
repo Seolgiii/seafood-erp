@@ -4,9 +4,9 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-07)
-- 일일 보고서 미도착 원인 = 발송 도메인 vs 본문 링크 mismatch (Resend Insights 확정). CTA 링크 제거로 임시 deliverability 개선
+- 일일 보고서 deliverability 임시 fix (도메인 mismatch → CTA 링크 제거) + 첫 운영 회의 자료 HTML 작성 (meeting-2026-05-07.html)
 - 입고 폼 라벨 단순화: "매입처 (출발)" / "보관처 (도착)" → "매입처" / "보관처"
-- 첫 운영 회의 자료 HTML 작성 (meeting-2026-05-07.html) — 시스템 소개 + 기능 설명서 + 운영 결정 의제 10개
+- SEAERP Obsidian vault 구조화 — 모듈 20 + 결정 41 노트 일괄 생성 + 모듈↔결정 양방향 [[wiki-link]] 연결
 
 ■ 핵심 도메인 흐름
 - 입고: 신청 → 승인 대기 → 관리자 승인 → LOT별 재고 생성/반영 + 보관처 비용 적용 + 입고증 PDF
