@@ -1,0 +1,59 @@
+{
+  "items": [
+    {
+      "type": "group",
+      "ctime": 1778215785610,
+      "items": [],
+      "title": "무제 그룹"
+    },
+    {
+      "type": "graph",
+      "ctime": 1778215786864,
+      "title": "Graph View",
+      "options": {
+        "collapse-filter": false,
+        "search": "",
+        "showTags": false,
+        "showAttachments": false,
+        "hideUnresolved": false,
+        "showOrphans": false,
+        "collapse-color-groups": false,
+        "colorGroups": [
+          {
+            "query": "path:30_모듈별_상세",
+            "color": {
+              "a": 1,
+              "rgb": 9958
+            }
+          },
+          {
+            "query": "path:50_시나리오",
+            "color": {
+              "a": 1,
+              "rgb": 2284553
+            }
+          },
+          {
+            "query": "path:40_결정기록",
+            "color": {
+              "a": 1,
+              "rgb": 9078149
+            }
+          }
+        ],
+        "collapse-display": true,
+        "showArrow": false,
+        "textFadeMultiplier": 0,
+        "nodeSizeMultiplier": 1,
+        "lineSizeMultiplier": 1,
+        "collapse-forces": false,
+        "centerStrength": 0.518713248970312,
+        "repelStrength": 11.3585069444444,
+        "linkStrength": 0,
+        "linkDistance": 250,
+        "scale": 0.0078125,
+        "close": true
+      }
+    }
+  ]
+}

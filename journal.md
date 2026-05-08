@@ -281,6 +281,42 @@ UX (3건):
 
 ---
 
+### 2026-05-08
+
+**완료한 작업**
+- `/wrap-up` 회사 PC dry run 검증 — vault 경로 불일치(`~/seafood-erp/` 하드코드) 발견. `git rev-parse --show-toplevel` 기반 상대경로로 환경 독립화 (mac `seafood-erp` / Windows `.seaerp` 양쪽 동작) (`a9fb1ff`)
+- 옵시디언 vault 빈 폴더 4개 생성 (`20_단기과제_완료` / `21_중기과제_진행중` / `22_장기과제_예정` / `60_관계도`)
+- `60_관계도/` Mermaid 시범 3종 작성 — `ERP_핵심구조_큰그림.md`(graph TD subgraph 분류), `LOT_의존성_상세.md`(LOT 중심 의존), `입고_시나리오_플로우.md`(sequenceDiagram + flowchart)
+- `/wrap-up` 4.5-D 단계 신설 — 60_관계도/ 자동 갱신 (`98fe242`)
+  - 4.5-D-1: ERP_핵심구조_큰그림.md (3그룹 subgraph, mermaid 큰 그림)
+  - 4.5-D-2: 시나리오_플로우/{A1~A5}.md (sequenceDiagram 자동 생성, 트리거 첫 단어 → first actor 추출, `## 흐름` numbered step 파싱, link 없는 step은 `Note over` 폴백)
+  - 동일 내용 시 write 스킵(idempotent), 격리 안전장치(`sync_relations` 함수)
+- 큰 그림에 `조회 → 출고`, `조회 → 이동` edge 누락 보강 (A2/A3/A5 등장 흐름) (`8ef535f`)
+- 큰 그림 인프라 subgraph에 Airtable 노드(cylinder DB shape) + LOT/결재 점선 edge 추가 (`4f37755`)
+
+**결정 사항**
+- vault 경로는 `git rev-parse --show-toplevel` 기반 — `~/seafood-erp/` 하드코드 제거. 어느 환경에서든 ERP 루트 자동 감지
+- 4.5-D-1은 **create-if-missing** 정책 — 파일이 있으면 절대 건드리지 않음. 사용자 수동 편집 보존이 자동 갱신보다 우선 (시스템 구조 변경은 직접 파일 편집)
+- 4.5-D-2는 `## 흐름` 변경 감지 시만 갱신 — write_if_changed로 git diff 0 보장
+- first actor는 트리거 첫 줄 "X가/이 Y" 패턴 추출 (예: "작업자가 입고 폼 제출" → "작업자"). 흐름 step에 다른 actor 등장 시 추가 participant
+- Airtable은 `[(...)]` cylinder shape (DB 의미)로 인프라 subgraph에 표현. 모든 허브(LOT/결재) 점선 edge로 데이터 의존 표시
+
+**미해결 이슈**
+- 60_관계도 prototype 2개(`LOT_의존성_상세.md`, `입고_시나리오_플로우.md`)와 자동 생성 `시나리오_플로우/A1_*.md` 일부 중복 — 정리 검토 필요
+- B/C/D/E/F 시나리오는 시퀀스 다이어그램 자동화 미적용 (현재 A1~A5만)
+- 모듈 노트에서 Airtable 명시적 [[link]] 매핑 부재 (현재 plain text only)
+- `현재 진행 중` 4월 메모 3건(갈치/200건/품목마스터) 여전히 누적
+
+**다음 작업 후보**
+- 운영 회의 진행 + 합의된 cleanup (갈치 LOT 사후 처리 / 비용 이력 보충 / 매입처 마스터)
+- B/C/D/E/F 시나리오도 4.5-D-2 자동화 확장
+- 60_관계도 prototype 정리 (시나리오_플로우와 중복 제거)
+- 입고 승인 멱등 가드 추가 (출고와 동일 안전장치)
+- GitHub Actions에 `npm run test:all` 통합
+- QR 통합 LOT 페이지(/lot/{번호}) 구현 착수 시점 결정
+
+---
+
 ## 누적 통계 (2026-05-06 기준)
 
 - 70 커밋, 활동 8일
