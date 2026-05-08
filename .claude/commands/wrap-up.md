@@ -115,6 +115,60 @@ description: 오늘 작업을 journal.md에 정리하고 CLAUDE.md를 갱신한 
   - `**다음 작업 후보**` → `## 다음 후보`
 - 같은 날짜 파일이 이미 있으면 **덮어쓰기** (journal.md가 이미 보강 처리한 결과를 그대로 반영)
 
+### 4.5-D: 60_관계도/ 자동 갱신
+
+조건: `<repo-root>/obsidian-vault/60_관계도` 폴더가 존재할 때만 실행 (없으면 조용히 스킵)
+하위 폴더 `60_관계도/시나리오_플로우/`는 없으면 자동 생성.
+
+#### 4.5-D-1: ERP_핵심구조_큰그림.md (큰 그림)
+
+동작:
+- 대상 파일: `<repo-root>/obsidian-vault/60_관계도/ERP_핵심구조_큰그림.md`
+- 하드코딩 템플릿 — 3개 그룹(비즈니스 핵심 / 허브 / 인프라) + 모듈/시나리오 노드 + [[wiki-link]] 매핑
+- 매 실행 시 재생성 (파일 내용이 동일하면 디스크 write 스킵 — 불필요한 mtime 갱신 방지)
+
+#### 4.5-D-2: 시나리오_플로우/{A1~A5}.md (시퀀스 다이어그램)
+
+조건: 시나리오 노트의 `## 흐름` 섹션이 마지막 생성 이후 변경됐을 때만 (변경 없으면 스킵)
+동작:
+- 소스: `<repo-root>/obsidian-vault/50_시나리오/{A1~A5}_*.md`
+- 대상: `<repo-root>/obsidian-vault/60_관계도/시나리오_플로우/{A1~A5}_*.md`
+- 파싱:
+  1. `## 트리거` 섹션 첫 줄에서 first actor 추출
+     - "X가 Y" / "X이 Y" 패턴 → first actor = X (예: "작업자가 입고 폼 제출" → "작업자")
+     - "X(또는 Y)가 Z" → first actor = X
+     - 추출 실패 시 → fallback: `Note over <첫모듈>: <트리거 전체>` 후 step 2부터 chain
+  2. `## 흐름` 섹션의 `^N. 설명 → [[30_모듈별_상세/모듈명]]` 패턴 파싱
+     - 한 줄에 `→ [[link]]`가 여러 개면 **마지막** link 사용
+     - link 없는 줄은 직전 모듈 재사용 (`Note over <prev>: <설명>` 형식)
+  3. participant 추가:
+     - 모든 사람 actor (작업자/관리자/마스터/사용자/Cron 등)
+     - 흐름의 모든 모듈 (등장 순)
+- 출력 형식:
+  ```
+  # {시나리오 ID} {제목}
+
+  > 자동 생성. /wrap-up이 ## 흐름 변경 감지 시 갱신.
+  > 마지막 갱신: YYYY-MM-DD
+
+  ## 시퀀스
+
+  ```mermaid
+  sequenceDiagram
+      participant 작업자
+      participant 입고_관리
+      ...
+      작업자->>입고_관리: 1. 입고 폼 입력
+      입고_관리->>입력_Sanitize: 2. ...
+  ```
+
+  ## 관련 노트
+
+  - [[A1_입고_골든패스]] (소스)
+  - [[입고_관리]], [[LOT별_재고]], ... (등장 모듈)
+  ```
+- 파일 내용이 기존과 동일하면 write 스킵 (변경 없음 = git diff 0)
+
 ### 4.5 안전장치 (필수)
 
 bash 함수로 격리 실행. 어떤 sub-step이 실패해도 전체 흐름은 계속 진행:
@@ -129,12 +183,25 @@ sync_obsidian() {
     return 0  # vault 없으면 조용히 스킵
   fi
 
-  # 4.5-A, 4.5-B, 4.5-C 각각 시도. 하나가 실패해도 다음 단계 시도.
+  # 4.5-A, 4.5-B, 4.5-C, 4.5-D 각각 시도. 하나가 실패해도 다음 단계 시도.
   # 각 sub-step 안에서 || true 로 개별 격리.
   ...
 }
 
+sync_relations() {
+  local repo_root
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+  local relations="$repo_root/obsidian-vault/60_관계도"
+
+  [ -d "$relations" ] || return 0  # 60_관계도 없으면 조용히 스킵
+  mkdir -p "$relations/시나리오_플로우" 2>/dev/null
+
+  generate_core_structure || echo "⚠️ 4.5-D-1 실패" >&2
+  generate_sequence_diagrams || echo "⚠️ 4.5-D-2 실패" >&2
+}
+
 sync_obsidian || echo "⚠️ 옵시디언 동기화 일부 실패 (기존 흐름 계속 진행)" >&2
+sync_relations || echo "⚠️ 관계도 갱신 일부 실패 (기존 흐름 계속 진행)" >&2
 ```
 
 → 실패해도 절대 /wrap-up 자체를 멈추지 않음. 5단계 사용자 확인으로 그대로 이어진다.
@@ -181,6 +248,7 @@ git push origin main
 - journal.md: 완료 N건 / 결정 N건 / 미해결 N건 / 다음 후보 N건
 - CLAUDE.md: 최근 변경 갱신
 - 옵시디언: 작업일지·현황 동기화 완료 / 변경 없음 / vault 없음 (스킵) 중 하나
+- 관계도: 큰 그림 갱신 + 시나리오 N개 / 변경 없음 / 60_관계도 없음 (스킵) 중 하나
 - 커밋 <hash> 푸시됨
 ```
 
