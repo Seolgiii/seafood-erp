@@ -1,7 +1,7 @@
 # ERP 핵심 구조 (큰 그림)
 
-> 자동 생성. /wrap-up이 매일 갱신.
-> 마지막 갱신: 2026-05-08
+> 수동 관리. /wrap-up은 파일이 없을 때만 초기화하며, 존재 시 절대 덮어쓰지 않음.
+> 시스템 구조 변경 시 이 파일을 직접 편집.
 
 ## 시스템 전체 관계도
 
@@ -25,6 +25,7 @@ graph TD
         PIN[PIN_인증]
         권한[서버_권한_검증]
         Idem[POST_Idempotency]
+        AT[(Airtable)]
     end
 
     입고 --> LOT
@@ -51,8 +52,12 @@ graph TD
 
     PIN -.-> 권한
 
+    LOT -.-> AT
+    결재 -.-> AT
+
     style LOT fill:#ffd700
     style 결재 fill:#ffa500
+    style AT fill:#e0e7ff
 ```
 
 화살표 의미:
@@ -96,6 +101,7 @@ graph LR
 - PIN → [[PIN_인증]]
 - 권한 → [[서버_권한_검증]]
 - Idem → [[POST_Idempotency]]
+- AT → Airtable (외부 SaaS — 운영 7개 + 마스터 4개 테이블)
 
 **시나리오**:
 - A1 → [[A1_입고_골든패스]]
