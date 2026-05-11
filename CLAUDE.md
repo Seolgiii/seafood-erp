@@ -3,10 +3,10 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
-■ 최근 변경 (2026-05-08)
-- `/wrap-up` vault 경로 환경 독립화 — `git rev-parse --show-toplevel` 기반(mac/Windows 양쪽 동작)
-- `/wrap-up` 4.5-D 단계 신설 — 60_관계도/ 자동 갱신 (4.5-D-1 큰그림 create-if-missing + 4.5-D-2 시나리오_플로우/A1~A5 sequenceDiagram 자동 생성)
-- 큰 그림에 `조회 → 출고/이동` edge + 인프라 subgraph에 Airtable cylinder 추가
+■ 최근 변경 (2026-05-11)
+- 1~2주 테스트 운영 직전 종합 점검 — 5개 fork 병렬 분석 + HTML 보고서(`pre-launch-audit-2026-05-11.html`, 42KB, 토스 스타일, D-1 체크리스트 17개)
+- QR 스캔 단일화 영향 범위 분석 + 의사결정 5건 — 출고/이동 폼 QR 제거, 메인 글로벌 QR, 모든 QR이 `/inventory/lot/{번호}` 라우팅, 옛 PDF `?lot=` 호환 redirect, NEXT_PUBLIC_BASE_URL 도입
+- 작업 5단계 task 등록(LOT 상세→PDF URL→메인 QR→폼 정리→callbackUrl). 0단계 스키마 확인(잔여수량·매입자·선박명 모두 입고관리, join 조회 방식 채택) 완료, 1단계 진입 중 wrap-up
 
 ■ 핵심 도메인 흐름
 - 입고: 신청 → 승인 대기 → 관리자 승인 → LOT별 재고 생성/반영 + 보관처 비용 적용 + 입고증 PDF

@@ -317,6 +317,49 @@ UX (3건):
 
 ---
 
+### 2026-05-11
+
+**완료한 작업**
+- 1~2주 테스트 운영 직전 종합 점검 — 5개 fork 병렬 (미해결 이슈 / 안정성 / 모니터링 / 사용자 가이드 / 운영 지표). 운영 차단 후보 5건, 안정성 위험 [중] 4건(E1~E4), 사용자 안내 시급 5건, 회고 5질문 정리
+- 점검 결과 HTML 보고서 작성 — `pre-launch-audit-2026-05-11.html` (42KB, 토스 스타일 #3182F6/#191F28, 7 섹션 + D-1 체크리스트 17개 항목, 인쇄 친화 CSS + 모바일 반응형, 체크박스 동작)
+- QR 스캔 단일화 영향 범위 분석 — 5개 fork 병렬 (BarcodeScanner 사용처 / 출고·이동 폼 영향 / 메인 화면 위치 / LOT 상세 페이지 현황 / PDF QR URL + callbackUrl 패턴)
+- 의사결정 5건 수합 — 옛 PDF redirect / 옵션 A 메인만 / PC도 표시+안내 / 재고 정보만(이력 X) / NEXT_PUBLIC_BASE_URL 도입
+- 0단계 스키마 확인 — `잔여수량`/`매입자`/`선박명` 모두 입고관리 테이블에만 존재 (LOT엔 `매입처` link만). LOT.입고관리링크 (LinkedRecord)로 join 가능 확인
+- 작업 5단계 순서 task 등록 — LOT 상세 페이지·API → PDF URL → 메인 QR → 폼 정리 → callbackUrl 보강
+
+**결정 사항**
+- QR 스캔 용도 = "재고 정보 빠른 조회" 단일화 — 출고/이동 폼 QR 버튼 제거, 메인 화면 우측 상단에 글로벌 QR 버튼 추가. 앱 내 스캔 + 아이폰 기본 카메라 모두 동일 URL(`/inventory/lot/{lotNumber}`)로 라우팅
+- QR 버튼 글로벌 범위 = 옵션 A (메인 화면만) — PageHeader 확장은 운영 후 필요시 추가. BottomTabBar 재고 조회 진입점이 이미 있어 1탭 비용 수용 가능
+- PC 처리 = 옵션 B (항상 표시) — 클릭 시 "모바일에서 사용 가능" 안내 메시지. hasCamera 가드로 숨김 안 함
+- LOT 상세 정보 = 재고 정보 8필드만 (입출고 이력 미포함) — LOT번호+QR 이미지 / 품목명 / 규격·미수 / 보관처 / 재고수량·입고수량 / 입고일 / 누적 보관일수 / 매입처·매입자·선박명
+- 잔여수량·매입자·선박명 접근 = 코드 join — Airtable lookup 필드 추가 X. API에서 LOT 조회 → 입고관리링크 ID로 입고관리 fetch → 매입자(LinkedRecord)로 작업자 fetch. 실시간 동기화 + Airtable 조작 0
+- NEXT_PUBLIC_BASE_URL 도입 — PDF QR URL 호스트 분리 (Production: `https://seafood-erp.vercel.app`, 개발/스테이징 환경 분리 가능)
+- 옛 PDF 인쇄본 호환 = `/inventory/outbound?lot=...` 진입 시 자동 redirect — outbound page useEffect로 LOT 상세로 이동
+- callbackUrl 흐름 = 추가 작업 없음 — `SessionGuard.tsx:41-46` + `WorkerPinLogin.tsx:108-109`에 이미 동작. (선택) 이미 로그인 + `/login?callbackUrl=...` 직접 방문 시 존중 보강만 5단계로 분리
+- HTML 보고서는 위험도 색 시스템(critical/high/medium/low/info/pending)을 `meeting-2026-05-07.html`과 일관
+
+**미해결 이슈**
+- **QR 단일화 1단계 미완** — LOT 상세 페이지 + 단건 조회 API 신규 작성 진입 중 wrap-up으로 중단. `lib/lot-detail.ts` join 헬퍼 설계 단계
+- **2~5단계 전체 미진행** — PDF URL 교체, 메인 QR 버튼, 출고/이동 폼 QR 제거, WorkerPinLogin callbackUrl 보강
+- 매입처 마스터 / 보관처 마스터 **Primary field 이름 코드 확인 미완** — `status/page.tsx` parseLot은 매입처/보관처 텍스트를 가져오지 않아 기존 패턴 부족. transfer.ts:166 `보관처명` / debug API `매입처명` 발견은 했으나 LOT 상세에서 동일 패턴 적용 검증 필요
+- 운영 D-1 체크리스트 17개 항목 전체 미시작 — 갈치 LOT 16건 / 200건 보관처 비용 / 품목마스터 / 매입처·매입자·선박명 폼 필드 불일치 (CLAUDE.md ↔ `InboundForm.tsx`)
+- 일일 보고서 5항목 추가 미진행 — INTEGRITY-ALERT 카운트 / 음수 재고 / 잠긴 PIN / 결재 평균 소요시간 / 출고시점 비용 NULL (E1 조기 발견)
+- 운영 안정성 위험 [중] 4건 코드 가드 미추가 — E1 출고 비용 PATCH 실패 → 재승인 이중 차감 / E2 출고 다발+토글 잔여수량 정합성 / E3 idempotency 동일 key + 입력 변경 / E4 출고 반려 LOT 재고 PATCH 실패
+- 사용자 안내 시급 5건 사내 공지 미작성 — PIN 잠금 escalation / 자동 로그아웃 메커니즘 / QR 스캔 / 폼 필드 / 신청 결과 알림
+- "동결비" 필드 처리 의도 결정 미완 — 결정 노트 부재 (사용자 확인 필요)
+- Airtable view 4개 미생성 — 음수 재고 / 24h stale / 잔여수량&gt;입고수량 / 잠긴 PIN
+
+**다음 작업 후보**
+- QR 단일화 1단계 재개 — `lib/lot-detail.ts` (LOT + 입고관리 + 작업자 + 매입처 마스터 + 보관처 마스터 join) + `app/api/inventory/lot/[lotNumber]/route.ts` + `app/inventory/lot/[lotNumber]/page.tsx`. QR 이미지는 server에서 `qrcode` 패키지로 dataURL
+- 매입처/보관처 마스터 Primary field 확인 후 동일 패턴 적용 (`보관처명` / `매입처명`)
+- 2~5단계 순차 — PDF URL + NEXT_PUBLIC_BASE_URL → 메인 QR + 옛 URL redirect → 출고/이동 폼 QR 제거 → callbackUrl 보강
+- 운영 D-1 데이터 작업 (Airtable 직접) — 갈치 LOT backfill / 200건 보관처 비용 / 품목마스터 / 폼 필드 정합성
+- 일일 보고서 5항목 추가 (`lib/daily-report.ts`)
+- 사용자 안내 사내 공지 1장 작성 후 직원 배포
+- `pre-launch-audit-2026-05-11.html` 운영 회의에서 공유
+
+---
+
 ## 누적 통계 (2026-05-06 기준)
 
 - 70 커밋, 활동 8일
