@@ -2,18 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
-import { MagnifyingGlassIcon, QrCodeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, TrashIcon } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { searchTransferLot, createTransferRecord, getStorageOptions } from '@/app/actions';
 import type { TransferLotResult } from '@/app/actions/inventory/transfer';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-
-const BarcodeScanner = dynamic(
-  () => import('@/app/components/BarcodeScanner'),
-  { ssr: false, loading: () => null },
-);
 
 function todayKST(): string {
   const now = new Date();
@@ -43,10 +37,6 @@ export default function TransferPage() {
   const router = useRouter();
   const [workerId, setWorkerId] = useState('');
   const [storageOptions, setStorageOptions] = useState<{ id: string; name: string }[]>([]);
-
-  // QR 스캐너
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
 
   // LOT 검색
   const [keyword, setKeyword] = useState('');
@@ -78,18 +68,6 @@ export default function TransferPage() {
       .catch(() => {});
   }, []);
 
-  // 카메라 지원 여부 감지
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-      setHasCamera(false);
-      return;
-    }
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((devices) => setHasCamera(devices.some((d) => d.kind === 'videoinput')))
-      .catch(() => setHasCamera(false));
-  }, []);
-
   // 보관처 드롭다운 바깥 클릭 닫기
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -113,10 +91,8 @@ export default function TransferPage() {
           toast('일치하는 재고가 없습니다.', 'info');
         } else if (res.records.length === 1) {
           setSelectedLot(res.records[0]);
-          setScannerOpen(false);
         } else {
           setSearchResults(res.records);
-          setScannerOpen(false);
         }
       } else {
         toast(res.error ?? '검색 중 오류가 발생했습니다.');
@@ -127,17 +103,6 @@ export default function TransferPage() {
   }, []);
 
   const handleSearch = () => doSearch(keyword);
-
-  const handleBarcodeDetected = useCallback(async (raw: string) => {
-    let code = raw.trim();
-    try {
-      const url = new URL(code);
-      const lotParam = url.searchParams.get('lot');
-      if (lotParam) code = lotParam;
-    } catch {}
-    setKeyword(code);
-    await doSearch(code);
-  }, [doSearch]);
 
   const handleSelect = (lot: TransferLotResult) => {
     setSelectedLot(lot);
@@ -153,7 +118,6 @@ export default function TransferPage() {
     setTargetStorageName('');
     setKeyword('');
     setSearchResults([]);
-    setScannerOpen(false);
   };
 
   const filteredStorage = storageOptions.filter((o) => o.name.includes(storageQuery));
@@ -236,21 +200,13 @@ export default function TransferPage() {
           {/* LOT 검색 입력 */}
           {!selectedLot && (
             <div className="space-y-3">
-              {!scannerOpen && (
-                <label className="text-[13px] font-bold text-gray-500 ml-1">
-                  LOT 일련번호 또는 품목명
-                </label>
-              )}
-              {scannerOpen && hasCamera && <BarcodeScanner onDetected={handleBarcodeDetected} />}
-              {scannerOpen && isSearching && (
-                <p className="text-[13px] font-bold text-gray-500 animate-pulse text-center py-2">
-                  검색 중...
-                </p>
-              )}
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                LOT 일련번호 또는 품목명
+              </label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder={scannerOpen ? '스캔 결과 또는 직접 입력' : '예: 사료, 0001'}
+                  placeholder="예: 사료, 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -266,16 +222,6 @@ export default function TransferPage() {
                     : <MagnifyingGlassIcon className="w-5 h-5" />
                   }
                 </button>
-                {hasCamera !== false && (
-                  <button
-                    onClick={() => setScannerOpen((v) => !v)}
-                    className={`shrink-0 w-12 rounded-2xl flex items-center justify-center active:scale-95 transition-all ${
-                      scannerOpen ? 'bg-[#FF8C00] text-white' : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
-                    <QrCodeIcon className="w-5 h-5" />
-                  </button>
-                )}
               </div>
             </div>
           )}

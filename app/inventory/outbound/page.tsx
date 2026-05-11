@@ -1,11 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import {
   MagnifyingGlassIcon,
-  QrCodeIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
@@ -13,12 +11,6 @@ import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
 import { formatIntKo, fromGroupedIntegerInput } from '@/lib/number-format';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-
-// html5-qrcode는 window/document에 접근하므로 SSR에서 완전히 제외합니다.
-const BarcodeScanner = dynamic(
-  () => import('@/app/components/BarcodeScanner'),
-  { ssr: false, loading: () => null },
-);
 
 type CartItem = {
   cartId: string;
@@ -51,10 +43,6 @@ export default function OutboundRecordPage() {
   const searchParams = useSearchParams();
   const [workerId, setWorkerId] = useState('');
 
-  const [scannerOpen, setScannerOpen] = useState(false);
-  // null = 아직 감지 중, true/false = 결과
-  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
-
   const [keyword, setKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<LotSearchResult[]>([]);
   const [selectedLot, setSelectedLot] = useState<LotSearchResult | null>(null);
@@ -71,18 +59,6 @@ export default function OutboundRecordPage() {
   useEffect(() => {
     const s = readSession();
     if (s) setWorkerId(s.workerId);
-  }, []);
-
-  // 카메라 지원 여부 감지 (모바일: true, PC: false)
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-      setHasCamera(false);
-      return;
-    }
-    navigator.mediaDevices
-      .enumerateDevices()
-      .then((devices) => setHasCamera(devices.some((d) => d.kind === 'videoinput')))
-      .catch(() => setHasCamera(false));
   }, []);
 
   // ── 검색 공통 로직 ────────────────────────────────────────────────────────
@@ -107,35 +83,14 @@ export default function OutboundRecordPage() {
     await doSearch(keyword);
   };
 
-  // ── URL ?lot= 파라미터 자동 검색 ─────────────────────────────────────────
-  // 입고증 QR코드를 스캔하면 ?lot=LOT번호 파라미터와 함께 이 페이지가 열립니다.
+  // ── URL ?lot= 파라미터 자동 redirect ─────────────────────────────────────
+  // 옛 입고증/출고증 PDF QR(`/inventory/outbound?lot=...`) 호환:
+  // 새 QR 라우팅(`/inventory/lot/{번호}`)으로 자동 이동.
   useEffect(() => {
     const lot = searchParams.get('lot');
     if (!lot) return;
-    setKeyword(lot);
-    doSearch(lot);
-  // searchParams가 바뀌면 재실행하지 않도록 마운트 시 1회만 실행
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ── 바코드 감지 콜백 ─────────────────────────────────────────────────────
-  const handleBarcodeDetected = useCallback(
-    async (raw: string) => {
-      // QR코드에 URL이 담긴 경우 ?lot= 파라미터를 추출합니다.
-      let code = raw.trim();
-      try {
-        const url = new URL(code);
-        const lotParam = url.searchParams.get('lot');
-        if (lotParam) code = lotParam;
-      } catch {
-        // URL 형식이 아닌 경우 원본 값 그대로 사용
-      }
-      setScannerOpen(false);
-      setKeyword(code);
-      await doSearch(code);
-    },
-    [doSearch],
-  );
+    router.replace(`/inventory/lot/${encodeURIComponent(lot)}`);
+  }, [router, searchParams]);
 
   const resetForm = () => {
     setSelectedLot(null);
@@ -226,22 +181,14 @@ export default function OutboundRecordPage() {
           {/* LOT 검색 입력 */}
           {!selectedLot && (
             <form onSubmit={handleSearch} className="space-y-3">
-              {!scannerOpen && (
-                <label className="text-[13px] font-bold text-gray-500 ml-1">
-                  품목명 또는 LOT 번호
-                </label>
-              )}
-              {scannerOpen && hasCamera && <BarcodeScanner onDetected={handleBarcodeDetected} />}
-              {scannerOpen && isSearching && (
-                <p className="text-[13px] font-bold text-gray-500 animate-pulse text-center py-2">
-                  검색 중...
-                </p>
-              )}
+              <label className="text-[13px] font-bold text-gray-500 ml-1">
+                품목명 또는 LOT 번호
+              </label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  autoFocus={!scannerOpen}
-                  placeholder={scannerOpen ? '스캔 결과 또는 직접 입력' : '예: 고등어, 0001'}
+                  autoFocus
+                  placeholder="예: 고등어, 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   className="flex-1 min-w-0 bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#FF3B30] transition-all"
@@ -256,17 +203,6 @@ export default function OutboundRecordPage() {
                     : <MagnifyingGlassIcon className="w-5 h-5" />
                   }
                 </button>
-                {hasCamera !== false && (
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen((v) => !v)}
-                    className={`shrink-0 w-12 rounded-2xl flex items-center justify-center active:scale-95 transition-all ${
-                      scannerOpen ? 'bg-[#FF3B30] text-white' : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
-                    <QrCodeIcon className="w-5 h-5" />
-                  </button>
-                )}
               </div>
             </form>
           )}

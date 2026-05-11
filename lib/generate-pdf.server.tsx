@@ -19,6 +19,7 @@ import {
 } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { NOTO_SANS_KR_REGULAR, NOTO_SANS_KR_BOLD } from "./fonts-base64";
+import { getBaseUrl } from "./base-url";
 
 // prebuild 스크립트가 폰트를 base64 data URI 상수로 번들에 포함시킵니다.
 // 파일 시스템 접근이 없으므로 Vercel 서버리스에서도 안정적으로 동작합니다.
@@ -308,7 +309,7 @@ export async function generateInboundPdf(data: InboundPdfData): Promise<Buffer> 
   let qrDataUrl: string | undefined;
   if (data.lotNumber) {
     try {
-      const qrContent = `https://seafood-erp.vercel.app/inventory/outbound?lot=${encodeURIComponent(data.lotNumber)}`;
+      const qrContent = `${getBaseUrl()}/inventory/lot/${encodeURIComponent(data.lotNumber)}`;
       qrDataUrl = await QRCode.toDataURL(qrContent, {
         errorCorrectionLevel: "M",
         width: 300,

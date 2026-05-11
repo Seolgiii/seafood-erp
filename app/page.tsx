@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowDownOnSquareIcon,
   ArrowUpOnSquareIcon,
@@ -11,8 +12,15 @@ import {
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
 } from "@heroicons/react/24/solid";
+import { QrCodeIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { readSession } from "@/lib/session";
 import { getDashboardStats, type DashboardStats } from "@/app/actions/dashboard";
+import { toast } from "@/lib/toast";
+
+const BarcodeScanner = dynamic(
+  () => import("@/app/components/BarcodeScanner"),
+  { ssr: false, loading: () => null },
+);
 
 export default function WorkerDashboard() {
   const router = useRouter();
@@ -31,6 +39,8 @@ export default function WorkerDashboard() {
   }, []);
   const [role, setRole] = useState<string | undefined>(undefined);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [hasCamera, setHasCamera] = useState<boolean | null>(null);
 
   useEffect(() => {
     const session = readSession();
@@ -44,6 +54,54 @@ export default function WorkerDashboard() {
       .then(setStats)
       .catch(() => {});
   }, []);
+
+  // 카메라 지원 여부 감지 (모바일: true, PC: false)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+      setHasCamera(false);
+      return;
+    }
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => setHasCamera(devices.some((d) => d.kind === "videoinput")))
+      .catch(() => setHasCamera(false));
+  }, []);
+
+  const handleQrClick = () => {
+    if (hasCamera === false) {
+      toast("QR 스캔은 모바일에서 사용할 수 있습니다.", "info");
+      return;
+    }
+    setScannerOpen(true);
+  };
+
+  const handleScanResult = (raw: string) => {
+    const code = raw.trim();
+    let target = "";
+    try {
+      const url = new URL(code);
+      const match = url.pathname.match(/^\/inventory\/lot\/(.+)$/);
+      if (match) {
+        target = `/inventory/lot/${match[1]}`;
+      } else {
+        // 옛 PDF QR(`/inventory/outbound?lot=...`) 호환
+        const lotParam = url.searchParams.get("lot");
+        if (lotParam) target = `/inventory/lot/${encodeURIComponent(lotParam)}`;
+      }
+    } catch {
+      // URL 형식이 아닌 경우: LOT 번호 패턴이면 직접 사용
+      if (/^[0-9A-Za-z-]+$/.test(code) && code.length >= 6) {
+        target = `/inventory/lot/${encodeURIComponent(code)}`;
+      }
+    }
+
+    setScannerOpen(false);
+    if (target) {
+      router.push(target);
+    } else {
+      toast("인식할 수 없는 QR입니다.", "error");
+    }
+  };
 
   const heroItems = [
     { id: "inbound", title: "물품 입고", desc: "새로운 원물 등록", Icon: ArrowDownOnSquareIcon, iconBg: "#3182F6", path: "/inventory/record" },
@@ -67,8 +125,16 @@ export default function WorkerDashboard() {
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-10" style={{ fontFamily: "'Spoqa Han Sans Neo', 'sans-serif'" }}>
       
       {/* 상단 헤더 */}
-      <header className="px-5 pt-5 pb-1">
+      <header className="px-5 pt-5 pb-1 flex items-center justify-between">
         <h1 className="text-[20px] font-black text-[#3182F6] tracking-tight">SEAERP</h1>
+        <button
+          type="button"
+          onClick={handleQrClick}
+          aria-label="QR 스캔"
+          className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-[0_4px_12px_rgba(149,157,165,0.12)] active:scale-95 transition-transform"
+        >
+          <QrCodeIcon className="w-5 h-5 text-[#3182F6]" />
+        </button>
       </header>
 
       {/* 메인 콘텐츠 영역 */}
@@ -156,6 +222,35 @@ export default function WorkerDashboard() {
           {isOnline ? "클라우드 동기화됨" : "오프라인 모드"}
         </span>
       </footer>
+
+      {scannerOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/60"
+          onClick={() => setScannerOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-white rounded-t-[32px] p-5"
+            style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom))" }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[18px] font-black text-gray-900">QR 스캔</h2>
+              <button
+                type="button"
+                onClick={() => setScannerOpen(false)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center active:bg-gray-100"
+                aria-label="닫기"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <BarcodeScanner onDetected={handleScanResult} />
+            <p className="text-center text-[12px] font-medium text-gray-400 mt-3">
+              QR을 인식하면 LOT 상세로 이동합니다
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

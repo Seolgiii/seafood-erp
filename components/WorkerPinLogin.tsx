@@ -15,6 +15,24 @@ function avatarColor(index: number) {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
+/**
+ * callbackUrl 안전성 검증.
+ * - 절대 path("/...")만 허용 — 외부 도메인 / protocol-relative URL 차단 (open redirect 방지)
+ * - decodeURIComponent 실패 시 null 반환
+ */
+function safeCallbackUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  if (!decoded.startsWith("/")) return null;
+  if (decoded.startsWith("//")) return null;
+  return decoded;
+}
+
 export function WorkerPinLogin() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,10 +56,14 @@ export function WorkerPinLogin() {
   useEffect(() => { activeWorkerRef.current = activeWorker; }, [activeWorker]);
   useEffect(() => { submittingRef.current = submitting; }, [submitting]);
 
+  // 이미 로그인된 상태에서 /login 진입 시 — callbackUrl 있으면 그곳으로, 없으면 메인으로
   useEffect(() => {
     const s = readSession();
-    if (s && !isSessionExpired(s)) router.replace("/");
-  }, [router]);
+    if (s && !isSessionExpired(s)) {
+      const target = safeCallbackUrl(searchParams.get("callbackUrl")) ?? "/";
+      router.replace(target);
+    }
+  }, [router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,8 +127,8 @@ export function WorkerPinLogin() {
           role: data.worker.role ?? "WORKER",
           lastActivityAt: Date.now(),
         });
-        const callbackUrl = searchParams.get("callbackUrl");
-        router.push(callbackUrl ? decodeURIComponent(callbackUrl) : "/");
+        const target = safeCallbackUrl(searchParams.get("callbackUrl")) ?? "/";
+        router.push(target);
       }
     } catch {
       triggerError("연결에 실패했습니다");
