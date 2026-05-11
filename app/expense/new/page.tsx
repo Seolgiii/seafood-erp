@@ -200,8 +200,8 @@ export default function NewExpensePage() {
             </div>
           </div>
 
-          <button type="submit" disabled={isSubmitting || isUploading} className={`w-full py-6 rounded-2xl text-xl font-black text-white shadow-lg ${isSubmitting ? 'bg-gray-400' : 'bg-blue-600'} active:scale-95 transition-all`}>
-            {isSubmitting ? '제출 중...' : '지출 신청하기'}
+          <button type="submit" disabled={isSubmitting || isUploading} className={`w-full py-6 rounded-2xl text-xl font-black text-white shadow-lg ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600'} active:scale-95 transition-all`}>
+            {isSubmitting ? '제출 중...' : '지출 신청'}
           </button>
           {submitError && (
             <p className="text-sm font-bold text-red-600 text-center">{submitError}</p>

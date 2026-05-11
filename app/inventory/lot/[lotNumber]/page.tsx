@@ -72,7 +72,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function formatBoxes(qty: number): string {
   if (!Number.isFinite(qty) || qty <= 0) return "-";
-  return `${qty.toLocaleString("ko-KR")} BOX`;
+  return `${qty.toLocaleString("ko-KR")}박스`;
 }
 
 function formatSpecMisu(spec: string, detailSpec: string): string {

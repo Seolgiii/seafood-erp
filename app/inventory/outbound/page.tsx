@@ -268,13 +268,13 @@ export default function OutboundRecordPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-gray-500 ml-1">현재 남은 재고</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">현재 재고</label>
                   <div className="w-full bg-gray-100 rounded-2xl px-4 py-3.5 text-[15px] font-bold text-blue-600">
                     {formatIntKo(Math.trunc(Number(selectedLot.fields['재고수량'] ?? 0)))}박스
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-gray-500 ml-1">출고할 수량</label>
+                  <label className="text-[13px] font-bold text-gray-500 ml-1">출고 수량</label>
                   <input
                     type="text"
                     inputMode="numeric"

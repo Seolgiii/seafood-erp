@@ -187,7 +187,7 @@ export default function TransferPage() {
     <div className="min-h-screen bg-[#F2F4F6] flex flex-col pb-32 font-['Spoqa_Han_Sans_Neo']">
       <PageHeader
         title="재고 이동"
-        subtitle="보관처 간 재고를 이동합니다"
+        subtitle="어디로 옮기시나요?"
         onBack={() => router.push('/')}
         titleClassName="text-[#FF8C00] font-black"
       />

@@ -9,6 +9,7 @@ import { readSession } from "@/lib/session";
 import { toast } from "@/lib/toast";
 import PageHeader from "@/components/PageHeader";
 import BottomTabBar from "@/components/BottomTabBar";
+import { useConfirm } from "@/app/components/ConfirmBottomSheet";
 
 type TabKey = "ALL" | "LOGISTICS" | "EXPENSE" | "DONE";
 
@@ -46,6 +47,7 @@ function formatSubmittedAt(iso?: string): string | null {
 export default function MyRequestsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const confirm = useConfirm();
   // URL 쿼리에서 초기 탭 복원 — 잘못된 값은 ALL로 fallback
   const initialTab: TabKey = (() => {
     const t = searchParams.get("tab");
@@ -105,7 +107,13 @@ export default function MyRequestsPage() {
       toast("로그인 정보를 확인해주세요.");
       return;
     }
-    if (!window.confirm("이 신청 건을 취소하시겠습니까?")) return;
+    const ok = await confirm({
+      title: "이 신청을 취소할까요?",
+      message: "취소하면 결재 대기에서 사라지며 되돌릴 수 없습니다.",
+      confirmLabel: "신청 취소",
+      accent: "red",
+    });
+    if (!ok) return;
 
     setCancellingId(item.id);
     const result = await cancelMyRequest(session.workerId, item.id, item.type);
@@ -177,7 +185,7 @@ export default function MyRequestsPage() {
         )}
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           <span className="text-[15.6px] font-bold text-gray-800">{qtyLabel(item)} :</span>
-          <span className="text-[15.6px] font-bold text-blue-600">{item.amountOrQuantity} BOX</span>
+          <span className="text-[15.6px] font-bold text-blue-600">{item.amountOrQuantity}박스</span>
         </div>
       </div>
 

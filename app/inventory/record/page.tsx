@@ -258,11 +258,11 @@ export default function InventoryRecordPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-2">
                 <label className="text-[14px] font-bold text-gray-500 ml-1">규격</label>
-                <input type="text" value={formData.spec} onChange={(e) => setFormData({ ...formData, spec: e.target.value })} placeholder="예 : 10" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
+                <input type="text" value={formData.spec} onChange={(e) => setFormData({ ...formData, spec: e.target.value })} placeholder="예:10" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[14px] font-bold text-gray-500 ml-1">미수</label>
-                <input type="text" value={formData.count} onChange={(e) => setFormData({ ...formData, count: e.target.value })} placeholder="예 : 42/44미" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
+                <input type="text" value={formData.count} onChange={(e) => setFormData({ ...formData, count: e.target.value })} placeholder="예:42/44미" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
               </div>
             </div>
           </section>
@@ -273,7 +273,7 @@ export default function InventoryRecordPage() {
           <section className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-2">
-                <label className="text-[14px] font-bold text-[#3182F6] ml-1">수량 (BOX)</label>
+                <label className="text-[14px] font-bold text-[#3182F6] ml-1">수량 (박스)</label>
                 <input type="text" inputMode="numeric" value={formData.quantity} onChange={(e) => handleNumberChange("quantity", e.target.value)} placeholder="0" className="w-full bg-blue-50 text-[#3182F6] text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
               </div>
               <div className="flex flex-col gap-2">
@@ -338,7 +338,7 @@ export default function InventoryRecordPage() {
             {isImport ? (
               <div className="flex flex-col gap-2">
                 <label className="text-[14px] font-bold text-gray-500 ml-1">원산지 (수입산)</label>
-                <input type="text" value={formData.origin} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="예 : 수입산, 러시아, 노르웨이" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
+                <input type="text" value={formData.origin} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="예:수입산, 러시아, 노르웨이" className="w-full bg-gray-100 text-gray-900 text-[15px] font-bold rounded-2xl p-4 outline-none focus:ring-2 focus:ring-[#3182F6] transition-all" />
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -367,7 +367,7 @@ export default function InventoryRecordPage() {
           onClick={handleAddToCart}
           className="w-full text-white text-[18px] font-black py-5 rounded-[24px] transition-all active:scale-95 shadow-lg bg-gray-800"
         >
-          + 입고 추가
+          + 입고 목록에 추가
         </button>
 
         {/* 입고 목록 */}
@@ -413,7 +413,7 @@ export default function InventoryRecordPage() {
               isSubmitting ? 'bg-blue-300 cursor-not-allowed' : 'bg-[#3182F6] active:scale-[0.98]'
             }`}
           >
-            {isSubmitting ? '신청 중...' : `입고 신청하기 (${cart.length}건)`}
+            {isSubmitting ? '신청 중...' : `입고 신청 (${cart.length}건)`}
           </button>
         </div>
       )}

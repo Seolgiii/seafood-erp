@@ -11,9 +11,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { readSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import { useConfirm } from '@/app/components/ConfirmBottomSheet';
 
 export default function Home() {
   const [workerName, setWorkerName] = useState('');
+  const confirm = useConfirm();
 
   useEffect(() => {
     const s = readSession();
@@ -21,8 +23,13 @@ export default function Home() {
   }, []);
 
   // 로그아웃 더블 확인 방어 로직
-  const handleLogout = () => {
-    if (window.confirm("정말 로그아웃 하시겠습니까?")) {
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: "정말 로그아웃할까요?",
+      confirmLabel: "로그아웃",
+      accent: "red",
+    });
+    if (ok) {
       toast("로그아웃 되었습니다.", "success");
       // 실제 로그인 연동 시 라우팅 추가 필요
     }

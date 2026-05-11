@@ -86,7 +86,7 @@ export default function CompletedItemActionSheet({
               </span>{" "}
               <span className="font-bold text-gray-900">
                 {item.amountOrQuantity}
-                {!isExpense ? " BOX" : ""}
+                {!isExpense ? "박스" : ""}
               </span>
             </p>
           )}

@@ -17,6 +17,7 @@ const ADMIN_TABS: { key: AdminTabKey; label: string }[] = [
 ];
 import RejectBottomSheet from "@/app/components/RejectBottomSheet";
 import CompletedItemActionSheet from "@/app/components/CompletedItemActionSheet";
+import { useConfirm } from "@/app/components/ConfirmBottomSheet";
 import { updateApprovalStatus, getMyRequests } from "@/app/actions";
 import { useSyncQueryParams } from "@/lib/use-sync-query-params";
 import type { RequestItem } from "@/app/actions/my-requests";
@@ -52,6 +53,7 @@ function formatSubmittedAt(iso?: string): string | null {
 export default function AdminDashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const confirm = useConfirm();
   const tabParam = searchParams.get('tab');
   const initialTab: AdminTabKey =
     tabParam === 'LOGISTICS' || tabParam === 'EXPENSE' || tabParam === 'DONE' || tabParam === 'ALL'
@@ -140,7 +142,14 @@ export default function AdminDashboardPage() {
     }
 
     // 액션 시트에서 호출되는 경우(skipConfirm) 사용자가 이미 명시적으로 클릭한 것이므로 confirm 생략
-    if (!opts?.skipConfirm && !window.confirm("해당 건을 승인하시겠습니까?")) return;
+    if (!opts?.skipConfirm) {
+      const ok = await confirm({
+        title: "해당 건을 승인할까요?",
+        confirmLabel: "승인",
+        accent: "blue",
+      });
+      if (!ok) return;
+    }
 
     processingIds.current.add(item.id);
     setUiOverrides((prev) => ({ ...prev, [item.id]: "PROCESSING" }));
@@ -155,11 +164,17 @@ export default function AdminDashboardPage() {
       if (amount < 1_000_000) {
         // 100만원 미만: 권한 무관 바로 승인 완료
         nextStatus = "승인 완료";
-      } else if (role === "MASTER" && window.confirm("중간 승인을 생략하시겠습니까?")) {
-        // 100만원 이상 + MASTER가 중간 승인 생략 선택
-        nextStatus = "승인 완료";
+      } else if (role === "MASTER") {
+        const skip = await confirm({
+          title: "중간 승인을 생략할까요?",
+          message: "100만원 이상 건은 기본적으로 최종 승인 대기로 넘어갑니다.",
+          confirmLabel: "생략",
+          cancelLabel: "최종 승인 대기로",
+          accent: "blue",
+        });
+        nextStatus = skip ? "승인 완료" : "최종 승인 대기";
       } else {
-        // 100만원 이상 + ADMIN, 또는 MASTER가 생략 안 함 → 최종 승인 대기
+        // 100만원 이상 + ADMIN → 최종 승인 대기
         nextStatus = "최종 승인 대기";
       }
     } else {
@@ -377,7 +392,7 @@ export default function AdminDashboardPage() {
                 <span className="text-[17.6px] font-bold text-gray-800">
                   {item.type === "INBOUND" ? "입고 수량" : item.type === "TRANSFER" ? "이동 수량" : "출고 수량"} :
                 </span>
-                <span className="text-[17.6px] font-bold text-blue-600">{item.amountOrQuantity} BOX</span>
+                <span className="text-[17.6px] font-bold text-blue-600">{item.amountOrQuantity}박스</span>
               </div>
             </div>
           </>
@@ -493,11 +508,11 @@ export default function AdminDashboardPage() {
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3">
             <div className="w-10 h-10 border-4 border-gray-200 border-t-[#3182F6] rounded-full animate-spin"></div>
-            <p className="text-gray-400 font-bold">에어테이블 연결 중...</p>
+            <p className="text-gray-400 font-bold">데이터를 불러오는 중...</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-[16px]">
-            {isDoneTab ? "완료된 내역이 없습니다." : "대기 중인 결재가 없습니다."}
+            {isDoneTab ? "완료된 내역이 없습니다" : "대기 중인 결재가 없습니다"}
           </div>
         ) : (
           filteredItems.map((item) => renderCard(item))
