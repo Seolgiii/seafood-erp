@@ -201,12 +201,12 @@ export default function TransferPage() {
           {!selectedLot && (
             <div className="space-y-3">
               <label className="text-[13px] font-bold text-gray-500 ml-1">
-                LOT 일련번호 또는 품목명
+                품목명 또는 LOT번호
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="예: 사료, 0001"
+                  placeholder="예: 고등어, 0001"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}

@@ -182,7 +182,7 @@ export default function OutboundRecordPage() {
           {!selectedLot && (
             <form onSubmit={handleSearch} className="space-y-3">
               <label className="text-[13px] font-bold text-gray-500 ml-1">
-                품목명 또는 LOT 번호
+                품목명 또는 LOT번호
               </label>
               <div className="flex gap-2">
                 <input
