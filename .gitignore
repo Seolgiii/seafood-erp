@@ -1,6 +1,9 @@
 # 폰트 base64 변환 파일 (prebuild 스크립트로 자동 생성)
 lib/fonts-base64.ts
 
+# PWA 아이콘 원본(15.5MB) — scripts/generate-pwa-icons.mjs 재생성용 로컬 백업
+public/icons/source-4096.png
+
 .env.local
 .env.loacl
 .env
