@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { log, logWarn } from "@/lib/logger";
 
@@ -7,6 +8,7 @@ import { log, logWarn } from "@/lib/logger";
  * 동작:
  *  - 클라이언트가 `X-Idempotency-Key: <uuid>` 헤더를 보내면 5분간 응답을 캐시
  *  - 같은 key의 두 번째 요청은 캐시된 응답을 그대로 반환 (재실행 X)
+ *  - 같은 key + 다른 body → 409 `payload_mismatch` (실수로 key를 재사용한 다른 요청 차단)
  *  - 진행 중인 동일 key 요청은 409로 거부
  *  - 헤더가 없으면 idempotency 비활성 (backward compatible — 기존 호출 영향 없음)
  *
@@ -20,8 +22,14 @@ const TTL_MS = 5 * 60 * 1000; // 5분
 const MAX_ENTRIES = 1000;     // 메모리 폭주 방어용 상한
 
 type CacheEntry =
-  | { type: "pending"; expiresAt: number }
-  | { type: "done"; bodyJson: unknown; status: number; expiresAt: number };
+  | { type: "pending"; expiresAt: number; bodyHash: string }
+  | {
+      type: "done";
+      bodyJson: unknown;
+      status: number;
+      expiresAt: number;
+      bodyHash: string;
+    };
 
 const cache = new Map<string, CacheEntry>();
 
@@ -52,6 +60,24 @@ function isValidKey(key: string): boolean {
 }
 
 /**
+ * 요청 body의 SHA256 해시 계산.
+ * Request body는 한 번만 읽을 수 있어 clone() 후 arrayBuffer로 추출.
+ * body가 없는 요청(GET 등) 또는 본문이 비어 있으면 빈 문자열 해시를 반환.
+ */
+async function computeBodyHash(request: Request): Promise<string> {
+  try {
+    const buf = await request.clone().arrayBuffer();
+    if (buf.byteLength === 0) {
+      return createHash("sha256").update("").digest("hex");
+    }
+    return createHash("sha256").update(Buffer.from(buf)).digest("hex");
+  } catch {
+    // body 추출 실패 시 빈 해시 — 다른 body와 매칭되지 않도록 unique 값 사용
+    return `unhashable:${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+/**
  * @param request 원본 Request
  * @param handler idempotency 통과 시 실행할 실제 핸들러 (NextResponse 반환)
  * @returns NextResponse — 캐시 hit이면 캐시된 응답 재구성, miss면 handler 실행 후 캐싱
@@ -69,8 +95,22 @@ export async function withIdempotency(
   const now = Date.now();
   cleanup(now);
 
+  const bodyHash = await computeBodyHash(request);
+
   const existing = cache.get(rawKey);
   if (existing) {
+    // E3: 같은 key + 다른 body → payload_mismatch
+    if (existing.bodyHash !== bodyHash) {
+      logWarn("[idempotency] payload mismatch:", rawKey);
+      return NextResponse.json(
+        {
+          error:
+            "동일한 Idempotency-Key로 다른 요청 페이로드가 전송되었습니다.",
+          idempotency: "payload_mismatch",
+        },
+        { status: 409 },
+      );
+    }
     if (existing.type === "pending") {
       // 동일 key가 처리 중 — 두 번째 요청은 충돌 응답
       log("[idempotency] in-flight conflict:", rawKey);
@@ -88,7 +128,7 @@ export async function withIdempotency(
   }
 
   // 처음 보는 key — 진행 중 마킹 후 핸들러 실행
-  cache.set(rawKey, { type: "pending", expiresAt: now + TTL_MS });
+  cache.set(rawKey, { type: "pending", expiresAt: now + TTL_MS, bodyHash });
   try {
     const res = await handler();
     // 응답 본문을 JSON으로 추출해 캐시 (스트림 소비 방지를 위해 clone 사용)
@@ -105,6 +145,7 @@ export async function withIdempotency(
       bodyJson,
       status: res.status,
       expiresAt: Date.now() + TTL_MS,
+      bodyHash,
     });
     return res;
   } catch (e) {

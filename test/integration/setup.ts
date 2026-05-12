@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { store } from "./airtable-store";
-import { installFetchMock, uninstallFetchMock } from "./fetch-mock";
+import { clearFaults, installFetchMock, uninstallFetchMock } from "./fetch-mock";
 
 /**
  * 통합 테스트 공용 setup
@@ -62,4 +62,5 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  clearFaults();
 });

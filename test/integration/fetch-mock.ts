@@ -10,9 +10,54 @@ import { store, type Tables } from "./airtable-store";
  *
  * filterByFormula는 무시하고 전체 records 반환합니다 — 테스트마다 store에
  * 필요한 데이터만 seed해 정확성을 확보하는 패턴.
+ *
+ * fault injection (E1/E4 등 PATCH 실패 시나리오 검증용):
+ *   injectFault({ table, method, fieldKey })로 다음 매칭 호출 1건을 500 응답
+ *   처리합니다. afterEach에서 clearFaults()로 초기화하세요.
  */
 
 const AIRTABLE_BASE_RE = /^https:\/\/api\.airtable\.com\/v0\/[^/]+\/(.+?)(?:\?|$)/;
+
+export type FetchFault = {
+  table: Tables | string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  recordId?: string;
+  /** PATCH 시 body.fields에 이 키가 있으면 매칭 (예: "출고시점 판매원가") */
+  fieldKey?: string;
+  status?: number;
+  /** 적용 횟수 (기본 1) */
+  count?: number;
+};
+
+let activeFaults: FetchFault[] = [];
+
+export function injectFault(fault: FetchFault): void {
+  activeFaults.push({ ...fault, count: fault.count ?? 1 });
+}
+
+export function clearFaults(): void {
+  activeFaults = [];
+}
+
+function pickFault(
+  table: string,
+  method: string,
+  recordId: string | null,
+  body: { fields?: Record<string, unknown> },
+): FetchFault | null {
+  for (let i = 0; i < activeFaults.length; i++) {
+    const f = activeFaults[i];
+    if (f.table !== table) continue;
+    if (f.method !== method) continue;
+    if (f.recordId && f.recordId !== recordId) continue;
+    if (f.fieldKey && !(body.fields && f.fieldKey in body.fields)) continue;
+    // 소진 처리
+    f.count = (f.count ?? 1) - 1;
+    if ((f.count ?? 0) <= 0) activeFaults.splice(i, 1);
+    return f;
+  }
+  return null;
+}
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -57,6 +102,14 @@ async function airtableHandler(
 
   const method = (init?.method ?? "GET").toUpperCase();
   const body = await readBody(init);
+
+  // fault injection — 매칭되면 store 변경 없이 에러 응답
+  const fault = pickFault(table, method, recordId, body);
+  if (fault) {
+    return jsonResponse(fault.status ?? 500, {
+      error: { type: "INJECTED_FAULT", table, method, recordId, fieldKey: fault.fieldKey },
+    });
+  }
 
   // GET single
   if (method === "GET" && recordId) {

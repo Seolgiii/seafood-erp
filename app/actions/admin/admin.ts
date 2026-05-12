@@ -567,6 +567,36 @@ async function deductStockOnOutboundApproval(
     return { success: false, message: "입고 관리 잔여수량 차감에 실패했습니다." };
   }
 
+  // E2: 입고 잔여수량 race 감지 모니터링 (mutex 미도입 — 관측만)
+  // PATCH 직후 재조회해 expected와 observed가 어긋나면 [INTEGRITY-ALERT] 로깅.
+  // 동시 두 PATCH가 같은 값으로 끝나는 일부 race는 감지 불가능하나, 외부 변경/
+  // 동시 다른 outQty/순차적 race는 포착 가능. 운영자는 prefix로 grep 추적.
+  {
+    const verifyInbound = await fetchRecord("입고 관리", inboundRecordId);
+    const rawObserved = verifyInbound?.["잔여수량"];
+    const observedRemain = Number(
+      Array.isArray(rawObserved) ? rawObserved[0] : rawObserved,
+    );
+    const expectedRemain = currentRemain - outQty;
+    const inboundMismatch =
+      Number.isFinite(observedRemain) &&
+      Math.abs(observedRemain - expectedRemain) > 0.001;
+    logError(
+      inboundMismatch
+        ? "[INTEGRITY-ALERT][OUTBOUND-RACE-MON] 입고 잔여수량 race 감지:"
+        : "[OUTBOUND-RACE-MON] inbound:",
+      {
+        outboundRecordId,
+        inboundRecordId,
+        before: currentRemain,
+        expected: expectedRemain,
+        observed: Number.isFinite(observedRemain) ? observedRemain : null,
+        outQty,
+        mismatch: inboundMismatch,
+      },
+    );
+  }
+
   // 4. LOT별 재고.재고수량 차감 (LOT 단위 현재 재고 감소)
   if (lotInventoryRecordId && /^rec/.test(lotInventoryRecordId)) {
     const lotFields = await fetchRecord("LOT별 재고", lotInventoryRecordId);
@@ -578,7 +608,38 @@ async function deductStockOnOutboundApproval(
         재고수량: Math.max(0, currentLotQty - outQty),
       });
 
+      // E2: LOT 재고수량 race 감지 모니터링
+      {
+        const verifyLot = await fetchRecord("LOT별 재고", lotInventoryRecordId);
+        const rawObservedLot = verifyLot?.["재고수량"];
+        const observedLotQty = Number(
+          Array.isArray(rawObservedLot) ? rawObservedLot[0] : rawObservedLot,
+        );
+        const expectedLotQty = Math.max(0, currentLotQty - outQty);
+        const lotMismatch =
+          Number.isFinite(observedLotQty) &&
+          Math.abs(observedLotQty - expectedLotQty) > 0.001;
+        logError(
+          lotMismatch
+            ? "[INTEGRITY-ALERT][OUTBOUND-RACE-MON] LOT 재고수량 race 감지:"
+            : "[OUTBOUND-RACE-MON] lot:",
+          {
+            outboundRecordId,
+            lotInventoryRecordId,
+            before: currentLotQty,
+            expected: expectedLotQty,
+            observed: Number.isFinite(observedLotQty) ? observedLotQty : null,
+            outQty,
+            mismatch: lotMismatch,
+          },
+        );
+      }
+
       // 5. 출고시점 비용 계산 → 출고 관리에 저장
+      // E1: 이 PATCH가 실패하면 멱등 가드(출고시점 판매원가>0)가 동작하지 않아
+      //     재승인 시 이중 차감 위험. 실패 시 입고/LOT 재고를 원복하고 승인 실패 반환.
+      let costPatchOk = false;
+      let costPatchError: unknown = null;
       try {
         const num = (v: unknown) =>
           Number(Array.isArray(v) ? v[0] : v) || 0;
@@ -595,7 +656,7 @@ async function deductStockOnOutboundApproval(
           outboundDate: String(outFields["출고일"] ?? "").trim(),
         });
 
-        await patchRecord("출고 관리", outboundRecordId, {
+        costPatchOk = await patchRecord("출고 관리", outboundRecordId, {
           "출고시점 단가": breakdown.unitCost,
           "출고시점 냉장료": breakdown.refrigerationCost,
           "출고시점 입출고비": breakdown.inOutFee,
@@ -605,7 +666,47 @@ async function deductStockOnOutboundApproval(
           "출고시점 손익": breakdown.profit,
         });
       } catch (e) {
-        logWarn("[deductStockOnOutboundApproval] 출고시점 비용 저장 실패 (승인은 계속 진행):", e);
+        costPatchError = e;
+      }
+
+      if (!costPatchOk) {
+        logError(
+          "[INTEGRITY-ALERT][deductStockOnOutboundApproval] 출고시점 비용 PATCH 실패 — 재고 원복 시도:",
+          {
+            outboundRecordId,
+            inboundRecordId,
+            lotInventoryRecordId,
+            outQty,
+            currentRemain,
+            currentLotQty,
+            error: costPatchError ? String(costPatchError) : null,
+          },
+        );
+        const inboundRevertOk = await patchRecord("입고 관리", inboundRecordId, {
+          잔여수량: currentRemain,
+        });
+        const lotRevertOk = await patchRecord("LOT별 재고", lotInventoryRecordId, {
+          재고수량: currentLotQty,
+        });
+        if (!inboundRevertOk || !lotRevertOk) {
+          logError(
+            "[INTEGRITY-ALERT][deductStockOnOutboundApproval] 재고 원복 PATCH 실패 — 수동 보정 필요:",
+            {
+              outboundRecordId,
+              inboundRecordId,
+              lotInventoryRecordId,
+              inboundRevertOk,
+              lotRevertOk,
+              targetInboundRemain: currentRemain,
+              targetLotQty: currentLotQty,
+              outQty,
+            },
+          );
+        }
+        return {
+          success: false,
+          message: "출고시점 비용 저장에 실패해 재고를 원복했습니다. 다시 시도해주세요.",
+        };
       }
     } else {
       logWarn("[deductStockOnOutboundApproval] LOT재고레코드ID 있으나 레코드 없음:", lotInventoryRecordId);
@@ -693,20 +794,51 @@ async function restoreStockOnOutboundReject(
         재고수량: currentLotQty + outQty,
       });
       if (!ok) {
+        // E4: LOT 복구 실패 — inbound가 이미 복구되었다면 정합 깨짐(+outQty 입고 / 0 LOT).
+        // 보상 트랜잭션으로 inbound 잔여수량을 원복해 두 테이블 상태를 일치시킴.
+        let compensationOk = true;
+        let compensationDetail: Record<string, unknown> = {};
+        if (inboundRestored && inboundRecordId) {
+          const refreshInbound = await fetchRecord("입고 관리", inboundRecordId);
+          const refreshedRemain = Number(refreshInbound?.["잔여수량"]);
+          if (Number.isFinite(refreshedRemain)) {
+            compensationOk = await patchRecord("입고 관리", inboundRecordId, {
+              잔여수량: refreshedRemain - outQty,
+            });
+            compensationDetail = {
+              refreshedRemain,
+              targetRemain: refreshedRemain - outQty,
+            };
+          } else {
+            compensationOk = false;
+            compensationDetail = { refreshedRemainRaw: refreshInbound?.["잔여수량"] };
+          }
+        }
         logError(
-          "[INTEGRITY-ALERT][restoreStockOnOutboundReject] LOT 재고 복구 PATCH 실패 — 수동 정합 확인 필요:",
+          "[INTEGRITY-ALERT][restoreStockOnOutboundReject] LOT 재고 복구 PATCH 실패 — 보상 트랜잭션 결과:",
           {
             outboundRecordId,
+            inboundRecordId,
             lotInventoryRecordId,
             outQty,
             currentLotQty,
             inboundRestored,
-            note: inboundRestored
-              ? "입고 관리 잔여수량은 이미 복구됨 — LOT 재고만 수동 +outQty 필요"
-              : "입고/LOT 모두 미복구 상태",
+            compensationAttempted: inboundRestored,
+            compensationOk,
+            ...compensationDetail,
+            note: !inboundRestored
+              ? "inbound 미복구 상태 — 보상 불필요, 양쪽 모두 차감된 상태로 유지됨"
+              : compensationOk
+                ? "inbound 잔여수량 원복 성공 — 양쪽 모두 차감된 상태로 일치"
+                : "inbound 원복 PATCH 실패 — 입고(+outQty) / LOT(미복구) 불일치, 수동 보정 필요",
           },
         );
-        return { success: false, message: "LOT 재고 복구에 실패했습니다." };
+        return {
+          success: false,
+          message: compensationOk
+            ? "LOT 재고 복구에 실패해 입고 관리 잔여수량을 원복했습니다. 다시 시도해주세요."
+            : "LOT 재고 복구에 실패했습니다. 수동 정합 확인이 필요합니다.",
+        };
       }
     } else {
       logWarn(
