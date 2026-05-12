@@ -3,10 +3,10 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
-■ 최근 변경 (2026-05-11)
-- QR 단일화 5단계 완료 — LOT 상세 페이지/API + `lib/lot-detail.ts` join 헬퍼 + `NEXT_PUBLIC_BASE_URL` 도입 + 메인 헤더 QR 버튼 + 옛 `?lot=` redirect + 출고/이동 폼 QR 제거 + `safeCallbackUrl()` open-redirect 차단
-- UI 일관성 정리 8건 — 라벨/버튼 명사형 통일("출고 수량"/"X 신청"), 단위 "BOX"→"박스" 한글화, placeholder "예:" 공백 정리, `window.confirm` 4곳 → `ConfirmBottomSheet` Promise 기반 모달(Context/Provider)
-- E1~E4 안정성 가드 Plan 수령 — admin.ts:598 비용 PATCH 반환값 미검사 / idempotency body hash / 출고 반려 보상 트랜잭션. 적용 범위 결정 대기 (다음 세션 시작 지점)
+■ 최근 변경 (2026-05-12)
+- E1~E4 운영 안정성 가드 4건 적용 (E2는 모니터링 모드, mutex 도입 X) + 통합 테스트 12건 신규 + legacy 페이지 2개 정리
+- PWA 설치 가능 완성 (Phase 0 완료) + 모바일·PC 분리 아키텍처 방향성 결정 + `docs/ROADMAP.md` 신규 (Phase 0~5+)
+- Phase 1 Step 0 outbound 정책 정렬 — `handleSubmitAll` B안(부분 성공 + 결과 패널 inline + 실패 N건 재시도) + 안전망 통합 테스트 4 시나리오
 
 ■ 프로젝트 아키텍처 방향성 (2026-05-12 결정)
 

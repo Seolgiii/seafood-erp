@@ -381,6 +381,44 @@ UX (3건):
 
 ---
 
+### 2026-05-12
+
+**완료한 작업**
+- E1~E4 운영 안정성 가드 4건 일괄 적용 (커밋 `1455484`) — E1 출고비용 PATCH 실패 가드 + E4 출고 반려 LOT 복구 보상 트랜잭션 + E3 idempotency body SHA256 hash 비교(다른 body → 409 `payload_mismatch`) + E2 출고 결재 race 모니터링 모드 (`[OUTBOUND-RACE-MON]` 로그, mutex 도입 X). 통합 테스트 12건 신규 (`outbound-cost-patch-fail`/`outbound-reject-lot-fail`/`idempotency-payload-mismatch`/`outbound-bulk-race`) + `injectFault()`/`clearFaults()` 테스트 인프라
+- legacy 페이지 2개 정리 (커밋 `b9474dc`) — `app/admin/approvals/page.tsx` (옛 프로토타입, 메뉴 없음) + `app/expense/record/page.tsx` (URL `/expense/record`인데 타이틀이 "원물 입고 등록"으로 모순, 한글 필드명 리팩터링 반영 안 됨). 외부 참조 0건 확인 후 제거
+- PWA 설치 가능 완성 (커밋 `6c35d42`, **Phase 0 완료**) — Android Chrome 192/512 아이콘 + apple-touch-icon 180×180 정규화 + favicon 32×32 + manifest theme_color #F2F4F6 통일 + sharp 기반 아이콘 재생성 스크립트
+- 모바일 PWA + PC PWA 분리 아키텍처 방향성 결정 (커밋 `f5c8dc9`) — CLAUDE.md에 단일 코드베이스/두 PWA 구조 명시 + `docs/ROADMAP.md` 신규 (Phase 0~5+ 상세 계획)
+- 최소 수정 원칙 의미 명확화 (커밋 `1705194`) — "잘 작동하는 기능은 건드리지 않음" 항목을 최소 수정 원칙에 흡수 통합, 계획된 변경 vs 의도하지 않은 변경 구분, 원칙 유래(AI 과잉 리팩토링 경험) 기록
+- Phase 1 Step 0 — outbound 정책 정렬 (커밋 `25293e1` 계획 → `e26873b` 1단계 → `59d7a5f` 2단계) — `test/integration/outbound-bulk-policy.test.ts` 4 시나리오 안전망 신규 (자연 거절 활용, fault injection 미사용) → `app/inventory/outbound/page.tsx` `handleSubmitAll` status 패턴 정렬 (첫 실패 abort 제거, successCartIds/failures 분리 누적, 결과 패널 inline, 실패 N건 재시도)
+
+**결정 사항**
+- E1~E4 적용 범위 = 4건 전부 (옵션 d), 단 E2는 모니터링 모드만 도입 — mutex 도입은 회귀 위험 + 1인 운영 빈도 낮아 보류
+- 프로젝트 아키텍처 방향 = 단일 Next.js 코드베이스 + 두 개의 PWA (모바일=작업자, PC=관리자) — Airtable이 하던 마스터 데이터 관리 역할을 PC PWA로 흡수, PostgreSQL 이전은 조건부 미래 단계
+- Phase 0~5+ 로드맵 신규 작성 (`docs/ROADMAP.md`) — Phase 0 ✅ / Phase 1 모바일 UX 다듬기 / Phase 2 백엔드 부채 / Phase 3 PC 화면 신설 / Phase 4 시범 출시 + 피드백 / Phase 5+ 조건부 (PostgreSQL 등)
+- Phase 1 Step 0 = outbound handleSubmitAll 정렬 (UI 작업 전 회계 안전 우선) — B안 = 부분 성공 허용 + 결과 화면 표시 (전체 롤백 아님)
+- Step 0 분할 = 1단계 회귀 방지 안전망 통합 테스트 4건 → 2단계 client 코드 정렬 — 1단계 코드 변경 0건 원칙 준수, 2단계는 안전망 위에서 진행
+- BulkResultsPanel 컴포넌트 추출 = Phase 1 Step 1로 분리 — outbound + status 페이지 결과 패널 inline JSX 일괄 추출 예정 (Step 0에서는 도메인 차이 유지 + outbound에 inline 패턴 그대로 복제)
+- 최소 수정 원칙 정의 = "계획된 작업은 가능 / 작업 범위 밖 코드는 손대지 않음" — 잘 작동하는 기능은 우선 보호, 리팩토링 필요 시 별도 작업으로 분리 제안
+
+**미해결 이슈**
+- Phase 1 Step 1 — `BulkResultsPanel` 컴포넌트 추출 대기 (outbound + status 중복 JSX 일괄 처리)
+- Phase 1 본격 모바일 UX 다듬기 항목 미시작 — 우선순위 정리 필요
+- 일일 보고서 5항목 추가 미진행 — `[INTEGRITY-ALERT]` / `[OUTBOUND-RACE-MON]` 카운트 / 음수 재고 / 잠긴 PIN / 결재 평균 소요시간
+- 운영 D-1 체크리스트 데이터 작업 17개 항목 — 갈치 LOT 16건 / 200건 보관처 비용 / 품목마스터 / 매입처·매입자·선박명 폼 필드 정합성
+- 사용자 안내 시급 5건 사내 공지 미작성 — PIN 잠금 / 자동 로그아웃 / QR 스캔 / 폼 필드 / 신청 결과 알림
+- "동결비" 필드 처리 의도 결정 미완 (사용자 확인 필요)
+- Airtable view 4개 미생성 — 음수 재고 / 24h stale / 잔여수량>입고수량 / 잠긴 PIN
+- LOW 9·10 (rounded 위계 / gray 톤) 디자인 토큰 정리 보류
+
+**다음 작업 후보**
+- Phase 1 Step 1 — `BulkResultsPanel` 컴포넌트 추출 (outbound + status 공통화, props로 accent 색만 분기)
+- Phase 1 본격 진행 — 모바일 UX 다듬기 항목 우선순위 정리 후 착수
+- 일일 보고서 5항목 추가 (`lib/daily-report.ts`) — E1/E2 조기 발견 알람
+- 운영 D-1 데이터 작업 (Airtable 직접) — 갈치 LOT backfill / 200건 보관처 비용 / 품목마스터 / 폼 필드 정합성
+- 사용자 안내 사내 공지 1장 작성 후 직원 배포
+
+---
+
 ## 누적 통계 (2026-05-06 기준)
 
 - 70 커밋, 활동 8일
