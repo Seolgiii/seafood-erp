@@ -46,20 +46,43 @@
 
 **목표**: 작업자가 모바일 PWA로 일상 업무를 무리 없이 처리할 수 있는 수준으로 완성
 
+**Phase 1 작업 원칙**:
+- 회계 영향 가능 코드는 통합 테스트 보강 후 작업
+- UI 작업 시 데이터 로직 미수정
+- 회귀 발견 즉시 작업 중단
+
 **우선순위**:
 
-1. /inventory/status (954 LOC) 길이 문제 해결
-   - 3단계 플로우의 세로 길이 부담
-   - 카드 다건 표시 시 가상 스크롤 또는 페이지네이션
-   - 필터 상단 고정으로 빠른 재검색
+### Step 0: outbound 정책 정렬 (회계 안전 우선)
+- 배경: 2026-05-12 진단 보고서에서 outbound의 handleSubmitAll이 결정 노트(출고이동_카트_UX_통일.md, B안 = A안과 동일 개념)를 미적용한 상태로 발견됨
+- 현재 동작: 중간 실패 시 abort, 처리된 건은 그대로 남음 + 사용자 미고지
+- 정책 목표: status의 handleBulkOutbound 패턴과 동일하게 정렬 (부분 성공 + 결과 화면 명시)
+- 작업 내용:
+  - A2_출고_골든패스 통합 테스트에 부분 성공/실패 케이스 보강
+  - outbound handleSubmitAll을 status 패턴으로 정렬
+  - BulkResultsPanel 또는 동등 UI를 outbound에도 적용
+- 위험: 중간 (결재 정합성 영역, 테스트 보강으로 완화)
+- 효과: 회계 사고 가능성 차단, 정책 일관성 확보
 
-2. /inventory/outbound (수정 21회, 1위) 사용성 다듬기
-   - 가장 자주 쓰이는 화면이라 작은 마찰도 큰 영향
-   - 실사용 마찰점 수집 후 일괄 수정
+### Step 1: 공통 LotCard 컴포넌트 추출 (기존 P0)
+- 세 화면(status results, outbound 검색 결과, dashboard 카드)의 LOT 표기를 통일
+- 변형은 props(showQtyInput, showStock, action 등)로 분기
+- 다른 화면에도 즉시 효과, 회귀 위험 낮음
 
-3. /admin/dashboard (547 LOC) 결재 흐름 검토
-   - 결재 카드 다건 시 스크롤 부담
-   - 모바일에서 결재 액션 시트 최적화 확인
+### Step 2: 포맷 helper 일관화 (기존 P0)
+- formatIntKo 사용을 status에도 확산
+- toLocaleString 직접 호출 제거
+- 회귀 위험 매우 낮음, "박스" 표기 한글 통일에 후속
+
+### Step 3: /inventory/status 3단계 분리 (기존 P1)
+- 3단계(form / results / summary) 모두 sub-route로 분리
+- 효과: (a) 컴포넌트 길이 ~300줄/단계로 감소 (b) 뒤로가기 자연스러움 (c) 각 단계 독립 테스트 가능
+- 결정 필요: stage 간 state 전달 방식 (query string / context / sessionStorage)
+
+### Step 4: /admin/dashboard renderCard 분해 (기존 P1)
+- ApprovalLogisticsCard / ApprovalExpenseCard 두 컴포넌트로 분리
+- isExpense / isTransfer 분기 일소
+- dashboard 단일 컴포넌트 길이 감소
 
 **진행 방식**:
 - Phase 0 끝나자마자 본인이 며칠 실사용
