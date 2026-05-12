@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   MagnifyingGlassIcon,
   TrashIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/components/PageHeader';
 import { searchLotByKeyword, createOutboundRecord } from '@/app/actions';
@@ -54,6 +56,16 @@ export default function OutboundRecordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  // ── 묶음 처리 결과 (B안: 부분 성공·실패 표시) ─────────────────────────────
+  // status 페이지의 handleBulkOutbound 패턴과 동일한 형태로 정렬.
+  // cart는 동일 LOT을 다른 판매처/판매가로 여러 번 담을 수 있으므로
+  // 식별자는 lotId가 아닌 cartId(고유) 기준.
+  type BulkResult = {
+    successCartIds: string[];
+    failures: { cartId: string; lotNumber: string; reason: string }[];
+  };
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null);
 
   // ── 초기화 ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -134,9 +146,16 @@ export default function OutboundRecordPage() {
   };
 
   // ── 출고 신청 ─────────────────────────────────────────────────────────────
+  // B안 정책 (obsidian-vault/40_결정기록/출고이동_카트_UX_통일.md):
+  //   첫 실패에서 abort 하지 않고 cart 끝까지 순회 → 성공/실패 분리 누적 →
+  //   실패 1건 이상이면 결과 패널 표시. 모두 성공이면 기존 단일 toast + redirect.
+  // 회귀 방지 안전망: test/integration/outbound-bulk-policy.test.ts 4 시나리오.
   const handleSubmitAll = async () => {
     if (cart.length === 0) return;
     setIsSubmitting(true);
+
+    const successCartIds: string[] = [];
+    const failures: { cartId: string; lotNumber: string; reason: string }[] = [];
 
     for (const item of cart) {
       const result = await createOutboundRecord({
@@ -152,16 +171,49 @@ export default function OutboundRecordPage() {
         salePrice: item.salePrice,
       });
 
-      if (!result.success) {
-        setIsSubmitting(false);
-        toast(`출고 실패 (${item.lotNumber}): ${result.error}`);
-        return;
+      if (result.success) {
+        successCartIds.push(item.cartId);
+      } else {
+        failures.push({
+          cartId: item.cartId,
+          lotNumber: item.lotNumber,
+          reason: result.error ?? '알 수 없는 오류',
+        });
       }
     }
 
     setIsSubmitting(false);
-    toast('출고 신청이 완료되었습니다. 관리자 승인 후 재고가 차감됩니다.', 'success');
-    router.push('/');
+
+    if (failures.length === 0) {
+      toast('출고 신청이 완료되었습니다. 관리자 승인 후 재고가 차감됩니다.', 'success');
+      router.push('/');
+      return;
+    }
+
+    setBulkResult({ successCartIds, failures });
+  };
+
+  // 실패 N건만 cart에 남기고 결과 패널 닫기 (재시도용)
+  const retryFailedBulk = () => {
+    if (!bulkResult) return;
+    const succeeded = new Set(bulkResult.successCartIds);
+    setCart((prev) => prev.filter((c) => !succeeded.has(c.cartId)));
+    setBulkResult(null);
+  };
+
+  // 성공 LOT 제거 + 요약 toast 후 결과 패널 닫기
+  const closeBulkResult = () => {
+    if (!bulkResult) return;
+    const succeeded = new Set(bulkResult.successCartIds);
+    setCart((prev) => prev.filter((c) => !succeeded.has(c.cartId)));
+    const successCount = bulkResult.successCartIds.length;
+    const failCount = bulkResult.failures.length;
+    const summary =
+      successCount > 0
+        ? `${successCount}건 신청 완료, ${failCount}건 실패`
+        : `${failCount}건 모두 실패`;
+    toast(summary, successCount > 0 ? 'info' : 'error');
+    setBulkResult(null);
   };
 
   return (
@@ -175,6 +227,8 @@ export default function OutboundRecordPage() {
       />
 
       <div className="p-4 space-y-4">
+        {!bulkResult && (
+          <>
         {/* ── 검색 · 선택 카드 ──────────────────────────────────────────── */}
         <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
 
@@ -386,10 +440,80 @@ export default function OutboundRecordPage() {
             </div>
           </div>
         )}
+          </>
+        )}
+
+        {/* ── 결과 패널 (B안: 부분 성공/실패 표시) ─────────────────────── */}
+        {bulkResult && (
+          <div className="space-y-4">
+            {bulkResult.successCartIds.length > 0 && (
+              <div className="bg-green-50 border border-green-100 rounded-[2rem] p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                  <p className="text-[14px] font-black text-green-700">
+                    {bulkResult.successCartIds.length}건 신청 완료
+                  </p>
+                </div>
+                <ul className="text-[12px] font-medium text-green-700 space-y-1 pl-7">
+                  {bulkResult.successCartIds.map((cid) => {
+                    const item = cart.find((c) => c.cartId === cid);
+                    return (
+                      <li key={cid} className="truncate font-mono">
+                        {item?.lotNumber ?? '—'}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {bulkResult.failures.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-[2rem] p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <ExclamationCircleIcon className="w-5 h-5 text-[#FF3B30]" />
+                  <p className="text-[14px] font-black text-[#FF3B30]">
+                    {bulkResult.failures.length}건 실패
+                  </p>
+                </div>
+                <ul className="space-y-2 pl-7">
+                  {bulkResult.failures.map((f) => (
+                    <li key={f.cartId} className="text-[12px]">
+                      <p className="font-bold text-gray-800 truncate font-mono">{f.lotNumber}</p>
+                      <p className="text-gray-500 mt-0.5">{f.reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <p className="text-[12px] font-medium text-gray-400 leading-relaxed px-1">
+              성공한 건은 결재 대기로 등록되었습니다. 실패한 건만 다시 시도하거나 닫고 종료할 수 있습니다.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* ── 출고 신청 버튼 (장바구니 1건 이상) ─────────────────────────────── */}
-      {cart.length > 0 && (
+      {/* ── 하단 고정 — 결과 패널일 땐 재시도/닫기, 평소엔 출고 신청 ──────── */}
+      {bulkResult ? (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F4F6] border-t border-gray-200 space-y-2">
+          {bulkResult.failures.length > 0 && (
+            <button
+              type="button"
+              onClick={retryFailedBulk}
+              className="w-full py-4 rounded-2xl text-white text-[16px] font-black bg-[#FF3B30] shadow-lg active:scale-[0.98] transition-all"
+            >
+              실패한 {bulkResult.failures.length}건 다시 시도
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={closeBulkResult}
+            className="w-full py-3 rounded-2xl text-gray-700 text-[14px] font-bold bg-gray-100 active:scale-[0.98] transition-all"
+          >
+            닫기
+          </button>
+        </div>
+      ) : cart.length > 0 ? (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F4F6] border-t border-gray-200">
           <button
             onClick={handleSubmitAll}
@@ -401,7 +525,7 @@ export default function OutboundRecordPage() {
             {isSubmitting ? '신청 중...' : `출고 신청 (${cart.length}건)`}
           </button>
         </div>
-      )}
+      ) : null}
     </main>
   );
 }
