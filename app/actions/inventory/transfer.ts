@@ -408,6 +408,13 @@ export async function approveTransfer(
     String(lotFields["최초입고일"] ?? lotFields["입고일자"] ?? "").trim() || 이동일;
 
   const newStorageName = newStorageId ? await resolveStorageName(newStorageId) : "";
+  // 품목명: 원본 LOT에 있으면 그대로, 없으면(재이동 케이스) 품목마스터에서 조회
+  let productName = String(lotFields["품목명"] ?? "").trim();
+  if (!productName && productMasterId) {
+    const pmRec = await fetchRecord("품목마스터", productMasterId);
+    productName = String(pmRec?.["품목명"] ?? "").trim();
+  }
+
   const lotInventoryFields: Record<string, unknown> = {
     "LOT번호": newLotNumber,
     "입고관리링크": [newInbound.id],
@@ -416,6 +423,8 @@ export async function approveTransfer(
     "규격": spec,
     "미수": misu,
     "수매가": pricing.newPurchasePrice,
+    ...(productMasterId && { "품목": [productMasterId] }),
+    ...(productName && { "품목명": productName }),
     "최초입고일": originalFirstInbound,
     "이동입고일": 이동일,
     "이월냉장료": pricing.newCarriedRefrigeration,
