@@ -349,7 +349,7 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       규격: spec,
       미수: misu,
       원산지: String(formData?.["원산지"] ?? "").trim(),
-      입고일자: bizDate,
+      최초입고일: bizDate,
       ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
       "입고수량(BOX)": qty,
       ...(productMaster.productCategory && { 품목구분: productMaster.productCategory }),

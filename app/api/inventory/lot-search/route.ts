@@ -29,8 +29,8 @@ export async function GET(request: Request) {
   if (q)    conditions.push(`FIND('${esc(q)}', {품목명})`);
   if (spec) conditions.push(`OR(FIND('${esc(spec)}', ${safe("규격표시")}), FIND('${esc(spec)}', ${safe("규격")}))`);
   if (misu) conditions.push(`OR(FIND('${esc(misu)}', ${safe("상세규격_표기")}), FIND('${esc(misu)}', ${safe("미수")}))`);
-  if (from) conditions.push(`NOT(IS_BEFORE({입고일자}, '${from}'))`);
-  if (to)   conditions.push(`NOT(IS_AFTER({입고일자}, '${to}'))`);
+  if (from) conditions.push(`NOT(IS_BEFORE({최초입고일}, '${from}'))`);
+  if (to)   conditions.push(`NOT(IS_AFTER({최초입고일}, '${to}'))`);
 
   const formula =
     conditions.length === 1 ? conditions[0] : `AND(${conditions.join(",")})`;
