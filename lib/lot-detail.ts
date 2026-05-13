@@ -151,7 +151,10 @@ export async function fetchLotDetailByNumber(
   let inboundStorageName = "";
   let inboundSupplierName = "";
   let inboundQty = 0;
-  let inboundDate = asString(lotFields[LOT_FIELDS.inboundDate]);
+  // 이동입고일 우선, 없으면 최초입고일
+  let inboundDate =
+    asString(lotFields[LOT_FIELDS.transferInboundDate]) ||
+    asString(lotFields[LOT_FIELDS.firstInboundDate]);
 
   if (inboundFields) {
     shipName = asString(inboundFields["선박명"]);
@@ -182,8 +185,7 @@ export async function fetchLotDetailByNumber(
   }
 
   const initialQty = asNumber(lotFields["입고수량(BOX)"]) || inboundQty;
-  const stockQty =
-    asNumber(lotFields["재고수량"]) || asNumber(lotFields[LOT_FIELDS.qtyBase]);
+  const stockQty = asNumber(lotFields[LOT_FIELDS.stockQty]);
   const productName =
     asString(productFields?.[PRODUCT_FIELDS.name]) ||
     asString(lotFields["품목명"]);

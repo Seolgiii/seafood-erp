@@ -117,8 +117,6 @@ export async function createInboundLotAndTxn(
   let baseSpec = "";
   let baseDetailSpec = "";
   let baseUnit = "";
-  let detailUnit = "";
-  let R: number | null = null;
 
   if (resolvedProductId) {
     assertRecordId(resolvedProductId, "productRecordId");
@@ -130,23 +128,17 @@ export async function createInboundLotAndTxn(
     baseSpec = String(pf[PRODUCT_FIELDS.spec] ?? "").trim();
     baseDetailSpec = String(pf[PRODUCT_FIELDS.detailSpec] ?? "").trim();
     baseUnit = String(pf[PRODUCT_FIELDS.baseUnit] ?? "").trim();
-    detailUnit = String(pf[PRODUCT_FIELDS.detailUnit] ?? "").trim();
-    const ratio = asNumber(pf[PRODUCT_FIELDS.detailPerBase]);
-    R = ratio != null && ratio > 1 ? ratio : null;
   } else {
     name = (productNameManual ?? "").trim();
     if (!name) throw new Error("Product name is required");
     baseSpec = specInput.trim();
     baseDetailSpec = misuInput.trim();
     baseUnit = "박스";
-    detailUnit = "";
-    R = null;
     const created = await createAirtableRecord(productTable(), {
       [PRODUCT_FIELDS.name]: name,
       [PRODUCT_FIELDS.spec]: baseSpec,
       [PRODUCT_FIELDS.detailSpec]: baseDetailSpec,
       [PRODUCT_FIELDS.baseUnit]: baseUnit,
-      [PRODUCT_FIELDS.detailUnit]: detailUnit,
     });
     resolvedProductId = created.id;
   }
@@ -166,15 +158,10 @@ export async function createInboundLotAndTxn(
     }),
   );
 
-  const qtyBase = qtyBoxes;
-  const qtyDetail =
-    R != null && baseUnit && detailUnit ? qtyBoxes * R : 0;
-
   const lotFields: Record<string, unknown> = {
     [LOT_FIELDS.lotNumber]: lotNumber,
     [LOT_FIELDS.productLink]: [resolvedProductId],
-    [LOT_FIELDS.qtyBase]: qtyBase,
-    [LOT_FIELDS.qtyDetail]: qtyDetail,
+    [LOT_FIELDS.stockQty]: qtyBoxes,
   };
 
   if (

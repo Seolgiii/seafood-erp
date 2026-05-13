@@ -27,8 +27,8 @@ export const LOT_FIELDS = {
   /** LOT에 직접 저장/룩업된 규격 필드(베이스별 실제 이름과 일치 필요) */
   spec: "규격표시",
   detailSpec: "상세규격_표기",
-  qtyBase: "기준단위_재고",
-  qtyDetail: "상세단위_재고",
+  /** 박스 단위 단일화된 재고수량 */
+  stockQty: "재고수량",
   /** LOT에 텍스트로 계산/룩업된 현재고(옵션) */
   stockText: "현재고",
   approvalStatus: "승인상태",
@@ -39,8 +39,10 @@ export const LOT_FIELDS = {
   memo: "비고",
   /** 보관처명 — 보관처 비용 이력 테이블과 조인 키 */
   storage: "보관처",
-  /** 입고일자 YYYY-MM-DD — 비용 이력 적용 기준 */
-  inboundDate: "입고일자",
+  /** LOT 최초 입고일 YYYY-MM-DD — 비용 이력 적용 기준 */
+  firstInboundDate: "최초입고일",
+  /** 재고 이동 승인일 (이동 안 된 LOT는 최초입고일과 동일) — 누적 경비 계산 기준 */
+  transferInboundDate: "이동입고일",
   /** 입고 승인 시 보관처 비용 이력에서 읽어 저장하는 냉장료 단가 */
   refrigerationFeePerUnit: "냉장료단가",
   /** 출고시점 단가 계산용 총중량 */
@@ -49,6 +51,13 @@ export const LOT_FIELDS = {
   inOutFeeStored: "입출고비",
   /** LOT에 저장/룩업된 노조비 단가 */
   unionFeeStored: "노조비",
+  /** LOT에 저장/룩업된 동결비 단가 */
+  freezeFeeStored: "동결비",
+  /** 이전 보관처에서 발생한 누적 경비 (이동 시 비례 분할 저장) */
+  carriedRefrigeration: "이월냉장료",
+  carriedInOutFee: "이월입출고비",
+  carriedUnionFee: "이월노조비",
+  carriedFreezeFee: "이월동결비",
   /** 판매 원가 */
   salePrice: "판매원가",
 } as const;
@@ -74,6 +83,7 @@ export const STORAGE_COST_FIELDS = {
   refrigerationFee: "냉장료",
   inOutFee: "입출고비",
   unionFee: "노조비",
+  freezeFee: "동결비",
 } as const;
 
 /** 승인상태 필드값 — 이 문구일 때 화면에 승인 대기 표시 */

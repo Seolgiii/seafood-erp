@@ -3,7 +3,7 @@ import "server-only";
  * 보관처 비용 이력 조회
  *
  * LOT의 입고일자와 보관처를 받아 해당 시점에 적용된
- * 냉장료·입출고비·노조비를 반환합니다.
+ * 냉장료·입출고비·노조비·동결비를 반환합니다.
  *
  * 적용 조건: 적용시작일 <= 입고일자 <= 적용종료일
  * 적용종료일이 비어 있으면 현재 유효한 요금으로 간주합니다.
@@ -21,6 +21,7 @@ export type StorageCost = {
   refrigerationFee: number | null; // 냉장료 (원/박스 등)
   inOutFee: number | null;         // 입출고비
   unionFee: number | null;         // 노조비
+  freezeFee: number | null;        // 동결비
 };
 
 // ─── 내부 유틸 ───────────────────────────────────────────────────────────────
@@ -79,7 +80,7 @@ export async function getStorageCostForLot(
     `)`,
   ].join("");
 
-  const fieldList = [SC.storage, SC.startDate, SC.endDate, SC.refrigerationFee, SC.inOutFee, SC.unionFee];
+  const fieldList = [SC.storage, SC.startDate, SC.endDate, SC.refrigerationFee, SC.inOutFee, SC.unionFee, SC.freezeFee];
   const fieldsQs = fieldList
     .map((f) => `fields[]=${encodeURIComponent(f)}`)
     .join("&");
@@ -111,6 +112,7 @@ export async function getStorageCostForLot(
     refrigerationFee: toNum(f[SC.refrigerationFee]),
     inOutFee: toNum(f[SC.inOutFee]),
     unionFee: toNum(f[SC.unionFee]),
+    freezeFee: toNum(f[SC.freezeFee]),
   };
 }
 

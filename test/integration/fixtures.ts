@@ -81,6 +81,7 @@ export const STORAGE_COST_BUSAN: AirtableRecord = {
     냉장료: 1700,
     입출고비: 600,
     노조비: 250,
+    동결비: 350,
   },
 };
 
@@ -94,6 +95,7 @@ export const STORAGE_COST_HANRIM: AirtableRecord = {
     냉장료: 1500,
     입출고비: 500,
     노조비: 200,
+    동결비: 300,
   },
 };
 
@@ -146,26 +148,46 @@ export function makeInStockLot(opts: {
   storageId?: string;
   productId?: string;
   purchasePrice?: number;
-  inboundDate?: string;
+  inboundDate?: string;          // 최초입고일 (default: 2026-04-15)
+  transferInboundDate?: string;  // 이동입고일 (default: 최초입고일과 동일)
+  refrigerationFeePerUnit?: number;
+  inOutFee?: number;
+  unionFee?: number;
+  freezeFee?: number;
+  carriedRefrigeration?: number;
+  carriedInOutFee?: number;
+  carriedUnionFee?: number;
+  carriedFreezeFee?: number;
 }): AirtableRecord {
+  const firstInbound = opts.inboundDate ?? "2026-04-15";
+  const fields: Record<string, unknown> = {
+    LOT번호: opts.lotNumber,
+    품목: opts.productId ? [opts.productId] : [PRODUCT_MACKEREL.id],
+    재고수량: opts.stockQty,
+    "입고수량(BOX)": opts.stockQty,
+    수매가: opts.purchasePrice ?? 50000,
+    총중량: opts.stockQty * 11, // 11kg/박스 기준
+    최초입고일: firstInbound,
+    보관처: opts.storageId ? [opts.storageId] : [STORAGE_HANRIM.id],
+    입고관리링크: [opts.inboundRecordId],
+    품목명: PRODUCT_MACKEREL.fields.품목명,
+    규격: "11",
+    미수: "26",
+    냉장료단가: opts.refrigerationFeePerUnit ?? 1500,
+    입출고비: opts.inOutFee ?? 500,
+    노조비: opts.unionFee ?? 200,
+    동결비: opts.freezeFee ?? 300,
+    이월냉장료: opts.carriedRefrigeration ?? 0,
+    이월입출고비: opts.carriedInOutFee ?? 0,
+    이월노조비: opts.carriedUnionFee ?? 0,
+    이월동결비: opts.carriedFreezeFee ?? 0,
+  };
+  // 이동입고일은 명시된 경우에만 채움 (이동 안 된 LOT은 null)
+  if (opts.transferInboundDate) {
+    fields.이동입고일 = opts.transferInboundDate;
+  }
   return {
     id: opts.id ?? "recLOTINSTOCK001",
-    fields: {
-      LOT번호: opts.lotNumber,
-      품목: opts.productId ? [opts.productId] : [PRODUCT_MACKEREL.id],
-      재고수량: opts.stockQty,
-      "입고수량(BOX)": opts.stockQty,
-      수매가: opts.purchasePrice ?? 50000,
-      총중량: opts.stockQty * 11, // 11kg/박스 기준
-      입고일자: opts.inboundDate ?? "2026-04-15",
-      보관처: opts.storageId ? [opts.storageId] : [STORAGE_HANRIM.id],
-      입고관리링크: [opts.inboundRecordId],
-      품목명: PRODUCT_MACKEREL.fields.품목명,
-      규격: "11",
-      미수: "26",
-      냉장료단가: 1500,
-      입출고비: 500,
-      노조비: 200,
-    },
+    fields,
   };
 }

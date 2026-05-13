@@ -35,11 +35,12 @@ export const OutboundFieldsSchema = z
     반려사유: z.string().optional(),
     출고증URL: z.string().optional(),
 
-    // 출고 승인 시 스냅샷되는 비용 7개 필드
+    // 출고 승인 시 스냅샷되는 비용 8개 필드
     "출고시점 단가": NumberLike,
     "출고시점 냉장료": NumberLike,
     "출고시점 입출고비": NumberLike,
     "출고시점 노조비": NumberLike,
+    "출고시점 동결비": NumberLike,
     "출고시점 판매원가": NumberLike,
     "출고시점 판매금액": NumberLike,
     "출고시점 손익": NumberLike,

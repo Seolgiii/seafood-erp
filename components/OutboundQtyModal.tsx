@@ -1,15 +1,13 @@
 "use client";
 
-import type { LotSearchCard, ShipmentInputMode } from "@/lib/inventory-types";
+import type { LotSearchCard } from "@/lib/inventory-types";
 import { readSession, touchSession } from "@/lib/session";
 import {
   formatQtyKo,
   fromGroupedQtyInputAllowDecimal,
 } from "@/lib/number-format";
 import {
-  canonicalDetailTotal,
-  defaultInputMode,
-  detailToInputQty,
+  maxOutboundQty,
   planOutboundRequest,
   quickAddPresets,
 } from "@/lib/shipment-plan";
@@ -29,14 +27,8 @@ const quickBtnClass =
 const primaryBtnClass =
   "w-full rounded-2xl bg-blue-600 py-7 text-center text-3xl font-bold text-white shadow-lg active:scale-[0.99] touch-manipulation hover:bg-blue-700 disabled:opacity-40 md:py-8 md:text-4xl";
 
-const modeBtnOn =
-  "flex-1 rounded-2xl border-4 border-blue-600 bg-blue-100 py-5 text-2xl font-bold text-blue-900 md:py-6 md:text-3xl";
-const modeBtnOff =
-  "flex-1 rounded-2xl border-4 border-slate-300 bg-white py-5 text-2xl font-semibold text-slate-700 md:py-6 md:text-3xl";
-
 export function OutboundQtyModal({ card, open, onClose }: Props) {
   const router = useRouter();
-  const [mode, setMode] = useState<ShipmentInputMode>("detail");
   const [qty, setQty] = useState(0);
   const [qtyInput, setQtyInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +38,6 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open || !card) return;
-    setMode(defaultInputMode(card));
     setQty(0);
     setQtyInput("");
     setSubmitErr(null);
@@ -61,12 +52,12 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
   }, [toast]);
 
   const plan = useMemo(
-    () => (card ? planOutboundRequest(qty, mode, card) : null),
-    [card, qty, mode]
+    () => (card ? planOutboundRequest(qty, card) : null),
+    [card, qty]
   );
 
-  const maxDetail = card ? canonicalDetailTotal(card) : 0;
-  const presets = card ? quickAddPresets(mode, card) : [];
+  const maxStock = card ? maxOutboundQty(card) : 0;
+  const presets = quickAddPresets();
 
   const formatQtyInput = (n: number): string => {
     if (!Number.isFinite(n) || n <= 0) return "";
@@ -75,10 +66,9 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
 
   const setMax = useCallback(() => {
     if (!card) return;
-    const next = detailToInputQty(maxDetail, mode, card);
-    setQty(next);
-    setQtyInput(formatQtyInput(next));
-  }, [card, mode, maxDetail]);
+    setQty(maxStock);
+    setQtyInput(formatQtyInput(maxStock));
+  }, [card, maxStock]);
 
   const submit = async () => {
     if (!card || !plan || plan.qtyInInputUnit <= 0) return;
@@ -102,7 +92,6 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
           lotRecordId: card.recordId,
           requestedQty: plan.qtyInInputUnit,
           unitLabel: plan.unitLabel,
-          yieldVarianceDetail: plan.yieldVarianceDetail,
         }),
       });
       const data = (await res.json()) as { error?: string; id?: string };
@@ -151,14 +140,6 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
 
   if (!open || !card) return null;
 
-  const dual =
-    card.detailPerBase != null &&
-    card.detailPerBase > 0 &&
-    card.baseUnitLabel.trim() &&
-    card.detailUnitLabel.trim();
-  const isPbo = card.detailPerBase != null && card.detailPerBase > 0;
-  const activeUnitLabel =
-    mode === "base" ? card.baseUnitLabel.trim() : card.detailUnitLabel.trim();
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-black/60 p-3 md:p-6"
@@ -201,50 +182,15 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
             출고 수량 입력
           </h3>
 
-          {dual && (
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                className={mode === "base" ? modeBtnOn : modeBtnOff}
-                onClick={() => setMode("base")}
-              >
-                {card.baseUnitLabel.trim()}
-              </button>
-              <button
-                type="button"
-                className={mode === "detail" ? modeBtnOn : modeBtnOff}
-                onClick={() => setMode("detail")}
-              >
-                {card.detailUnitLabel.trim()}
-              </button>
-            </div>
-          )}
-
-          {!isPbo && card.baseUnitLabel.trim() && (
-            <p className="mt-5 rounded-2xl border-2 border-blue-200 bg-blue-50 px-4 py-3 text-2xl font-semibold text-blue-900 md:text-3xl">
-              원물 출고: 박스 수량만 입력됩니다.
-            </p>
-          )}
-
-          {isPbo ? (
-            <p className="mt-6 text-2xl text-slate-600 md:text-3xl">
-              현재 합산(상세 환산):{" "}
-              <span className="font-bold text-slate-900">
-                {maxDetail.toLocaleString("ko-KR", { maximumFractionDigits: 3 })}{" "}
-                {card.detailUnitLabel.trim()}
-              </span>
-            </p>
-          ) : (
-            <p className="mt-6 text-2xl text-slate-600 md:text-3xl">
-              현재 박스 재고:{" "}
-              <span className="font-bold text-slate-900">
-                {(card.qtyBase ?? 0).toLocaleString("ko-KR", {
-                  maximumFractionDigits: 3,
-                })}{" "}
-                {card.baseUnitLabel.trim()}
-              </span>
-            </p>
-          )}
+          <p className="mt-6 text-2xl text-slate-600 md:text-3xl">
+            현재 박스 재고:{" "}
+            <span className="font-bold text-slate-900">
+              {maxStock.toLocaleString("ko-KR", {
+                maximumFractionDigits: 3,
+              })}{" "}
+              박스
+            </span>
+          </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3 md:gap-4">
             <span className="text-3xl font-semibold text-slate-700 md:text-4xl">
@@ -264,11 +210,7 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
                 setQty(value);
               }}
             />
-            {activeUnitLabel ? (
-              <span className="text-3xl font-bold md:text-4xl">
-                {activeUnitLabel}
-              </span>
-            ) : null}
+            <span className="text-3xl font-bold md:text-4xl">박스</span>
             <button
               type="button"
               className="rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-xl font-semibold text-slate-700 hover:bg-slate-50 md:text-2xl"
@@ -280,17 +222,6 @@ export function OutboundQtyModal({ card, open, onClose }: Props) {
               초기화
             </button>
           </div>
-
-          {plan && plan.yieldVarianceDetail !== 0 && (
-            <p className="mt-5 rounded-2xl border-4 border-amber-500 bg-amber-50 px-4 py-4 text-2xl font-bold text-amber-900 md:text-3xl">
-              수율 오차(Yield Variance) 자동 보정:{" "}
-              {plan.yieldVarianceDetail > 0 ? "+" : ""}
-              {plan.yieldVarianceDetail.toLocaleString("ko-KR", {
-                maximumFractionDigits: 3,
-              })}{" "}
-              {card.detailUnitLabel.trim() || ""} (전체 소진 스냅)
-            </p>
-          )}
 
           {submitErr && (
             <p className="mt-4 text-2xl text-red-600 md:text-3xl">

@@ -4,7 +4,7 @@ import { log, logError, logWarn } from '@/lib/logger';
 import { revalidatePath } from "next/cache";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { AuthError, requireWorker } from "@/lib/server-auth";
-import { calculateTransferPurchasePrice } from "@/lib/cost-calc";
+import { calculateTransferPricing } from "@/lib/cost-calc";
 import { generateUniqueLotNumber } from "@/lib/lot-sequence";
 import { TransferFieldsSchema, reportSchemaIssue } from "@/lib/schemas";
 
@@ -334,14 +334,22 @@ export async function approveTransfer(
     return { success: false, message: `잔여수량 부족 (잔여: ${currentRemain}박스, 이동: ${이동수량}박스)` };
   }
 
-  // 4. 새 수매가 = 판매원가 × (이동수량 / 재고수량)
-  //    판매원가 = 수매가 + 누적냉장료 + 입출고비 + 노조비 + 동결비
-  const newPurchasePrice = calculateTransferPurchasePrice({
+  // 4. 옵션 B 가격/이월 경비 산정
+  //    새 수매가         = 원본 수매가 × 비율 (단가만 이월)
+  //    새 이월냉장료     = (원본 누적냉장료 + 원본 이월냉장료) × 비율
+  //    새 이월입출고비   = (원본 입출고비 + 원본 이월입출고비) × 비율
+  //    새 이월노조비     = (원본 노조비 + 원본 이월노조비) × 비율
+  //    새 이월동결비     = (원본 동결비 + 원본 이월동결비) × 비율
+  const pricing = calculateTransferPricing({
     purchasePrice: num(lotFields["수매가"]),
     refrigerationCostAccum: num(lotFields["누적냉장료"]),
     inOutFee: num(lotFields["입출고비"]),
     unionFee: num(lotFields["노조비"]),
     freezeCost: num(lotFields["동결비"]),
+    carriedRefrigeration: num(lotFields["이월냉장료"]),
+    carriedInOutFee: num(lotFields["이월입출고비"]),
+    carriedUnionFee: num(lotFields["이월노조비"]),
+    carriedFreezeFee: num(lotFields["이월동결비"]),
     currentStock,
     transferQty: 이동수량,
   });
@@ -372,7 +380,7 @@ export async function approveTransfer(
     "미수": misu,
     "입고수량": 이동수량,
     "잔여수량": 이동수량,
-    "수매가": newPurchasePrice,
+    "수매가": pricing.newPurchasePrice,
     "원산지": 원산지,
     "승인상태": "승인 완료",
     "비고": "재고 이동",
@@ -391,14 +399,26 @@ export async function approveTransfer(
   // LOT번호 별도 PATCH (생성 시 자동 채번이 필요하므로 분리)
   await patchRecord("입고 관리", newInbound.id, { "LOT번호": newLotNumber });
 
-  // 7. 새 LOT별 재고 레코드 생성
+  // 7. 새 LOT별 재고 레코드 생성 (옵션 B)
+  //    - 최초입고일: 원본 LOT에서 복사 (LOT 추적용, 변경 X)
+  //    - 이동입고일: 이동일 (누적 경비 계산 기준일)
+  //    - 이월 4개: 비례 분할로 이전 보관처 비용 분리 저장
+  //    - 입출고비/노조비/동결비/냉장료단가: 새 보관처 비용 이력에서 조회
+  const originalFirstInbound =
+    String(lotFields["최초입고일"] ?? lotFields["입고일자"] ?? "").trim() || 이동일;
+
   const newStorageName = newStorageId ? await resolveStorageName(newStorageId) : "";
   const lotInventoryFields: Record<string, unknown> = {
     "LOT번호": newLotNumber,
     "입고관리링크": [newInbound.id],
     "재고수량": 이동수량,
-    "수매가": newPurchasePrice,
-    "입고일자": 이동일,
+    "수매가": pricing.newPurchasePrice,
+    "최초입고일": originalFirstInbound,
+    "이동입고일": 이동일,
+    "이월냉장료": pricing.newCarriedRefrigeration,
+    "이월입출고비": pricing.newCarriedInOutFee,
+    "이월노조비": pricing.newCarriedUnionFee,
+    "이월동결비": pricing.newCarriedFreezeFee,
     "LOT번호(이동출처)": [lotRecordId],
   };
   if (newStorageId) lotInventoryFields["보관처"] = [newStorageId];
@@ -409,6 +429,7 @@ export async function approveTransfer(
       if (cost?.refrigerationFee != null) lotInventoryFields["냉장료단가"] = cost.refrigerationFee;
       if (cost?.inOutFee != null) lotInventoryFields["입출고비"] = cost.inOutFee;
       if (cost?.unionFee != null) lotInventoryFields["노조비"] = cost.unionFee;
+      if (cost?.freezeFee != null) lotInventoryFields["동결비"] = cost.freezeFee;
     } catch (e) {
       logWarn("[approveTransfer] 새 보관처 비용 조회 실패 (승인 계속 진행):", e);
     }
@@ -437,7 +458,13 @@ export async function approveTransfer(
     originalLot: originalLotNumber,
     newLot: newLotNumber,
     이동수량,
-    newPurchasePrice,
+    newPurchasePrice: pricing.newPurchasePrice,
+    carried: {
+      refrigeration: pricing.newCarriedRefrigeration,
+      inOut: pricing.newCarriedInOutFee,
+      union: pricing.newCarriedUnionFee,
+      freeze: pricing.newCarriedFreezeFee,
+    },
   });
 
   return { success: true };

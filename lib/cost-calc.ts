@@ -15,7 +15,9 @@ export type OutboundCostBreakdown = {
   inOutFee: number;
   /** 노조비 (LOT 저장값 그대로) */
   unionFee: number;
-  /** 판매원가 = 단가 + 냉장료 + 입출고비 + 노조비 */
+  /** 동결비 (LOT 저장값 그대로) */
+  freezeFee: number;
+  /** 판매원가 = 단가 + 냉장료 + 입출고비 + 노조비 + 동결비 */
   totalCost: number;
   /** 손익 = 판매금액 − 판매원가 */
   profit: number;
@@ -32,9 +34,19 @@ export type OutboundCostInput = {
   inOutFee: number;
   /** LOT.노조비 */
   unionFee: number;
+  /** LOT.동결비 */
+  freezeFee: number;
+  /** LOT.이월냉장료 (이전 보관처에서 비례 분할로 이월된 누적 냉장료) */
+  carriedRefrigeration: number;
+  /** LOT.이월입출고비 */
+  carriedInOutFee: number;
+  /** LOT.이월노조비 */
+  carriedUnionFee: number;
+  /** LOT.이월동결비 */
+  carriedFreezeFee: number;
   /** 출고 관리.판매금액 */
   saleAmount: number;
-  /** LOT.입고일자 (YYYY-MM-DD) */
+  /** LOT.이동입고일 (YYYY-MM-DD) — 누적 냉장료 기준일 */
   inboundDate: string;
   /** 출고 관리.출고일 (YYYY-MM-DD) */
   outboundDate: string;
@@ -56,13 +68,25 @@ export function calculateOutboundCost(input: OutboundCostInput): OutboundCostBre
   const unitCost = input.totalWeight > 0 ? input.purchasePrice / input.totalWeight : 0;
   const daysHeld = daysBetween(input.inboundDate, input.outboundDate);
   const refrigerationCost = input.refrigerationFeePerUnit * daysHeld;
-  const totalCost = unitCost + refrigerationCost + input.inOutFee + input.unionFee;
+  const carried =
+    input.carriedRefrigeration +
+    input.carriedInOutFee +
+    input.carriedUnionFee +
+    input.carriedFreezeFee;
+  const totalCost =
+    unitCost +
+    refrigerationCost +
+    input.inOutFee +
+    input.unionFee +
+    input.freezeFee +
+    carried;
   return {
     unitCost,
     refrigerationCost,
     daysHeld,
     inOutFee: input.inOutFee,
     unionFee: input.unionFee,
+    freezeFee: input.freezeFee,
     totalCost,
     profit: input.saleAmount - totalCost,
   };
@@ -71,7 +95,7 @@ export function calculateOutboundCost(input: OutboundCostInput): OutboundCostBre
 export type TransferPricingInput = {
   /** 원본 LOT.수매가 */
   purchasePrice: number;
-  /** 원본 LOT.누적냉장료 */
+  /** 원본 LOT.누적냉장료 (formula 결과 — 이동입고일 ~ 오늘) */
   refrigerationCostAccum: number;
   /** 원본 LOT.입출고비 */
   inOutFee: number;
@@ -79,25 +103,63 @@ export type TransferPricingInput = {
   unionFee: number;
   /** 원본 LOT.동결비 */
   freezeCost: number;
+  /** 원본 LOT.이월냉장료 */
+  carriedRefrigeration: number;
+  /** 원본 LOT.이월입출고비 */
+  carriedInOutFee: number;
+  /** 원본 LOT.이월노조비 */
+  carriedUnionFee: number;
+  /** 원본 LOT.이월동결비 */
+  carriedFreezeFee: number;
   /** 원본 LOT.재고수량 (박스) */
   currentStock: number;
   /** 이동 수량 (박스) */
   transferQty: number;
 };
 
+export type TransferPricing = {
+  /** 새 LOT.수매가 = 원본 수매가 × 비율 (원본 단가만 이월, 비용은 이월 필드에 분해 저장) */
+  newPurchasePrice: number;
+  /** 새 LOT.이월냉장료 = (원본 누적냉장료 + 원본 이월냉장료) × 비율 */
+  newCarriedRefrigeration: number;
+  /** 새 LOT.이월입출고비 = (원본 입출고비 + 원본 이월입출고비) × 비율 */
+  newCarriedInOutFee: number;
+  /** 새 LOT.이월노조비 = (원본 노조비 + 원본 이월노조비) × 비율 */
+  newCarriedUnionFee: number;
+  /** 새 LOT.이월동결비 = (원본 동결비 + 원본 이월동결비) × 비율 */
+  newCarriedFreezeFee: number;
+};
+
 /**
- * 재고 이동 시 새 LOT의 수매가 산정
- *   판매원가 = 수매가 + 누적냉장료 + 입출고비 + 노조비 + 동결비
- *   비율    = 이동수량 / 재고수량
- *   새 수매가 = round(판매원가 × 비율)
+ * 재고 이동 시 새 LOT의 가격/이월 경비 산정 (옵션 B)
+ *
+ *   비율 = 이동수량 / 재고수량
+ *   새 수매가          = round(원본 수매가 × 비율)
+ *   새 이월냉장료      = round((원본 누적냉장료 + 원본 이월냉장료) × 비율)
+ *   새 이월입출고비    = round((원본 입출고비 + 원본 이월입출고비) × 비율)
+ *   새 이월노조비      = round((원본 노조비 + 원본 이월노조비) × 비율)
+ *   새 이월동결비      = round((원본 동결비 + 원본 이월동결비) × 비율)
+ *
+ * 이렇게 분해 저장해 두면 새 LOT의 판매원가 formula에서
+ *   단가 + (새 보관처 누적냉장료/입출고비/노조비/동결비) + (이월 4개)
+ * 를 합산해 출고시점까지의 누적 비용을 정확히 계산할 수 있다.
  */
-export function calculateTransferPurchasePrice(input: TransferPricingInput): number {
-  const totalCost =
-    input.purchasePrice +
-    input.refrigerationCostAccum +
-    input.inOutFee +
-    input.unionFee +
-    input.freezeCost;
-  const ratio = input.currentStock > 0 ? input.transferQty / input.currentStock : 0;
-  return Math.round(totalCost * ratio);
+export function calculateTransferPricing(input: TransferPricingInput): TransferPricing {
+  const ratio =
+    input.currentStock > 0 ? input.transferQty / input.currentStock : 0;
+  return {
+    newPurchasePrice: Math.round(input.purchasePrice * ratio),
+    newCarriedRefrigeration: Math.round(
+      (input.refrigerationCostAccum + input.carriedRefrigeration) * ratio
+    ),
+    newCarriedInOutFee: Math.round(
+      (input.inOutFee + input.carriedInOutFee) * ratio
+    ),
+    newCarriedUnionFee: Math.round(
+      (input.unionFee + input.carriedUnionFee) * ratio
+    ),
+    newCarriedFreezeFee: Math.round(
+      (input.freezeCost + input.carriedFreezeFee) * ratio
+    ),
+  };
 }

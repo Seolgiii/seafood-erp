@@ -3,9 +3,8 @@
 import type { LotSearchCard } from "@/lib/inventory-types";
 import { fromGroupedIntegerInput } from "@/lib/number-format";
 import { readSession, touchSession } from "@/lib/session";
-import { defaultInputMode } from "@/lib/shipment-plan";
 import { toast } from "@/lib/toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   card: LotSearchCard | null;
@@ -25,15 +24,13 @@ export function InboundQtyModal({ card, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open || !card) return;
-    // 원물/PBO 판단은 서버에서 처리하지만, UX상 박스 입력이 기본
-    defaultInputMode(card); // keep behavior consistent
     setQtyInput("");
     setQty(0);
     setErr(null);
     setOk(false);
   }, [open, card]);
 
-  const unitLabel = useMemo(() => (card ? card.baseUnitLabel.trim() : ""), [card]);
+  const unitLabel = "박스";
   const specDetail = card?.specDetail.trim() ?? "";
 
   const submit = async () => {
@@ -45,13 +42,6 @@ export function InboundQtyModal({ card, open, onClose }: Props) {
       toast(m, "error");
       return;
     }
-    if (!unitLabel) {
-      const m = "기준단위(박스) 라벨이 없어 입고를 처리할 수 없습니다.";
-      setErr(m);
-      toast(m, "error");
-      return;
-    }
-
     setSubmitting(true);
     setErr(null);
     try {

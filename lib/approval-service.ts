@@ -15,7 +15,6 @@ import { formatSpecKgMisu } from "@/lib/spec-display";
 import { computeLotStockAfterOutbound } from "@/lib/stock-deduction";
 import type { N8nOutboundPayload, PendingTxnRow } from "@/lib/approval-types";
 import {
-  DEFAULT_TXN_TABLE,
   TXN,
   txnStatusApproved,
   txnStatusCompleted,
@@ -76,26 +75,10 @@ function orRecordIds(ids: string[]): string {
   return ids.map((id) => `RECORD_ID()="${escapeFormulaString(id)}"`).join(",");
 }
 
-/** LOT 테이블에 박스 잔여를 따로 두는 경우(수동 숫자 필드만 PATCH). Formula/Lookup이면 비워 두세요. */
-function optionalLotRemainingFieldName(): string | null {
-  const fromEnv = process.env.AIRTABLE_LOT_REMAINING_QTY_FIELD?.trim();
-  if (fromEnv) return fromEnv;
-  return null;
-}
-
 function buildLotInventoryPatch(
-  afterBase: number,
-  afterDetail: number
+  afterStock: number
 ): Record<string, unknown> {
-  const patch: Record<string, unknown> = {
-    [LOT.qtyBase]: afterBase,
-    [LOT.qtyDetail]: afterDetail,
-  };
-  const rem = optionalLotRemainingFieldName();
-  if (rem) {
-    patch[rem] = afterBase;
-  }
-  return patch;
+  return { [LOT.stockQty]: afterStock };
 }
 
 async function fetchRecordsByIds(
@@ -296,16 +279,10 @@ export async function approveOutboundTransaction(
   const pf = prRec.fields;
 
   const productName = String(pf[PR.name] ?? "").trim();
-  const category = String(pf[PR.category] ?? "").trim();
   const spec = String(pf[PR.spec] ?? "").trim();
   const detailSpec = String(pf[PR.detailSpec] ?? "").trim();
-  const baseU = String(pf[PR.baseUnit] ?? "").trim();
-  const detailU = String(pf[PR.detailUnit] ?? "").trim();
-  const ratio = asNumber(pf[PR.detailPerBase]);
-  const R = ratio != null && ratio > 0 ? ratio : null;
 
-  const B0 = asNumber(lf[LOT.qtyBase]) ?? 0;
-  const D0 = asNumber(lf[LOT.qtyDetail]) ?? 0;
+  const B0 = asNumber(lf[LOT.stockQty]) ?? 0;
 
   const workerId = firstLinkedId(tf[TXN.worker]);
   let workerName = "-";
@@ -329,56 +306,23 @@ export async function approveOutboundTransaction(
     productName: productName || "-",
     spec: spec || "-",
     detailSpec,
-    baseUnitLabel: baseU,
-    detailUnitLabel: detailU,
-    detailPerBase: R,
+    baseUnitLabel: "박스",
+    detailUnitLabel: "",
+    detailPerBase: null,
   };
 
-  // 품목 구분: 품목 마스터 `품목 구분`에 '원물'/'가공' 포함 여부 우선, 없으면 기준1당_상세수량 유무로 추정
-  const isRawByCategory = category.includes("원물");
-  const isProcessedByCategory = category.includes("가공");
-  const isRaw = isRawByCategory || (!isProcessedByCategory && R == null);
-
-  // 재고 초과 출고 방지 (PATCH 전 검증)
-  if (isRaw) {
-    if (unit !== baseU) {
-      throw new Error(`원물 출고 단위가 올바르지 않습니다: ${baseU} 단위만 허용`);
-    }
-    if (qty > B0) {
-      throw new Error("재고가 부족합니다");
-    }
-  } else {
-    /**
-     * 가공품(PBO) 스켈레톤: 상세 단위 공간에서의 총 차감량을 계산한 뒤 허용 재고와 비교.
-     * - 상세 단위로 출고: detailRemoved = qty + 수율오차
-     * - 기준(박스) 단위로 출고: detailRemoved = qty × R + 수율오차 (R = 기준1당_상세수량)
-     * 실제 LOT 반영은 아래 `computeLotStockAfterOutbound`가 동일한 규칙으로 수행.
-     */
-    const detailOut =
-      unit === detailU
-        ? qty + yieldV
-        : unit === baseU && R != null
-          ? qty * R + yieldV
-          : qty + yieldV;
-    const canonicalBefore = (R ?? 0) * B0 + D0;
-    if (detailOut > canonicalBefore + 1e-9) {
-      throw new Error("재고가 부족합니다");
-    }
+  // 박스 단위 단일화: 재고 초과 출고 방지
+  if (qty > B0) {
+    throw new Error("재고가 부족합니다");
   }
 
-  const after = computeLotStockAfterOutbound({
-    qtyBase: B0,
-    qtyDetail: D0,
+  const afterStock = computeLotStockAfterOutbound({
+    currentStock: B0,
     requestedQty: qty,
-    requestUnit: unit,
-    yieldVarianceDetail: yieldV,
-    productBaseUnit: baseU,
-    productDetailUnit: detailU,
-    detailPerBase: R,
   });
 
-  const lotPatch = buildLotInventoryPatch(after.qtyBase, after.qtyDetail);
-  const lotRollback = buildLotInventoryPatch(B0, D0);
+  const lotPatch = buildLotInventoryPatch(afterStock);
+  const lotRollback = buildLotInventoryPatch(B0);
 
   let lotPatched = false;
   try {
@@ -404,11 +348,8 @@ export async function approveOutboundTransaction(
   const webhook = process.env.N8N_APPROVAL_WEBHOOK_URL?.trim();
   const payload = buildN8nPayload(
     row,
-    { base: B0, detail: D0 },
-    {
-      base: after.qtyBase,
-      detail: after.qtyDetail,
-    },
+    { base: B0, detail: 0 },
+    { base: afterStock, detail: 0 },
     completedLabel
   );
 

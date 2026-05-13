@@ -11,19 +11,13 @@ export type LotSearchCard = {
   specDisplayLine: string;
   stockLine: string;
   pendingApproval: boolean;
-  qtyBase: number | null;
-  qtyDetail: number | null;
-  baseUnitLabel: string;
-  detailUnitLabel: string;
-  /** `기준1당_상세수량`: detail units per 1 base unit */
-  detailPerBase: number | null;
+  /** 박스 단위 재고수량 */
+  stockQty: number | null;
   productRecordId: string | null;
   /** LOT의 보관처명 */
   storage: string;
-  /** LOT의 입고일자 YYYY-MM-DD */
+  /** LOT의 입고일자 YYYY-MM-DD (이동입고일 우선, 없으면 최초입고일) */
   inboundDate: string;
   /** 입고일자 기준으로 조회된 보관처 요금 (없으면 null) */
   storageCost: StorageCost | null;
 };
-
-export type ShipmentInputMode = "base" | "detail";

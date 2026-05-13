@@ -13,10 +13,11 @@ import {
  *  - LOT번호 (텍스트, primary)
  *  - 품목 (품목마스터 link)
  *  - 입고관리링크 (입고 관리 link)
- *  - 재고수량 / 기준단위_재고 / 상세단위_재고
+ *  - 재고수량 (박스 단위 단일)
  *  - 보관처 (보관처 마스터 link)
- *  - 입고일자 (Date)
- *  - 수매가, 냉장료단가, 입출고비, 노조비 (number)
+ *  - 최초입고일 / 이동입고일 (Date)
+ *  - 수매가, 냉장료단가, 입출고비, 노조비, 동결비 (number)
+ *  - 이월냉장료 / 이월입출고비 / 이월노조비 / 이월동결비 (number)
  */
 
 export const LotFieldsSchema = z
@@ -30,8 +31,6 @@ export const LotFieldsSchema = z
     미수: z.string().optional(),
 
     재고수량: NumberLike,
-    기준단위_재고: NumberLike,
-    상세단위_재고: NumberLike,
     현재고: z.string().optional(),
 
     "입고수량(BOX)": NumberLike,
@@ -42,7 +41,8 @@ export const LotFieldsSchema = z
     원산지: z.string().optional(),
 
     보관처: LinkedRecord,
-    입고일자: z.string().optional(),
+    최초입고일: z.string().optional(),
+    이동입고일: z.string().optional(),
     입고관리링크: LinkedRecord,
     매입처: LinkedRecord,
     품목구분: z.string().optional(),
@@ -50,6 +50,12 @@ export const LotFieldsSchema = z
     냉장료단가: NumberLike,
     입출고비: NumberLike,
     노조비: NumberLike,
+    동결비: NumberLike,
+
+    이월냉장료: NumberLike,
+    이월입출고비: NumberLike,
+    이월노조비: NumberLike,
+    이월동결비: NumberLike,
 
     승인상태: z.string().optional(),
     비고: z.string().optional(),

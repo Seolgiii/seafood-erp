@@ -388,7 +388,7 @@ async function createLotOnInboundApproval(
     lotPatchFields["입고자"] = [workerLinkId]; // 작업자 테이블 링크 배열 형태로 저장
   }
 
-  // 입고일자 기준으로 보관처 비용 이력에서 냉장료단가·입출고비·노조비를 조회해 LOT에 저장
+  // 입고일자 기준으로 보관처 비용 이력에서 냉장료단가·입출고비·노조비·동결비를 조회해 LOT에 저장
   const storage = await resolveStorageName(inboundFields["보관처"]);
   const inboundDate = String(inboundFields["입고일"] ?? "").trim() || seoulDateString();
   if (storage) {
@@ -397,6 +397,7 @@ async function createLotOnInboundApproval(
       if (cost?.refrigerationFee != null) lotPatchFields["냉장료단가"] = cost.refrigerationFee;
       if (cost?.inOutFee != null) lotPatchFields["입출고비"] = cost.inOutFee;
       if (cost?.unionFee != null) lotPatchFields["노조비"] = cost.unionFee;
+      if (cost?.freezeFee != null) lotPatchFields["동결비"] = cost.freezeFee;
     } catch (e) {
       logWarn("[createLotOnInboundApproval] 보관처 비용 조회 실패 (승인은 계속 진행):", e);
     }
@@ -465,6 +466,7 @@ async function revertLotOnInboundReject(
     냉장료단가: null,
     입출고비: null,
     노조비: null,
+    동결비: null,
   });
   if (!ok) {
     logError(
@@ -651,8 +653,13 @@ async function deductStockOnOutboundApproval(
           refrigerationFeePerUnit: num(lotFields["냉장료단가"]),
           inOutFee: num(lotFields["입출고비"]),
           unionFee: num(lotFields["노조비"]),
+          freezeFee: num(lotFields["동결비"]),
+          carriedRefrigeration: num(lotFields["이월냉장료"]),
+          carriedInOutFee: num(lotFields["이월입출고비"]),
+          carriedUnionFee: num(lotFields["이월노조비"]),
+          carriedFreezeFee: num(lotFields["이월동결비"]),
           saleAmount,
-          inboundDate: String(lotFields["입고일자"] ?? "").trim(),
+          inboundDate: String(lotFields["이동입고일"] ?? lotFields["최초입고일"] ?? "").trim(),
           outboundDate: String(outFields["출고일"] ?? "").trim(),
         });
 
@@ -661,6 +668,7 @@ async function deductStockOnOutboundApproval(
           "출고시점 냉장료": breakdown.refrigerationCost,
           "출고시점 입출고비": breakdown.inOutFee,
           "출고시점 노조비": breakdown.unionFee,
+          "출고시점 동결비": breakdown.freezeFee,
           "출고시점 판매원가": breakdown.totalCost,
           "출고시점 판매금액": saleAmount,
           "출고시점 손익": breakdown.profit,
@@ -853,12 +861,13 @@ async function restoreStockOnOutboundReject(
     );
   }
 
-  // 3. 출고시점 비용 7개 필드 클리어 (반려된 출고가 손익 보고서에 잡히지 않도록)
+  // 3. 출고시점 비용 8개 필드 클리어 (반려된 출고가 손익 보고서에 잡히지 않도록)
   const clearOk = await patchRecord("출고 관리", outboundRecordId, {
     "출고시점 단가": null,
     "출고시점 냉장료": null,
     "출고시점 입출고비": null,
     "출고시점 노조비": null,
+    "출고시점 동결비": null,
     "출고시점 판매원가": null,
     "출고시점 판매금액": null,
     "출고시점 손익": null,

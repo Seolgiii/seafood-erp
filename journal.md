@@ -419,6 +419,44 @@ UX (3건):
 
 ---
 
+### 2026-05-13
+
+**완료한 작업**
+- 동결비 통합 (1단계) — 입고 승인 시 보관처 비용 이력에서 동결비를 LOT에 PATCH + 입고 반려 시 null 클리어 + 출고 승인 시 출고시점 동결비 스냅샷 + 출고 반려 시 null 복구. `lib/storage-cost.ts` / `lib/cost-calc.ts` / `lib/schemas/outbound.ts` / `app/actions/admin/admin.ts` 4곳 수정. `lib/cost-calc.test.ts`에 동결비 합산 케이스 추가.
+- 가공품 분기 전체 제거 (2단계) — Airtable에 실제 필드가 없는 `기준단위_재고`/`상세단위_재고` 코드 분기 12파일 정리. 박스 단위 / 재고수량 단일화. `stock-deduction.ts` 단순화, `shipment-plan.ts` mode/PBO 분기 제거, `OutboundQtyModal.tsx` mode 토글/수율오차 UI 제거. 가공품 흐름이 필요해지면 별도 모듈로 설계할 것 (메모리 저장).
+- 옵션 B 완성 (3단계) — 재고 이동 시 새 LOT의 최초입고일은 원본에서 복사 + 이동입고일은 이동일 + 이월 4개(냉장료/입출고비/노조비/동결비)는 비례 분할로 분리 저장. `cost-calc.ts`에 `calculateTransferPricing` 신규 함수 추가, `transfer.ts:approveTransfer` 새 LOT 필드 정리.
+- 누적 경비 계산 (4단계) — `calculateOutboundCost`에 이월 4개 합산 추가, Airtable formula 두 개(`판매원가`/`누적냉장료`)를 MCP로 직접 갱신 — 이동입고일 ?? 최초입고일 fallback + 이월 4개 합산.
+- 기존 데이터 마이그레이션 (5단계) — Airtable LOT 197건 batch PATCH로 이동입고일 채움 → 사용자 의도 재확인 후 196건 롤백 (이동입고일 = null). 이동된 적 있는 LOT 1건(`recfFhdj2rVdHSgiR`)은 그대로 유지하고 최초입고일을 2026-04-13(원본 LOT 기준)으로 정정.
+- 통합 테스트 7건 신규 (6단계, `test/integration/cost-carryover.test.ts`) — 입고 동결비 저장 / 입고 반려 동결비 null / 출고시점 동결비 / 출고 반려 동결비 복구 / 이동 시 이월 비례 분할 + 최초입고일 보존 / D1 재이동 누적 / 이동 후 출고 판매원가 합산.
+- 운영 검증 체크리스트 신규 (`docs/CHECKLIST-COST-CARRYOVER.md`) — 6 시나리오 운영 환경 골든패스 검증용.
+
+**결정 사항**
+- 동결비 입력 방식 = 옵션 b (보관처 비용 이력 테이블에 저장 + 입고 시 LOT으로 복사). 1회 발생 (입출고비/노조비/동결비) vs 일당 발생 (냉장료) 구분 유지.
+- 이동 이력 추적은 별도 필드 없이 원본LOT 체인 + 이동입고일로 코드에서 동적 생성 (PC 화면 도입 시 구현). 데이터 중복 회피.
+- 가공품 흐름은 단순 필드 추가가 아닌 별도 모듈로 설계 — 원물 → 가공공장 출고 → 가공 → 재입고(필렛) 체인은 새 시스템 필요.
+- 이월 4개 필드 타입은 number → currency로 변환 (다른 비용 필드 일관성). `_tmp_삭제대상` suffix로 임시 rename 후 새 필드 생성, UI에서 수동 삭제.
+- 최초입고일 = 진짜 처음 입고일 (모든 LOT). 이동입고일 = 이동 시에만 채움 (이동 안 된 LOT은 null). 코드/formula 모두 `이동입고일 ?? 최초입고일` fallback 패턴.
+- 출고시점 이월 4개의 별도 스냅샷은 미추가 (총합으로 판매원가에 합산되므로 분해 저장 불필요). 출고시점 동결비만 신규.
+
+**미해결 이슈**
+- **알려진 flaky test — `test/integration/security.test.ts` pin_hash 시나리오** — 단독 실행 시 통과, 전체 동시 실행 시 가끔 fail. cost-carryover 제외하고 실행해도 동일 재현 → 사전 존재 이슈. 운영 코드 영향 없음. 별도 작업으로 디버깅 예정.
+- `recfFhdj2rVdHSgiR` LOT의 이월 4개는 0 (옵션 B 도입 이전 이동분이라 추적 불가). 운영상 영향 작음 — 손익 과소 추정 가능.
+
+**다음 작업 후보**
+- 운영 환경에서 `docs/CHECKLIST-COST-CARRYOVER.md` 6 시나리오 골든패스 검증
+- security.test.ts flaky 디버깅 (별도 작업)
+- Phase 1 Step 1 — `BulkResultsPanel` 컴포넌트 추출
+
+---
+
+## 누적 통계 (2026-05-13 기준)
+
+- 단위 테스트: 5 files / **105 pass** (+2 vs 5-06)
+- 통합 테스트: 18 files / **68 pass** (+7 시나리오: cost-carryover)
+- 신규 Airtable 필드: LOT.이동입고일, LOT.이월냉장료/이월입출고비/이월노조비/이월동결비, 출고관리.출고시점 동결비
+- 필드명 변경: LOT.입고일자 → 최초입고일
+- 신규 Airtable formula 갱신: LOT.판매원가, LOT.누적냉장료 (이동입고일 ?? 최초입고일 fallback + 이월 4개 합산)
+
 ## 누적 통계 (2026-05-06 기준)
 
 - 70 커밋, 활동 8일

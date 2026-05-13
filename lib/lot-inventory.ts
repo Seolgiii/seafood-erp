@@ -58,43 +58,6 @@ function firstNonEmptyString(
   return "";
 }
 
-export function formatRemainingLine(
-  baseQty: number | null,
-  detailQty: number | null,
-  baseLabel: string,
-  detailLabel: string
-): string {
-  const bU = baseLabel.trim();
-  const dU = detailLabel.trim();
-  const hasB = baseQty != null && bU.length > 0;
-  const hasD = detailQty != null && dU.length > 0;
-  const prefix = "잔여: ";
-
-  if (hasB && hasD) {
-    return `${prefix}${formatQtyKo(baseQty!)}${bU}(${formatQtyKo(detailQty!)}${dU})`;
-  }
-  if (hasB) {
-    return `${prefix}${formatQtyKo(baseQty!)}${bU}`;
-  }
-  if (hasD) {
-    return `${prefix}${formatQtyKo(detailQty!)}${dU}`;
-  }
-  return `${prefix}-`;
-}
-
-function formatRemainingLineFallback(
-  baseQty: number | null,
-  detailQty: number | null
-): string {
-  const prefix = "잔여: ";
-  if (baseQty != null && detailQty != null) {
-    return `${prefix}${formatQtyKo(baseQty)} / ${formatQtyKo(detailQty)}`;
-  }
-  if (baseQty != null) return `${prefix}${formatQtyKo(baseQty)}`;
-  if (detailQty != null) return `${prefix}${formatQtyKo(detailQty)}`;
-  return `${prefix}-`;
-}
-
 function isPendingApproval(fields: Record<string, unknown>): boolean {
   const raw = fields[LOT.approvalStatus];
   const s = String(raw ?? "").trim();
@@ -120,9 +83,6 @@ type ProductRow = {
   name: string;
   spec: string;
   detailSpec: string;
-  baseUnit: string;
-  detailUnit: string;
-  detailPerBase: number | null;
 };
 
 async function fetchProductsByIds(ids: string[]): Promise<Map<string, ProductRow>> {
@@ -130,14 +90,7 @@ async function fetchProductsByIds(ids: string[]): Promise<Map<string, ProductRow
   if (ids.length === 0) return map;
 
   const tbl = productTable();
-  const fieldList = [
-    PR.name,
-    PR.spec,
-    PR.detailSpec,
-    PR.baseUnit,
-    PR.detailUnit,
-    PR.detailPerBase,
-  ] as const;
+  const fieldList = [PR.name, PR.spec, PR.detailSpec] as const;
   const fieldsQs = fieldList
     .map((f) => `fields[]=${encodeURIComponent(f)}`)
     .join("&");
@@ -154,9 +107,6 @@ async function fetchProductsByIds(ids: string[]): Promise<Map<string, ProductRow
         name: String(r.fields[PR.name] ?? "").trim(),
         spec: String(r.fields[PR.spec] ?? "").trim(),
         detailSpec: String(r.fields[PR.detailSpec] ?? "").trim(),
-        baseUnit: String(r.fields[PR.baseUnit] ?? "").trim(),
-        detailUnit: String(r.fields[PR.detailUnit] ?? "").trim(),
-        detailPerBase: asNumber(r.fields[PR.detailPerBase]),
       });
     }
   }
@@ -172,17 +122,17 @@ export async function searchLotsBySuffixDigits(
   const len = q.length;
   const esc = escapeFormulaString(q);
   const lotField = LOT.lotNumber;
-  const formula = `AND(RIGHT({${lotField}}, ${len})="${esc}", {${LOT.qtyBase}} > 0)`;
+  const formula = `AND(RIGHT({${lotField}}, ${len})="${esc}", {${LOT.stockQty}} > 0)`;
 
   const tbl = lotTable();
   const lotFields = [
     LOT.lotNumber,
     LOT.productLink,
-    LOT.qtyBase,
-    LOT.qtyDetail,
+    LOT.stockQty,
     LOT.approvalStatus,
     LOT.storage,
-    LOT.inboundDate,
+    LOT.firstInboundDate,
+    LOT.transferInboundDate,
   ] as const;
   const fieldsQs = lotFields
     .map((f) => `fields[]=${encodeURIComponent(f)}`)
@@ -204,10 +154,12 @@ export async function searchLotsBySuffixDigits(
 
   const products = await fetchProductsByIds(productIds);
 
-  // storage/inboundDate 추출 후 배치로 비용 조회
+  // 누적 경비 계산 기준일: 이동입고일 우선, 없으면 최초입고일
   const storageMeta = records.map((r) => ({
     storage: String(r.fields[LOT.storage] ?? "").trim(),
-    inboundDate: String(r.fields[LOT.inboundDate] ?? "").trim(),
+    inboundDate:
+      String(r.fields[LOT.transferInboundDate] ?? "").trim() ||
+      String(r.fields[LOT.firstInboundDate] ?? "").trim(),
   }));
   const storageCosts = await getStorageCostsBatch(storageMeta);
 
@@ -226,16 +178,11 @@ export async function searchLotsBySuffixDigits(
       spec === "-" ? "" : spec,
       specDetail
     );
-    const baseU = p?.baseUnit ?? "";
-    const detailU = p?.detailUnit ?? "";
-    const ratio = p?.detailPerBase ?? null;
 
-    const bq = asNumber(f[LOT.qtyBase]);
-    const dq = asNumber(f[LOT.qtyDetail]);
+    const stockQty = asNumber(f[LOT.stockQty]);
     const stockLineFromLot = firstNonEmptyString(f, [LOT.stockText, "잔여", "잔여수량"]);
-    const computedStockLine = p
-      ? formatRemainingLine(bq, dq, baseU, detailU)
-      : formatRemainingLineFallback(bq, dq);
+    const computedStockLine =
+      stockQty != null ? `잔여: ${formatQtyKo(stockQty)}박스` : "잔여: -";
     const stockLine =
       computedStockLine !== "잔여: -" ? computedStockLine : stockLineFromLot || "잔여: -";
 
@@ -248,11 +195,7 @@ export async function searchLotsBySuffixDigits(
       specDisplayLine,
       stockLine,
       pendingApproval: isPendingApproval(f),
-      qtyBase: bq,
-      qtyDetail: dq,
-      baseUnitLabel: baseU,
-      detailUnitLabel: detailU,
-      detailPerBase: ratio != null && ratio > 0 ? ratio : null,
+      stockQty,
       productRecordId: pid,
       storage: storageMeta[i].storage,
       inboundDate: storageMeta[i].inboundDate,
@@ -260,9 +203,7 @@ export async function searchLotsBySuffixDigits(
     };
   });
 
-  const withStock = cards.filter(
-    (c) => (c.qtyBase != null && c.qtyBase > 0) || (c.qtyDetail != null && c.qtyDetail > 0)
-  );
+  const withStock = cards.filter((c) => (c.stockQty ?? 0) > 0);
   withStock.sort((a, b) => a.lotNumber.localeCompare(b.lotNumber, "ko"));
   return withStock;
 }
