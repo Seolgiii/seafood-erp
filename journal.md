@@ -422,6 +422,7 @@ UX (3건):
 ### 2026-05-13
 
 **완료한 작업**
+- Airtable MCP 서버 연결 — 세션 시작 시 인증·연결. 이번 세션의 인프라 전제. 베이스 `appUY0ZQ5L67FzySd` (운영 "수산업 ERP")를 MCP로 직접 조작 (테이블 스키마 조회, 신규 필드 6건 생성, 필드명 rename, formula 2건 갱신, LOT 197건 batch PATCH 마이그레이션·롤백). UI 우회로 운영 데이터 직접 검증·정리 가능했음.
 - 동결비 통합 (1단계) — 입고 승인 시 보관처 비용 이력에서 동결비를 LOT에 PATCH + 입고 반려 시 null 클리어 + 출고 승인 시 출고시점 동결비 스냅샷 + 출고 반려 시 null 복구. `lib/storage-cost.ts` / `lib/cost-calc.ts` / `lib/schemas/outbound.ts` / `app/actions/admin/admin.ts` 4곳 수정. `lib/cost-calc.test.ts`에 동결비 합산 케이스 추가.
 - 가공품 분기 전체 제거 (2단계) — Airtable에 실제 필드가 없는 `기준단위_재고`/`상세단위_재고` 코드 분기 12파일 정리. 박스 단위 / 재고수량 단일화. `stock-deduction.ts` 단순화, `shipment-plan.ts` mode/PBO 분기 제거, `OutboundQtyModal.tsx` mode 토글/수율오차 UI 제거. 가공품 흐름이 필요해지면 별도 모듈로 설계할 것 (메모리 저장).
 - 옵션 B 완성 (3단계) — 재고 이동 시 새 LOT의 최초입고일은 원본에서 복사 + 이동입고일은 이동일 + 이월 4개(냉장료/입출고비/노조비/동결비)는 비례 분할로 분리 저장. `cost-calc.ts`에 `calculateTransferPricing` 신규 함수 추가, `transfer.ts:approveTransfer` 새 LOT 필드 정리.
@@ -429,6 +430,12 @@ UX (3건):
 - 기존 데이터 마이그레이션 (5단계) — Airtable LOT 197건 batch PATCH로 이동입고일 채움 → 사용자 의도 재확인 후 196건 롤백 (이동입고일 = null). 이동된 적 있는 LOT 1건(`recfFhdj2rVdHSgiR`)은 그대로 유지하고 최초입고일을 2026-04-13(원본 LOT 기준)으로 정정.
 - 통합 테스트 7건 신규 (6단계, `test/integration/cost-carryover.test.ts`) — 입고 동결비 저장 / 입고 반려 동결비 null / 출고시점 동결비 / 출고 반려 동결비 복구 / 이동 시 이월 비례 분할 + 최초입고일 보존 / D1 재이동 누적 / 이동 후 출고 판매원가 합산.
 - 운영 검증 체크리스트 신규 (`docs/CHECKLIST-COST-CARRYOVER.md`) — 6 시나리오 운영 환경 골든패스 검증용.
+- 운영 골든패스 6 시나리오 검증 완료 — 입고/출고/이동/입고반려/출고반려/D1 재이동. 핵심 검증 통과: 이동입고일 빈칸 / 이월 4개 비례 분할 / 최초입고일 보존 / 출고시점 동결비 신규 PATCH·null 복구 / D1 재이동 이월 누적(289, 239 정확).
+- 운영 검증 중 사전 존재 버그 4건 발견 + 모두 fix (5월 13일 추가 커밋):
+  - `0e63896` `app/actions/inventory/inbound.ts` + `app/api/inventory/lot-search/route.ts` — LOT POST·검색 formula에서 "입고일자" → "최초입고일" rename 반영 누락. 이번 작업의 필드명 변경 후속 누락.
+  - `037cbf0` `app/actions/inventory/inbound.ts` — LOT.품목구분이 운영 베이스에서 lookup으로 변경됐는데 코드가 텍스트 PATCH 시도 → 422 INVALID_VALUE_FOR_COLUMN. PATCH 제거 (lookup은 자동 계산).
+  - `48ae928` `app/actions/inventory/transfer.ts` — 이동 새 LOT 생성 시 입고수량(BOX)/규격/미수 누락 → 총중량 formula = 0 → 판매원가 formula = 0. 옵션 B 이전부터 잠재, 이동 LOT 판매원가 계산이 정확해야 하면서 부각.
+  - `f2f9974` `app/actions/inventory/transfer.ts` — 이동 새 LOT에 품목 link/품목명 누락 → LOT 검색·표시 시 품목명 빈 채. 재이동(D1) 시 원본도 비어있으면 품목마스터에서 fallback 조회.
 
 **결정 사항**
 - 동결비 입력 방식 = 옵션 b (보관처 비용 이력 테이블에 저장 + 입고 시 LOT으로 복사). 1회 발생 (입출고비/노조비/동결비) vs 일당 발생 (냉장료) 구분 유지.
@@ -440,11 +447,17 @@ UX (3건):
 
 **미해결 이슈**
 - **알려진 flaky test — `test/integration/security.test.ts` pin_hash 시나리오** — 단독 실행 시 통과, 전체 동시 실행 시 가끔 fail. cost-carryover 제외하고 실행해도 동일 재현 → 사전 존재 이슈. 운영 코드 영향 없음. 별도 작업으로 디버깅 예정.
-- `recfFhdj2rVdHSgiR` LOT의 이월 4개는 0 (옵션 B 도입 이전 이동분이라 추적 불가). 운영상 영향 작음 — 손익 과소 추정 가능.
+- `recfFhdj2rVdHSgiR` LOT의 이월 4개는 0 (옵션 B 도입 이전 이동분이라 추적 불가). 운영상 영향 작음 — 손익 과소 추정 가능. 최초입고일은 2026-04-13으로 정정 완료.
+- **출고시점 판매금액 = 0 버그** — 운영 출고관리 테이블에 `판매금액` 필드가 없고 `판매가`만 있는데 `admin.ts:deductStockOnOutboundApproval`이 `outFields["판매금액"]`을 읽음 → 0. 손익 계산 부정확 (시나리오 2 검증에서 발견). 사전 존재, 옵션 B와 무관. 별도 작업.
+- **재고 이동 반려 시 부분 복구 동작 관찰** — CLAUDE.md엔 "자동 복구 미구현"이라 명시했지만 시나리오 검증에서 LOT/입고관리 잔여수량이 +3 복구되는 동작 관찰됨. 정확한 출처 미파악. 코드 점검 + 문서 갱신 필요.
+- **옛 이동 LOT 0180 (`recfFhdj2rVdHSgiR`) 품목 link/품목명 누락** — 신규 코드(f2f9974)는 fix지만 기존 LOT은 수동 정리 필요. 사용자 결정 사항.
+- **운영 검증으로 생긴 테스트 LOT 정리 필요** — 0182~0188 LOT 7건 + 0183 출고건(recK4KpdNBItsqRi8, 의도 확인 필요) + 이동 반려 + 출고 반려로 데이터 흐름 복잡. 운영 사용 전 정리 (반려 또는 폐기) 권장.
 
 **다음 작업 후보**
-- 운영 환경에서 `docs/CHECKLIST-COST-CARRYOVER.md` 6 시나리오 골든패스 검증
-- security.test.ts flaky 디버깅 (별도 작업)
+- 출고시점 판매금액 버그 fix (출고관리.판매금액 필드 추가 또는 코드를 `판매가 × 수량`으로 변경) — 손익 정확도 회복
+- 재고 이동 반려 자동 복구 코드 점검 + 정합성 검증 + 문서 갱신
+- 0180 + 운영 검증 테스트 LOT(0182~0188) 정리
+- security.test.ts flaky 디버깅
 - Phase 1 Step 1 — `BulkResultsPanel` 컴포넌트 추출
 
 ---
