@@ -352,7 +352,6 @@ export async function createInventoryRecord(formData: InventoryCreatePayload) {
       최초입고일: bizDate,
       ...(isRecordId(String(formData?.["storageRecordId"] ?? "")) && { 보관처: [String(formData?.["storageRecordId"])] }),
       "입고수량(BOX)": qty,
-      ...(productMaster.productCategory && { 품목구분: productMaster.productCategory }),
       ...(isRecordId(supplierRecordId) && { 매입처: [supplierRecordId] }),
     };
     if (Number.isFinite(purchasePrice) && purchasePrice > 0) {
