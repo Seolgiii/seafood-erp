@@ -423,7 +423,7 @@ export async function approveTransfer(
     "규격": spec,
     "미수": misu,
     "수매가": pricing.newPurchasePrice,
-    ...(productMasterId && { "품목": [productMasterId] }),
+    ...(productMasterId && { "품목마스터": [productMasterId] }),
     ...(productName && { "품목명": productName }),
     "최초입고일": originalFirstInbound,
     "이동입고일": 이동일,
