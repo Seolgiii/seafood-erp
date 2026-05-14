@@ -385,9 +385,21 @@ export async function approveTransfer(
   );
 
   // 6. 새 입고관리 레코드 생성
+  //    매입자/입고자/선박명 같은 매입 시점 정보는 원본에서 그대로 복사한다.
+  //    작업자는 "이 레코드를 만든 사람"이므로 이동 처리자(workerId) 유지.
   const productMasterId = firstLink(inboundFields["품목마스터"]);
   const supplierId = firstLink(inboundFields["매입처"]);
-  const 원산지 = String(inboundFields["원산지"] ?? "").trim();
+  const purchaserId =
+    firstLink(inboundFields["매입자"]) ?? firstLink(lotFields["매입자"]);
+  const stockerId =
+    firstLink(lotFields["입고자"]) ?? firstLink(inboundFields["작업자"]);
+  const shipName = String(
+    inboundFields["선박명"] ?? lotFields["선박명"] ?? "",
+  ).trim();
+  const originalRemark = String(lotFields["비고"] ?? "").trim();
+  const 원산지 = String(
+    inboundFields["원산지"] ?? lotFields["원산지"] ?? "",
+  ).trim();
 
   const newInboundFields: Record<string, unknown> = {
     "입고일": 이동일,
@@ -402,11 +414,10 @@ export async function approveTransfer(
   };
   if (productMasterId) newInboundFields["품목마스터"] = [productMasterId];
   if (newStorageId) newInboundFields["보관처"] = [newStorageId];
-  if (workerId) {
-    newInboundFields["작업자"] = [workerId];
-    newInboundFields["매입자"] = [workerId];
-  }
+  if (workerId) newInboundFields["작업자"] = [workerId];
+  if (purchaserId) newInboundFields["매입자"] = [purchaserId];
   if (supplierId) newInboundFields["매입처"] = [supplierId];
+  if (shipName) newInboundFields["선박명"] = shipName;
 
   const newInbound = await createRecord("입고 관리", newInboundFields);
   if (!newInbound?.id) return { success: false, message: "신규 입고 관리 레코드 생성 실패" };
@@ -440,6 +451,12 @@ export async function approveTransfer(
     "수매가": pricing.newPurchasePrice,
     ...(productMasterId && { "품목마스터": [productMasterId] }),
     ...(productName && { "품목명": productName }),
+    ...(원산지 && { "원산지": 원산지 }),
+    ...(supplierId && { "매입처": [supplierId] }),
+    ...(purchaserId && { "매입자": [purchaserId] }),
+    ...(stockerId && { "입고자": [stockerId] }),
+    ...(shipName && { "선박명": shipName }),
+    ...(originalRemark && { "비고": originalRemark }),
     "최초입고일": originalFirstInbound,
     "이동입고일": 이동일,
     "이월냉장료": pricing.newCarriedRefrigeration,
