@@ -4,7 +4,8 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-14)
-- TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`). 안전 가드 3종 — (a) 신규 LOT.재고수량 == 이동수량 (b) 신규 LOT을 원본으로 한 활성 재이동 없음 (c) 신규 입고관리에서 활성 출고 없음. 통과 시 원본 LOT/입고관리 +이동수량, 신규 LOT/입고관리 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 하나라도 실패 시 [INTEGRITY-ALERT] + 반려 처리 차단. admin.ts:1027 분기 갱신. 통합 +3 시나리오 (정상 / 출고 차단 / 재이동 차단). 단위 105 / 통합 73 통과.
+- 이동 새 LOT/입고관리에 매입자·입고자·선박명·원산지·비고 복사 (이전엔 빈칸). 입고관리.매입자는 workerId(이동 처리자)로 잘못 채워지던 것을 원본 매입자로 정정. fallback 패턴 (입고관리 ↔ LOT). 통합 +2 시나리오. 단위 105 / 통합 75 통과.
+- TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`). 안전 가드 3종 — (a) 신규 LOT.재고수량 == 이동수량 (b) 신규 LOT을 원본으로 한 활성 재이동 없음 (c) 신규 입고관리에서 활성 출고 없음. 통과 시 원본 LOT/입고관리 +이동수량, 신규 LOT/입고관리 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 하나라도 실패 시 [INTEGRITY-ALERT] + 반려 처리 차단. admin.ts:1027 분기 갱신. 통합 +3 시나리오 (정상 / 출고 차단 / 재이동 차단).
 - 이동 새 LOT 생성 시 link 필드명 오타 fix (`품목` → `품목마스터`). f2f9974에서 잘못된 필드명으로 LOT 생성이 매번 422 실패하던 것을 정정.
 - Airtable 필드 정리 시작 (LOT별 재고 / 입고 관리). LOT별 재고: self-link 2개 이름 정리(`재고 이동`→`재고이동(출처 LOT)`, `재고 이동 2`→`재고이동(신규 LOT)` — 의미는 같은 LOT의 source/destination link), 미사용 link 1쌍 삭제(LOT.`입고 관리` ↔ 입고관리.`LOT별 재고`). 입고 관리: lookup 1개 이름 정리(`품목명(Lookup-출고관리))`→`품목명`, 출고관리.품목명 transitive lookup의 source라 삭제 불가). `품목유형`/`From field: LOT별 재고`/`출고 관리 2`(↔ 출고관리.`입고 관리`)는 사용자 직접 삭제. 코드 영향 0건 (lookup·미사용 link만 손댐).
 - 출고 관리 필드명 swap: link `LOT번호`(실제로는 입고관리 link였음) → `입고관리`, lookup `LOT번호(표시용)` → `LOT번호`. 코드 4파일 갱신 (outbound.ts POST 키, admin.ts·my-requests.ts 출고 컨텍스트 fields 접근, schemas/outbound.ts zod 키). 통합 테스트 outbound-bulk-race fixture 키도 갱신. 단위 105 / 통합 68 모두 통과.

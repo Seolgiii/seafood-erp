@@ -467,13 +467,16 @@ UX (3건):
 **완료한 작업**
 - 출고시점 판매금액 = 0 버그 fix (`0e113de`) — 출고관리 테이블에 `판매금액` formula 필드 신설, fetch-mock에 `applyFormulas()` 추가, cost-carryover 통합 +2 시나리오. 미해결 1건 해결.
 - 이동 새 LOT 생성 시 link 필드명 오타 fix (`ac98602`) — `품목` → `품목마스터` (LOT별 재고 테이블 실제 필드명). f2f9974에서 잘못 적은 필드명 때문에 이동 승인이 매번 422 실패하던 것 정정.
-- TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`) — 안전 가드 3종 (a) 신규 LOT 재고 == 이동수량 (b) 신규 LOT 원본 활성 재이동 없음 (c) 신규 입고관리 활성 출고 없음. 통과 시 원본 +이동수량 / 신규 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 차단 시 [INTEGRITY-ALERT] + 반려 처리 자체 차단(수동 보정 유도). admin.ts:1027 분기 갱신. 통합 +3 시나리오 (`transfer-revert.test.ts`).
+- TRANSFER 반려 자동 복구 도입 (`d453208`, `revertTransferOnReject`) — 안전 가드 3종 (a) 신규 LOT 재고 == 이동수량 (b) 신규 LOT 원본 활성 재이동 없음 (c) 신규 입고관리 활성 출고 없음. 통과 시 원본 +이동수량 / 신규 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 차단 시 [INTEGRITY-ALERT] + 반려 처리 자체 차단(수동 보정 유도). admin.ts:1027 분기 갱신. 통합 +3 시나리오 (`transfer-revert.test.ts`).
+- 이동 새 LOT/입고관리 매입정보 복사 (`8cda11f`) — 그동안 빈칸으로 남던 매입자/입고자/선박명/원산지/비고를 원본 입고관리·LOT에서 fallback 패턴으로 복사. 입고관리.매입자는 workerId(이동 처리자)로 잘못 채워지던 것을 원본 매입자로 정정. 통합 +2 시나리오 (`transfer-copy-fields.test.ts`).
 - D4 시나리오 + 결정기록 갱신 (자동 복구 ✅ 해결로 전환).
 
 **결정 사항**
 - TRANSFER 반려 시 신규 LOT은 hard delete가 아닌 soft delete (재고수량 0). 입고 반려와 일관성, link 깨질 위험 회피, 데이터 추적 보존. 화면에서는 재고수량 0이라 안 보임.
 - 자동 복구 가드 실패 시 반려 처리 자체를 차단 (출고 반려 패턴과 동일). UX보다 정합성 우선.
 - 옵션 B 이월 4개는 별도 클리어 없음 — 신규 LOT 재고수량 0이면 손익 계산상 의미 없음. 원본 LOT 이월값은 이동 시 손대지 않았으므로 그대로.
+- 이동 시 매입자/입고자/선박명/원산지/비고는 매입 시점에 결정된 정보로 보고 원본 그대로 복사 (비고는 LOT별 재고에만 — 입고관리는 "재고 이동" 고정). 작업자는 이동 처리자.
+- 이동 폼에 비고 입력 칸 추가 검토 — 현재는 원본 비고만 복사. 차후 사용자 입력으로 대체 또는 합성 가능.
 
 **미해결 이슈**
 - **0181 입고관리 고스트 레코드 2건** — 사용자 시나리오 검증 중 `품목` 오타로 LOT 생성 실패하면서 입고관리만 먼저 만들어진 흔적 (recbnR2SiMUyurHKk, reclDhxjSzoStxTGJ). 운영 LOT 정리 시 같이 폐기.
@@ -490,7 +493,7 @@ UX (3건):
 ## 누적 통계 (2026-05-14 기준)
 
 - 단위 테스트: 5 files / **105 pass**
-- 통합 테스트: 19 files / **73 pass** (+3 시나리오: transfer-revert / +2 시나리오: cost-carryover 5/13 누락분 포함)
+- 통합 테스트: 20 files / **75 pass** (+3 transfer-revert / +2 transfer-copy-fields / +2 cost-carryover 5/13 누락분 포함)
 - 신규 함수: `transfer.revertTransferOnReject` (안전 가드 3종 + soft delete 자동 복구)
 - 신규 Airtable formula: 출고관리.판매금액 (`판매가 × 출고수량`)
 - 필드명 변경: LOT.입고일자 → 최초입고일
