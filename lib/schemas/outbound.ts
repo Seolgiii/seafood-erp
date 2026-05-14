@@ -26,6 +26,7 @@ export const OutboundFieldsSchema = z
     보관처: LinkedRecord,
     판매처: z.string().optional(),
     판매가: NumberLike,
+    /** formula 필드: 판매가 × 출고수량 (Airtable이 자동 계산) */
     판매금액: NumberLike,
     규격: z.string().optional(),
     미수: z.string().optional(),

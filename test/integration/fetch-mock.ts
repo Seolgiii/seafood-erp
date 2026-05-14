@@ -59,6 +59,25 @@ function pickFault(
   return null;
 }
 
+/**
+ * 운영 Airtable formula 필드 시뮬레이션.
+ *
+ * in-memory store는 formula를 계산하지 않으므로, 실제 Airtable과 동일한 동작을
+ * 위해 POST/PATCH 직후 formula 결과 필드를 직접 채워준다.
+ *
+ *  - 출고 관리.판매금액 = 판매가 × 출고수량 (operational formula 필드)
+ */
+function applyFormulas(table: string, recordId: string): void {
+  if (table !== "출고 관리") return;
+  const rec = store.get(table, recordId);
+  if (!rec) return;
+  const salePrice = Number(rec.fields["판매가"]);
+  const qty = Number(rec.fields["출고수량"]);
+  const saleAmount =
+    Number.isFinite(salePrice) && Number.isFinite(qty) ? salePrice * qty : 0;
+  store.patch(table, recordId, { 판매금액: saleAmount });
+}
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -135,7 +154,8 @@ async function airtableHandler(
   if (method === "POST" && !recordId) {
     if (!body.fields) return jsonResponse(422, { error: "fields missing" });
     const rec = store.create(table, body.fields);
-    return jsonResponse(200, rec);
+    applyFormulas(table, rec.id);
+    return jsonResponse(200, store.get(table, rec.id) ?? rec);
   }
 
   // PATCH update
@@ -143,7 +163,8 @@ async function airtableHandler(
     if (!body.fields) return jsonResponse(422, { error: "fields missing" });
     const rec = store.patch(table, recordId, body.fields);
     if (!rec) return jsonResponse(404, { error: { type: "NOT_FOUND" } });
-    return jsonResponse(200, rec);
+    applyFormulas(table, recordId);
+    return jsonResponse(200, store.get(table, recordId) ?? rec);
   }
 
   return jsonResponse(400, { error: "Unsupported" });

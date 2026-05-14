@@ -465,3 +465,124 @@ describe("재고 이동 — 옵션 B (이월 경비 비례 분할)", () => {
     expect(out.fields["출고시점 동결비"]).toBe(350);
   });
 });
+
+describe("판매금액 자동 계산 (Airtable formula)", () => {
+  test("정상 — 출고시점 판매금액 = 판매가 × 출고수량, 손익 = 판매금액 − 판매원가", async () => {
+    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("품목마스터", ALL_MASTERS.products);
+    store.seed("보관처 마스터", ALL_MASTERS.storages);
+    store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
+
+    const inbound = makeApprovedInboundRecord({
+      lotNumber: "260501-MC1-11-26-0001",
+      qty: 100,
+    });
+    const lot = makeInStockLot({
+      lotNumber: "260501-MC1-11-26-0001",
+      stockQty: 100,
+      inboundRecordId: inbound.id,
+    });
+    store.seed("입고 관리", [inbound]);
+    store.seed("LOT별 재고", [lot]);
+
+    const { createOutboundRecord } = await import(
+      "@/app/actions/inventory/outbound"
+    );
+    await createOutboundRecord({
+      workerRecordId: WORKER_NORMAL.id,
+      lotRecordId: lot.id,
+      inboundRecordId: inbound.id,
+      quantity: 30,
+      date: "2026-05-06",
+      seller: "○○수산",
+      salePrice: 55_000,
+    });
+    const outbound = store.list("출고 관리")[0];
+
+    // formula 시뮬레이션: 판매금액이 POST 직후 채워졌어야 함
+    expect(Number(outbound.fields["판매금액"])).toBe(55_000 * 30);
+
+    const { updateApprovalStatus } = await import(
+      "@/app/actions/admin/admin"
+    );
+    const approval = await updateApprovalStatus(
+      WORKER_ADMIN.id,
+      outbound.id,
+      "OUTBOUND",
+      "승인 완료",
+    );
+    expect(approval.success).toBe(true);
+
+    const out = store.get("출고 관리", outbound.id)!;
+    const expectedSaleAmount = 55_000 * 30;
+    expect(Number(out.fields["출고시점 판매금액"])).toBe(expectedSaleAmount);
+
+    // 손익 = 판매금액 − 판매원가
+    const totalCost = Number(out.fields["출고시점 판매원가"]);
+    expect(totalCost).toBeGreaterThan(0);
+    expect(Number(out.fields["출고시점 손익"])).toBe(
+      expectedSaleAmount - totalCost,
+    );
+  });
+
+  test("판매가 누락 — 판매금액·출고시점 판매금액 = 0, 재고 차감/판매원가 PATCH는 정상", async () => {
+    store.seed("작업자", ALL_MASTERS.workers);
+    store.seed("품목마스터", ALL_MASTERS.products);
+    store.seed("보관처 마스터", ALL_MASTERS.storages);
+    store.seed("보관처 비용 이력", ALL_MASTERS.storageCosts);
+
+    const inbound = makeApprovedInboundRecord({
+      lotNumber: "260501-MC1-11-26-0002",
+      qty: 100,
+    });
+    const lot = makeInStockLot({
+      lotNumber: "260501-MC1-11-26-0002",
+      stockQty: 100,
+      inboundRecordId: inbound.id,
+    });
+    store.seed("입고 관리", [inbound]);
+    store.seed("LOT별 재고", [lot]);
+
+    const { createOutboundRecord } = await import(
+      "@/app/actions/inventory/outbound"
+    );
+    await createOutboundRecord({
+      workerRecordId: WORKER_NORMAL.id,
+      lotRecordId: lot.id,
+      inboundRecordId: inbound.id,
+      quantity: 30,
+      date: "2026-05-06",
+      seller: "○○수산",
+      // salePrice 의도적으로 누락
+    });
+    const outbound = store.list("출고 관리")[0];
+
+    // 판매가 미입력 → formula 결과 0
+    expect(outbound.fields["판매가"]).toBeUndefined();
+    expect(Number(outbound.fields["판매금액"])).toBe(0);
+
+    const { updateApprovalStatus } = await import(
+      "@/app/actions/admin/admin"
+    );
+    const approval = await updateApprovalStatus(
+      WORKER_ADMIN.id,
+      outbound.id,
+      "OUTBOUND",
+      "승인 완료",
+    );
+    expect(approval.success).toBe(true);
+
+    // 재고 차감 정상
+    expect(store.get("입고 관리", inbound.id)!.fields.잔여수량).toBe(70);
+    expect(store.get("LOT별 재고", lot.id)!.fields.재고수량).toBe(70);
+
+    const out = store.get("출고 관리", outbound.id)!;
+    // 판매원가 등 비용 PATCH는 정상 동작
+    expect(Number(out.fields["출고시점 판매원가"])).toBeGreaterThan(0);
+    // 판매금액은 0 — 손익은 -판매원가 (음수)
+    expect(Number(out.fields["출고시점 판매금액"])).toBe(0);
+    expect(Number(out.fields["출고시점 손익"])).toBe(
+      -Number(out.fields["출고시점 판매원가"]),
+    );
+  });
+});

@@ -44,7 +44,7 @@ export type OutboundCostInput = {
   carriedUnionFee: number;
   /** LOT.이월동결비 */
   carriedFreezeFee: number;
-  /** 출고 관리.판매금액 */
+  /** 출고 관리.판매금액 (Airtable formula: 판매가 × 출고수량) */
   saleAmount: number;
   /** LOT.이동입고일 (YYYY-MM-DD) — 누적 냉장료 기준일 */
   inboundDate: string;
