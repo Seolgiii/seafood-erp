@@ -327,7 +327,7 @@ export async function createOutboundRecord(payload: OutboundCreatePayload) {
     // 출고 관리 레코드에 저장할 필드 구성
     const fields: Record<string, unknown> = {
       "출고일": payload?.date,
-      "LOT번호": [inboundRecordId],         // 입고 관리 레코드 링크 (출고 승인 시 잔여수량 차감용)
+      "입고관리": [inboundRecordId],         // 입고 관리 레코드 링크 (출고 승인 시 잔여수량 차감용)
       "출고수량": qty,
       "작업자": [workerRecordId],
       "승인상태": "승인 대기",

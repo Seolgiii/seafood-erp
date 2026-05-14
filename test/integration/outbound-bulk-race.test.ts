@@ -70,7 +70,7 @@ async function seedAndCreateOutbound(opts: {
   });
   const outbound = store
     .list("출고 관리")
-    .find((r) => Array.isArray(r.fields.LOT번호) && (r.fields.LOT번호 as unknown[])[0] === inbound.id)!;
+    .find((r) => Array.isArray(r.fields.입고관리) && (r.fields.입고관리 as unknown[])[0] === inbound.id)!;
   return { inbound, lot, outbound };
 }
 
@@ -220,8 +220,8 @@ describe("시나리오 E2 — 출고 승인 race 감지 모니터링", () => {
       .list("출고 관리")
       .find(
         (r) =>
-          Array.isArray(r.fields.LOT번호) &&
-          (r.fields.LOT번호 as unknown[])[0] === inbound2.id,
+          Array.isArray(r.fields.입고관리) &&
+          (r.fields.입고관리 as unknown[])[0] === inbound2.id,
       )!;
 
     const { updateApprovalStatus } = await import("@/app/actions/admin/admin");

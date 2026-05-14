@@ -426,7 +426,8 @@ export async function getMyRequests(
     if (w.id) workerIds.push(w.id);
     const p = firstRecordIdFromFields(r.fields, PRODUCT_LINK_FIELD_CANDIDATES);
     if (p.id) productIds.push(p.id);
-    const lId = firstRecordId(r.fields["LOT번호"]);
+    // 출고 record는 "입고관리" link 필드, 입고 record는 "LOT번호" 텍스트 (link 아님). 출고만 의미 있음.
+    const lId = firstRecordId(r.fields["입고관리"] ?? r.fields["LOT번호"]);
     if (lId) lotIds.push(lId);
   }
 
@@ -557,9 +558,9 @@ export async function getMyRequests(
     );
     if (!passReq) continue;
 
-    // 출고의 LOT번호 link (로직용: 입고 관리 record ID)
-    const lotLinkId = firstRecordId(f["LOT번호"]);
-    const lotDisplay = f["LOT번호(표시용)"];
+    // 출고의 입고관리 link (로직용: 입고 관리 record ID)
+    const lotLinkId = firstRecordId(f["입고관리"]);
+    const lotDisplay = f["LOT번호"];
     // 표시용 LOT번호: 롤업 필드 → 입고 관리 LOT번호 텍스트 순서로 시도
     const lotNumber =
       (Array.isArray(lotDisplay) ? String(lotDisplay[0] ?? "") : String(lotDisplay ?? "")).trim() ||
@@ -584,7 +585,7 @@ export async function getMyRequests(
       JSON.stringify({
         type: "OUTBOUND",
         id: r.id,
-        lotLinkRaw: f["LOT번호"],
+        lotLinkRaw: f["입고관리"],
         inboundFromLotProductLinkId: viaLotPid,
         directProductLinkRaw: directPl.linkRawByKey,
         directProductLinkField: directPl.sourceKey,

@@ -5,6 +5,7 @@
 
 ■ 최근 변경 (2026-05-14)
 - Airtable 필드 정리 시작 (LOT별 재고 / 입고 관리). LOT별 재고: self-link 2개 이름 정리(`재고 이동`→`재고이동(출처 LOT)`, `재고 이동 2`→`재고이동(신규 LOT)` — 의미는 같은 LOT의 source/destination link), 미사용 link 1쌍 삭제(LOT.`입고 관리` ↔ 입고관리.`LOT별 재고`). 입고 관리: lookup 1개 이름 정리(`품목명(Lookup-출고관리))`→`품목명`, 출고관리.품목명 transitive lookup의 source라 삭제 불가). `품목유형`/`From field: LOT별 재고`/`출고 관리 2`(↔ 출고관리.`입고 관리`)는 사용자 직접 삭제. 코드 영향 0건 (lookup·미사용 link만 손댐).
+- 출고 관리 필드명 swap: link `LOT번호`(실제로는 입고관리 link였음) → `입고관리`, lookup `LOT번호(표시용)` → `LOT번호`. 코드 4파일 갱신 (outbound.ts POST 키, admin.ts·my-requests.ts 출고 컨텍스트 fields 접근, schemas/outbound.ts zod 키). 통합 테스트 outbound-bulk-race fixture 키도 갱신. 단위 105 / 통합 68 모두 통과.
 
 ■ 최근 변경 (2026-05-13)
 - 동결비 통합 + 옵션 B (재고 이동 시 새 LOT 최초입고일 보존·이월 4개 비례 분할) + 누적 경비 계산 (이동입고일 ?? 최초입고일 fallback) 구현. 가공품(qtyBase/qtyDetail) 분기 전체 제거 → 박스 단위 단일화. Airtable formula 2개(판매원가/누적냉장료) MCP로 직접 갱신.

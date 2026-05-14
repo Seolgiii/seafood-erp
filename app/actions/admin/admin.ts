@@ -226,7 +226,7 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
   if (!fields) return;
 
   const workerRecId = firstLinkId(fields["작업자"]);
-  const lotLinkId = firstLinkId(fields["LOT번호"]);
+  const lotLinkId = firstLinkId(fields["입고관리"]);
 
   // 품목명: LOT링크 → 입고 관리 → 품목마스터 체인
   let productName = "";
@@ -241,7 +241,7 @@ async function generateAndSaveOutboundPdf(recordId: string): Promise<void> {
   }
 
   // LOT번호 표시값 (rollup/lookup 필드 우선)
-  const lotDisplay = fields["LOT번호(표시용)"];
+  const lotDisplay = fields["LOT번호"];
   const lotNumber = (
     Array.isArray(lotDisplay) ? String(lotDisplay[0] ?? "") : String(lotDisplay ?? "")
   ).trim();
@@ -531,8 +531,8 @@ async function deductStockOnOutboundApproval(
     return { success: false, message: "출고 수량이 올바르지 않습니다." };
   }
 
-  // fields["LOT번호"]는 입고 관리 레코드 링크 배열
-  const rawLotLink = outFields["LOT번호"];
+  // outFields["입고관리"]는 입고 관리 레코드 링크 배열
+  const rawLotLink = outFields["입고관리"];
   const inboundRecordId =
     Array.isArray(rawLotLink) && typeof rawLotLink[0] === "string" && /^rec/.test(rawLotLink[0])
       ? rawLotLink[0]
@@ -746,8 +746,8 @@ async function restoreStockOnOutboundReject(
     return { success: false, message: "출고 수량을 확인할 수 없습니다." };
   }
 
-  // 입고 관리 링크 (출고 신청 시 저장한 LOT번호 link 필드 = 입고 관리 record ID)
-  const rawLotLink = outFields["LOT번호"];
+  // 입고 관리 링크 (출고 신청 시 저장한 입고관리 link 필드 = 입고 관리 record ID)
+  const rawLotLink = outFields["입고관리"];
   const inboundRecordId =
     Array.isArray(rawLotLink) && typeof rawLotLink[0] === "string" && /^rec/.test(rawLotLink[0])
       ? rawLotLink[0]

@@ -10,15 +10,15 @@ import {
 /**
  * 출고 관리 (outbound) 테이블 스키마
  *
- * 주의: "LOT번호" 필드는 입고 관리 record를 link하는 link 필드이고,
- *       "LOT번호(표시용)"은 룩업/롤업 텍스트.
+ * 주의: "입고관리" 필드는 입고 관리 record를 link하는 link 필드이고,
+ *       "LOT번호"는 입고관리.LOT번호를 가져오는 룩업.
  */
 
 export const OutboundFieldsSchema = z
   .object({
     출고일: z.string().optional(),
-    LOT번호: LinkedRecord, // 입고 관리 link
-    "LOT번호(표시용)": LookupValue, // 룩업
+    입고관리: LinkedRecord, // 입고 관리 link
+    LOT번호: LookupValue, // 룩업
     LOT재고레코드ID: z.string().optional(),
 
     출고수량: NumberLike,
