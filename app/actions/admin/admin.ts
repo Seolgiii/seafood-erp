@@ -16,7 +16,10 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { getMyRequests } from "../my-requests";
 import type { RequestItem } from "../my-requests";
-import { approveTransfer } from "../inventory/transfer";
+import {
+  approveTransfer,
+  revertTransferOnReject,
+} from "../inventory/transfer";
 import { getStorageCostForLot } from "@/lib/storage-cost";
 import { seoulDateString } from "@/lib/date";
 import {
@@ -1025,12 +1028,13 @@ export async function updateApprovalStatus(
           return { success: false, message: restoreResult.message };
         }
       } else if (type === "TRANSFER") {
-        // 재고 이동 반려는 새 LOT 생성 + 원본 차감을 모두 되돌려야 하므로 위험도가 높음.
-        // 자동 복구는 미구현 — 운영자가 인지할 수 있도록 명시 로그만 남김.
-        logError(
-          "[INTEGRITY-ALERT][updateApprovalStatus] TRANSFER 승인 완료 → 반려 — 자동 재고 복구 미구현, 수동 보정 필요:",
-          { recordId, rejectReason },
-        );
+        // 재고 이동 반려는 신규 LOT/입고관리에서 후속 작업(출고/재이동)이 일어났으면
+        // 자동 복구가 데이터를 망가뜨릴 수 있음. revertTransferOnReject 내부에서
+        // 안전 가드 3가지를 검사한 뒤 통과 시에만 복구를 진행한다.
+        const revertResult = await revertTransferOnReject(recordId);
+        if (!revertResult.success) {
+          return { success: false, message: revertResult.message };
+        }
       }
       // EXPENSE: 재고 영향 없음 (상태만 변경)
     }

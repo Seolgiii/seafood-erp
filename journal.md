@@ -462,11 +462,37 @@ UX (3건):
 
 ---
 
-## 누적 통계 (2026-05-13 기준)
+### 2026-05-14
 
-- 단위 테스트: 5 files / **105 pass** (+2 vs 5-06)
-- 통합 테스트: 18 files / **68 pass** (+7 시나리오: cost-carryover)
-- 신규 Airtable 필드: LOT.이동입고일, LOT.이월냉장료/이월입출고비/이월노조비/이월동결비, 출고관리.출고시점 동결비
+**완료한 작업**
+- 출고시점 판매금액 = 0 버그 fix (`0e113de`) — 출고관리 테이블에 `판매금액` formula 필드 신설, fetch-mock에 `applyFormulas()` 추가, cost-carryover 통합 +2 시나리오. 미해결 1건 해결.
+- 이동 새 LOT 생성 시 link 필드명 오타 fix (`ac98602`) — `품목` → `품목마스터` (LOT별 재고 테이블 실제 필드명). f2f9974에서 잘못 적은 필드명 때문에 이동 승인이 매번 422 실패하던 것 정정.
+- TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`) — 안전 가드 3종 (a) 신규 LOT 재고 == 이동수량 (b) 신규 LOT 원본 활성 재이동 없음 (c) 신규 입고관리 활성 출고 없음. 통과 시 원본 +이동수량 / 신규 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 차단 시 [INTEGRITY-ALERT] + 반려 처리 자체 차단(수동 보정 유도). admin.ts:1027 분기 갱신. 통합 +3 시나리오 (`transfer-revert.test.ts`).
+- D4 시나리오 + 결정기록 갱신 (자동 복구 ✅ 해결로 전환).
+
+**결정 사항**
+- TRANSFER 반려 시 신규 LOT은 hard delete가 아닌 soft delete (재고수량 0). 입고 반려와 일관성, link 깨질 위험 회피, 데이터 추적 보존. 화면에서는 재고수량 0이라 안 보임.
+- 자동 복구 가드 실패 시 반려 처리 자체를 차단 (출고 반려 패턴과 동일). UX보다 정합성 우선.
+- 옵션 B 이월 4개는 별도 클리어 없음 — 신규 LOT 재고수량 0이면 손익 계산상 의미 없음. 원본 LOT 이월값은 이동 시 손대지 않았으므로 그대로.
+
+**미해결 이슈**
+- **0181 입고관리 고스트 레코드 2건** — 사용자 시나리오 검증 중 `품목` 오타로 LOT 생성 실패하면서 입고관리만 먼저 만들어진 흔적 (recbnR2SiMUyurHKk, reclDhxjSzoStxTGJ). 운영 LOT 정리 시 같이 폐기.
+- **운영 검증 테스트 LOT 정리** — 0182~0188 LOT 7건 + 0181 고스트 2건 + 출고/이동 반려 데이터 흐름 복잡. 운영 사용 전 정리 권장.
+- **알려진 flaky `security.test.ts` PIN 마이그레이션** — 전체 실행 시 가끔 fail. 별도 작업.
+
+**다음 작업 후보**
+- 0180 + 0182~0188 + 0181 고스트 운영 LOT 정리
+- security.test.ts flaky 디버깅
+- Phase 1 Step 1 — `BulkResultsPanel` 컴포넌트 추출
+
+---
+
+## 누적 통계 (2026-05-14 기준)
+
+- 단위 테스트: 5 files / **105 pass**
+- 통합 테스트: 19 files / **73 pass** (+3 시나리오: transfer-revert / +2 시나리오: cost-carryover 5/13 누락분 포함)
+- 신규 함수: `transfer.revertTransferOnReject` (안전 가드 3종 + soft delete 자동 복구)
+- 신규 Airtable formula: 출고관리.판매금액 (`판매가 × 출고수량`)
 - 필드명 변경: LOT.입고일자 → 최초입고일
 - 신규 Airtable formula 갱신: LOT.판매원가, LOT.누적냉장료 (이동입고일 ?? 최초입고일 fallback + 이월 4개 합산)
 

@@ -4,13 +4,16 @@
 개발 방식: 1인 기획/개발 + Claude Code
 
 ■ 최근 변경 (2026-05-14)
+- TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`). 안전 가드 3종 — (a) 신규 LOT.재고수량 == 이동수량 (b) 신규 LOT을 원본으로 한 활성 재이동 없음 (c) 신규 입고관리에서 활성 출고 없음. 통과 시 원본 LOT/입고관리 +이동수량, 신규 LOT/입고관리 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 하나라도 실패 시 [INTEGRITY-ALERT] + 반려 처리 차단. admin.ts:1027 분기 갱신. 통합 +3 시나리오 (정상 / 출고 차단 / 재이동 차단). 단위 105 / 통합 73 통과.
+- 이동 새 LOT 생성 시 link 필드명 오타 fix (`품목` → `품목마스터`). f2f9974에서 잘못된 필드명으로 LOT 생성이 매번 422 실패하던 것을 정정.
 - Airtable 필드 정리 시작 (LOT별 재고 / 입고 관리). LOT별 재고: self-link 2개 이름 정리(`재고 이동`→`재고이동(출처 LOT)`, `재고 이동 2`→`재고이동(신규 LOT)` — 의미는 같은 LOT의 source/destination link), 미사용 link 1쌍 삭제(LOT.`입고 관리` ↔ 입고관리.`LOT별 재고`). 입고 관리: lookup 1개 이름 정리(`품목명(Lookup-출고관리))`→`품목명`, 출고관리.품목명 transitive lookup의 source라 삭제 불가). `품목유형`/`From field: LOT별 재고`/`출고 관리 2`(↔ 출고관리.`입고 관리`)는 사용자 직접 삭제. 코드 영향 0건 (lookup·미사용 link만 손댐).
 - 출고 관리 필드명 swap: link `LOT번호`(실제로는 입고관리 link였음) → `입고관리`, lookup `LOT번호(표시용)` → `LOT번호`. 코드 4파일 갱신 (outbound.ts POST 키, admin.ts·my-requests.ts 출고 컨텍스트 fields 접근, schemas/outbound.ts zod 키). 통합 테스트 outbound-bulk-race fixture 키도 갱신. 단위 105 / 통합 68 모두 통과.
+- 출고시점 판매금액 = 0 버그 fix (출고관리.판매금액 formula 신설). admin.ts:648/257이 읽던 필드가 실재하지 않아 출고시점 판매금액·손익이 항상 0이었음.
 
 ■ 최근 변경 (2026-05-13)
 - 동결비 통합 + 옵션 B (재고 이동 시 새 LOT 최초입고일 보존·이월 4개 비례 분할) + 누적 경비 계산 (이동입고일 ?? 최초입고일 fallback) 구현. 가공품(qtyBase/qtyDetail) 분기 전체 제거 → 박스 단위 단일화. Airtable formula 2개(판매원가/누적냉장료) MCP로 직접 갱신.
 - 운영 골든패스 6 시나리오 검증 완료 (입고/출고/이동/입고반려/출고반려/D1 재이동). 검증 중 사전 존재 버그 4건 fix: 입고일자 rename 누락 / 품목구분 lookup 거부 / 이동 LOT 입고수량(BOX)·규격·미수 누락 / 이동 LOT 품목 link·품목명 누락.
-- 미해결: 출고시점 판매금액 = 0 (판매가 필드 매핑) / 재고 이동 반려 부분 복구 동작 / 0180·운영 검증 테스트 LOT 정리.
+- 미해결: 0180·운영 검증 테스트 LOT 정리 (0182~0188 + 0181 입고관리 고스트 2건) / security.test.ts PIN 마이그레이션 flaky.
 
 ■ 프로젝트 아키텍처 방향성 (2026-05-12 결정)
 
@@ -78,7 +81,7 @@
 - 출고 반려: 잔여수량/LOT재고 +outQty 복구 + 출고시점 비용 7필드 null
 - 재승인 시 자동 복원 (createLotOnInboundApproval 재실행)
 - LOT 일련번호 동시성: 낙관적 재시도 (~99% 보호, 검증~POST 사이 race window 잔여)
-- TRANSFER 반려 자동 복구는 미구현 — [INTEGRITY-ALERT] 로그 + 수동 보정
+- TRANSFER 반려 자동 복구 — 안전 가드 3종 통과 시 자동 복구 (lib/admin.ts → transfer.revertTransferOnReject). 가드 실패 시 [INTEGRITY-ALERT] + 반려 처리 차단(수동 보정 유도)
 - Airtable 응답 zod 스키마 검증 (모니터링 모드, [SCHEMA-MISMATCH] 로그)
 - 모든 정합성 위험 지점에 [INTEGRITY-ALERT] prefix 로그
 
@@ -163,7 +166,6 @@ YYMMDD-품목코드-규격-미수-전체일련번호
 - AI 데이터 분석
 - 바코드 스캔 출고 (QR 스캔 도입됨, 바코드는 별도)
 - 부자재 재고 확장 (포장지·아이스팩 등)
-- TRANSFER 반려 자동 복구 (현재 수동 보정)
 - 검색 결과 자동 트리거 (URL 복원 시 검색 자동 실행 옵션)
 - LOT 일련번호 100% 동시성 (Airtable 자동번호 또는 Vercel KV 분산락)
 - FIFO 평단가 시스템

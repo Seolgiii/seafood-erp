@@ -41,6 +41,21 @@ async function fetchRecord(
   return (data.fields as Record<string, unknown>) ?? null;
 }
 
+async function listRecords(
+  tableName: string,
+): Promise<{ id: string; fields: Record<string, unknown> }[]> {
+  const res = await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(tableName)}?pageSize=100`,
+    { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }, next: { revalidate: 0 } },
+  );
+  if (!res.ok) {
+    logError(`[transfer listRecords] ${tableName} 실패:`, res.status);
+    return [];
+  }
+  const data = await res.json();
+  return (data.records as { id: string; fields: Record<string, unknown> }[]) ?? [];
+}
+
 async function patchRecord(
   tableName: string,
   recordId: string,
@@ -479,5 +494,253 @@ export async function approveTransfer(
     },
   });
 
+  return { success: true };
+}
+
+/**
+ * 재고 이동 승인 → 반려 전환 시 자동 복구 (admin.ts updateApprovalStatus에서 호출).
+ *
+ * 안전 가드 3가지를 모두 통과해야 복구가 진행된다 — 신규 LOT/입고관리에서 후속
+ * 작업이 일어났다면 자동 복구가 데이터를 망가뜨릴 수 있어 차단하고 운영자 보정 유도.
+ *
+ * 검사:
+ *  (a) 신규 LOT.재고수량 == 이동수량 (이동 후 출고/조정으로 변한 적 없음)
+ *  (b) 신규 LOT을 원본으로 한 다른 재이동이 반려 상태가 아닌 게 없음
+ *  (c) 신규 입고관리에서 발생한 출고가 반려 상태가 아닌 게 없음
+ *
+ * 통과 시:
+ *  - 원본 LOT.재고수량 += 이동수량
+ *  - 원본 입고관리.잔여수량 += 이동수량
+ *  - 신규 LOT.재고수량 = 0 (soft delete — 레코드 보존, 화면에서만 사라짐)
+ *  - 신규 입고관리.잔여수량 = 0, 승인상태 = "반려"
+ *
+ * 옵션 B 이월 4개(이월냉장료/이월입출고비/이월노조비/이월동결비)는 신규 LOT의
+ * 재고수량이 0이 되면 손익 계산상 의미가 사라지므로 별도 처리 불필요. 원본 LOT의
+ * 이월값은 이동 시 손대지 않았으므로 그대로 유지됨.
+ *
+ * 실패(검사 또는 PATCH) 시 [INTEGRITY-ALERT] 로그 + success:false 반환 → admin.ts가
+ * 반려 처리 자체를 중단해 정합성 깨진 상태 진입을 방지.
+ */
+export async function revertTransferOnReject(
+  transferRecordId: string,
+): Promise<{ success: boolean; message?: string }> {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    return { success: false, message: "환경변수 누락" };
+  }
+
+  const tfFields = await fetchRecord("재고 이동", transferRecordId);
+  if (!tfFields) {
+    return { success: false, message: "재고 이동 레코드를 찾을 수 없습니다." };
+  }
+
+  const 이동수량 = num(tfFields["이동수량"]);
+  if (이동수량 <= 0) {
+    return { success: false, message: "이동수량이 올바르지 않습니다." };
+  }
+
+  const originalLotRecordId = firstLink(tfFields["원본 LOT번호"]);
+  const newLotRecordId = firstLink(tfFields["신규 LOT번호"]);
+
+  if (!originalLotRecordId) {
+    return { success: false, message: "원본 LOT 링크가 없습니다." };
+  }
+
+  // 신규 LOT 링크 없음 = approveTransfer가 LOT 생성 단계에서 실패했던 흔적.
+  // 원본 차감(transfer.ts:454-461)도 일어나지 않은 상태이므로 복구할 게 없음.
+  if (!newLotRecordId) {
+    logWarn(
+      "[revertTransferOnReject] 신규 LOT 링크 없음 — 승인이 미완 상태였던 것으로 보아 복구 작업 생략:",
+      { transferRecordId },
+    );
+    return { success: true };
+  }
+
+  const newLotFields = await fetchRecord("LOT별 재고", newLotRecordId);
+  if (!newLotFields) {
+    logWarn(
+      "[revertTransferOnReject] 신규 LOT 레코드 없음 — 복구 생략:",
+      { transferRecordId, newLotRecordId },
+    );
+    return { success: true };
+  }
+
+  const newLotStock = num(newLotFields["재고수량"]);
+
+  // 멱등 가드: 이미 0이면 복구 끝난 상태로 간주 (반려 → 다시 반려 등)
+  if (newLotStock === 0) {
+    log(
+      "[revertTransferOnReject] 신규 LOT 재고가 이미 0 — 중복 처리 생략:",
+      { transferRecordId, newLotRecordId },
+    );
+    return { success: true };
+  }
+
+  const newLotLabel = String(newLotFields["LOT번호"] ?? newLotRecordId);
+
+  // 검사 (a)
+  if (newLotStock !== 이동수량) {
+    logError(
+      "[INTEGRITY-ALERT][revertTransferOnReject] 신규 LOT 재고가 이동수량과 다름 — 후속 출고/조정 발생 추정, 자동 복구 차단:",
+      { transferRecordId, newLotRecordId, newLotStock, 이동수량 },
+    );
+    return {
+      success: false,
+      message: `신규 LOT(${newLotLabel}) 재고가 이동수량과 달라 자동 복구할 수 없습니다. 후속 출고/조정 확인 후 수동 보정해주세요.`,
+    };
+  }
+
+  // 검사 (b) — 신규 LOT을 원본으로 한 다른 재이동(반려 외)이 있는가
+  const allTransfers = await listRecords("재고 이동");
+  for (const tf of allTransfers) {
+    if (tf.id === transferRecordId) continue;
+    const origLotLink = tf.fields["원본 LOT번호"];
+    const usesNewLot =
+      Array.isArray(origLotLink) &&
+      (origLotLink as unknown[]).some(
+        (v) => typeof v === "string" && v === newLotRecordId,
+      );
+    if (!usesNewLot) continue;
+    const status = String(tf.fields["승인상태"] ?? "");
+    if (status !== "반려") {
+      logError(
+        "[INTEGRITY-ALERT][revertTransferOnReject] 신규 LOT을 원본으로 한 다른 재이동이 활성 상태 — 자동 복구 차단:",
+        {
+          transferRecordId,
+          newLotRecordId,
+          blockedByTransferId: tf.id,
+          blockedByStatus: status,
+        },
+      );
+      return {
+        success: false,
+        message: `신규 LOT(${newLotLabel})이 다른 곳으로 또 이동된 기록이 있어 자동 복구할 수 없습니다.`,
+      };
+    }
+  }
+
+  const newInboundRecordId = firstLink(newLotFields["입고관리링크"]);
+
+  // 검사 (c) — 신규 입고관리에서 발생한 출고(반려 외)가 있는가
+  if (newInboundRecordId) {
+    const allOutbounds = await listRecords("출고 관리");
+    for (const ob of allOutbounds) {
+      const inLink = ob.fields["입고관리"];
+      const usesNewInbound =
+        Array.isArray(inLink) &&
+        (inLink as unknown[]).some(
+          (v) => typeof v === "string" && v === newInboundRecordId,
+        );
+      if (!usesNewInbound) continue;
+      const status = String(ob.fields["승인상태"] ?? "");
+      if (status !== "반려") {
+        logError(
+          "[INTEGRITY-ALERT][revertTransferOnReject] 신규 입고관리에서 발생한 출고가 활성 상태 — 자동 복구 차단:",
+          {
+            transferRecordId,
+            newLotRecordId,
+            newInboundRecordId,
+            blockedByOutboundId: ob.id,
+            blockedByStatus: status,
+          },
+        );
+        return {
+          success: false,
+          message: `신규 LOT(${newLotLabel})에서 출고된 기록이 있어 자동 복구할 수 없습니다.`,
+        };
+      }
+    }
+  }
+
+  // 원본 LOT 복구
+  const origLotFields = await fetchRecord("LOT별 재고", originalLotRecordId);
+  if (!origLotFields) {
+    logError(
+      "[INTEGRITY-ALERT][revertTransferOnReject] 원본 LOT 레코드 없음 — 복구 중단:",
+      { transferRecordId, originalLotRecordId },
+    );
+    return { success: false, message: "원본 LOT 레코드를 찾을 수 없습니다." };
+  }
+  const origLotStock = num(origLotFields["재고수량"]);
+  const lotPatchOk = await patchRecord("LOT별 재고", originalLotRecordId, {
+    재고수량: origLotStock + 이동수량,
+  });
+  if (!lotPatchOk) {
+    logError(
+      "[INTEGRITY-ALERT][revertTransferOnReject] 원본 LOT 재고수량 복구 PATCH 실패:",
+      { transferRecordId, originalLotRecordId, origLotStock, 이동수량 },
+    );
+    return { success: false, message: "원본 LOT 재고수량 복구에 실패했습니다." };
+  }
+
+  // 원본 입고관리 복구
+  const origInboundRecordId = firstLink(origLotFields["입고관리링크"]);
+  if (origInboundRecordId) {
+    const origInboundFields = await fetchRecord("입고 관리", origInboundRecordId);
+    if (origInboundFields) {
+      const origRemain = num(origInboundFields["잔여수량"]);
+      const inboundPatchOk = await patchRecord("입고 관리", origInboundRecordId, {
+        잔여수량: origRemain + 이동수량,
+      });
+      if (!inboundPatchOk) {
+        logError(
+          "[INTEGRITY-ALERT][revertTransferOnReject] 원본 입고관리 잔여수량 복구 PATCH 실패 — 원본 LOT은 이미 복구됨, 수동 정합 필요:",
+          {
+            transferRecordId,
+            originalLotRecordId,
+            origInboundRecordId,
+            origRemain,
+            이동수량,
+          },
+        );
+        return {
+          success: false,
+          message: "원본 입고관리 잔여수량 복구에 실패했습니다. (원본 LOT 재고수량은 이미 복구됨 — 수동 정합 확인 필요)",
+        };
+      }
+    } else {
+      logWarn(
+        "[revertTransferOnReject] 원본 입고관리 레코드 없음 — 잔여수량 복구 생략:",
+        { transferRecordId, origInboundRecordId },
+      );
+    }
+  } else {
+    logWarn(
+      "[revertTransferOnReject] 원본 LOT의 입고관리링크 없음 — 잔여수량 복구 생략:",
+      { transferRecordId, originalLotRecordId },
+    );
+  }
+
+  // 신규 LOT soft delete
+  const newLotZeroOk = await patchRecord("LOT별 재고", newLotRecordId, {
+    재고수량: 0,
+  });
+  if (!newLotZeroOk) {
+    logError(
+      "[INTEGRITY-ALERT][revertTransferOnReject] 신규 LOT 재고수량 0 PATCH 실패 — 원본 복구는 완료, 신규 LOT 수동 정리 필요:",
+      { transferRecordId, newLotRecordId },
+    );
+  }
+
+  // 신규 입고관리 soft delete
+  if (newInboundRecordId) {
+    const newInboundClearOk = await patchRecord("입고 관리", newInboundRecordId, {
+      잔여수량: 0,
+      승인상태: "반려",
+    });
+    if (!newInboundClearOk) {
+      logError(
+        "[INTEGRITY-ALERT][revertTransferOnReject] 신규 입고관리 soft delete PATCH 실패 — 수동 정리 필요:",
+        { transferRecordId, newInboundRecordId },
+      );
+    }
+  }
+
+  log("[revertTransferOnReject] 자동 복구 완료:", {
+    transferRecordId,
+    originalLotRecordId,
+    newLotRecordId,
+    newInboundRecordId,
+    이동수량,
+  });
   return { success: true };
 }
