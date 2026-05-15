@@ -3,6 +3,13 @@
 기술 스택: Next.js 15 + Airtable + Vercel + zod + Vitest + Resend
 개발 방식: 1인 기획/개발 + Claude Code
 
+■ 최근 변경 (2026-05-15)
+- C안 + 동결비 특례 — 수매가 절반 버그 + 박스당/총액 단위 일관성 fix. 수매가 박스당 그대로(이전엔 ratio로 절반화), 이월 4개 박스당×이동박스수(총액), sourceInboxQty 분모로 이동 사이 출고 끼는 케이스도 정확. 동결비 특례: 이동된 LOT 동결비=0 + 이월동결비는 원본 cost basis 박스당 보존(N단계 일관). LOT.판매원가 formula 갱신(박스당 비용 × 입고수량). 단위 110 / 통합 77 통과.
+- 일일 보고서 운영 건강도 5항목 추가 (🩺 섹션) — 음수 재고 LOT / 잔여수량 정합성 / 출고시점 비용 NULL(E1 가드 실패 조기 발견) / 잠긴 PIN / 어제 신청 당일 처리율. 빨강·초록 색 코딩.
+- LOT별 재고 상태 관리 필드 7개 추가 + 198건 backfill. 상태/상태사유/승인상태/결정자/결정일시/반려사유/반려메모. 영어 매핑 description (PostgreSQL 이전 대비). Airtable Automation 트리거 7종 수동 설정 안내.
+- 옵션 A: mock store lookup 시뮬레이션 + PATCH 잔재 제거 (`f8fd191`). fetch-mock에 양방향 link sync + lookup auto-fill(2-pass transitive). inbound.ts/transfer.ts LOT번호 PATCH 코드 제거(옵션 2 후 무용). 디버깅 0 사이클.
+- Airtable reverse link 15개 rename — 작업자/보관처/매입처/품목마스터의 헷갈리는 link 명확화. 운영 테스트 LOT 5건 일괄 정리.
+
 ■ 최근 변경 (2026-05-14)
 - 이동 새 LOT/입고관리에 매입자·입고자·선박명·원산지·비고 복사 (이전엔 빈칸). 입고관리.매입자는 workerId(이동 처리자)로 잘못 채워지던 것을 원본 매입자로 정정. fallback 패턴 (입고관리 ↔ LOT). 통합 +2 시나리오. 단위 105 / 통합 75 통과.
 - TRANSFER 반려 자동 복구 도입 (`revertTransferOnReject`). 안전 가드 3종 — (a) 신규 LOT.재고수량 == 이동수량 (b) 신규 LOT을 원본으로 한 활성 재이동 없음 (c) 신규 입고관리에서 활성 출고 없음. 통과 시 원본 LOT/입고관리 +이동수량, 신규 LOT/입고관리 soft delete (재고수량 0 + 잔여수량 0 + 승인상태 반려). 하나라도 실패 시 [INTEGRITY-ALERT] + 반려 처리 차단. admin.ts:1027 분기 갱신. 통합 +3 시나리오 (정상 / 출고 차단 / 재이동 차단).
