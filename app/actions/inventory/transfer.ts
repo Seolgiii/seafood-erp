@@ -422,8 +422,9 @@ export async function approveTransfer(
   const newInbound = await createRecord("입고 관리", newInboundFields);
   if (!newInbound?.id) return { success: false, message: "신규 입고 관리 레코드 생성 실패" };
 
-  // LOT번호 별도 PATCH (생성 시 자동 채번이 필요하므로 분리)
-  await patchRecord("입고 관리", newInbound.id, { "LOT번호": newLotNumber });
+  // 입고관리.LOT번호는 Lookup 필드(LOT별 재고 2 → LOT별 재고.LOT번호)로 전환됨.
+  // 아래 7단계에서 LOT별 재고 생성 시 입고관리링크가 채워지면 양방향 link 자동
+  // 동기화로 입고관리.LOT번호 lookup이 자동 채워진다 (별도 PATCH 불필요).
 
   // 7. 새 LOT별 재고 레코드 생성 (옵션 B)
   //    - 최초입고일: 원본 LOT에서 복사 (LOT 추적용, 변경 X)

@@ -78,6 +78,159 @@ function applyFormulas(table: string, recordId: string): void {
   store.patch(table, recordId, { 판매금액: saleAmount });
 }
 
+/**
+ * 운영 Airtable 양방향 link 자동 동기화 시뮬레이션.
+ *
+ * 실제 Airtable은 multipleRecordLinks 필드의 양쪽을 자동으로 동기화하지만
+ * in-memory store는 단방향이라 명시적으로 매핑·동기화한다.
+ *
+ * 각 항목 = [tableA, fieldA, tableB, fieldB]: tableA.fieldA에 tableB의 record id를
+ * 넣으면 tableB.fieldB에 tableA의 record id가 자동으로 채워진다.
+ */
+const LINK_PAIRS: Array<[Tables, string, Tables, string]> = [
+  // 입고 관리.LOT별 재고 2 ↔ LOT별 재고.입고관리링크
+  // (옵션 2 전환 후 LOT번호 lookup의 link source)
+  ["입고 관리", "LOT별 재고 2", "LOT별 재고", "입고관리링크"],
+];
+
+/**
+ * 운영 Airtable lookup 필드 시뮬레이션.
+ *
+ * lookup 필드는 link를 따라가 target record의 특정 필드 값을 가져온다.
+ * 양방향 link 동기화 후 호출되어, link가 가리키는 record에서 값을 가져온다.
+ *
+ *  - 입고 관리.LOT번호 = LOT별 재고 2 link → LOT별 재고.LOT번호 (옵션 2 전환)
+ *  - 출고 관리.LOT번호 = 입고관리 link → 입고관리.LOT번호 (transitive)
+ *  - 입고 관리.품목명 = 품목마스터 link → 품목마스터.품목명
+ *  - 출고 관리.품목명 = 입고관리 link → 입고관리.품목명 (transitive)
+ */
+type LookupDef = {
+  table: Tables;
+  field: string;
+  via: string;
+  targetTable: Tables;
+  targetField: string;
+};
+
+const LOOKUPS: LookupDef[] = [
+  {
+    table: "입고 관리",
+    field: "LOT번호",
+    via: "LOT별 재고 2",
+    targetTable: "LOT별 재고",
+    targetField: "LOT번호",
+  },
+  {
+    table: "출고 관리",
+    field: "LOT번호",
+    via: "입고관리",
+    targetTable: "입고 관리",
+    targetField: "LOT번호",
+  },
+];
+
+function firstLinkedId(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  for (const v of value) {
+    if (typeof v === "string" && v.startsWith("rec")) return v;
+  }
+  return null;
+}
+
+function syncBidirectionalLinks(
+  table: string,
+  recordId: string,
+  prevFields: Record<string, unknown>,
+): void {
+  const rec = store.get(table as Tables, recordId);
+  if (!rec) return;
+
+  for (const [tableA, fieldA, tableB, fieldB] of LINK_PAIRS) {
+    // 이 record가 양방향 link 쌍에 매칭되는지 확인 (양쪽 모두 검사)
+    let myField: string, otherTable: Tables, otherField: string;
+    if (table === tableA) {
+      myField = fieldA;
+      otherTable = tableB;
+      otherField = fieldB;
+    } else if (table === tableB) {
+      myField = fieldB;
+      otherTable = tableA;
+      otherField = fieldA;
+    } else {
+      continue;
+    }
+
+    const newLinks = Array.isArray(rec.fields[myField])
+      ? (rec.fields[myField] as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.startsWith("rec"),
+        )
+      : [];
+    const prevLinks = Array.isArray(prevFields?.[myField])
+      ? (prevFields[myField] as unknown[]).filter(
+          (v): v is string => typeof v === "string" && v.startsWith("rec"),
+        )
+      : [];
+
+    const newSet = new Set(newLinks);
+    const prevSet = new Set(prevLinks);
+
+    // 추가된 link: 반대편 record에 이 recordId 추가
+    for (const id of newSet) {
+      if (prevSet.has(id)) continue;
+      const otherRec = store.get(otherTable, id);
+      if (!otherRec) continue;
+      const reverse = Array.isArray(otherRec.fields[otherField])
+        ? [...(otherRec.fields[otherField] as unknown[])]
+        : [];
+      if (!reverse.includes(recordId)) {
+        reverse.push(recordId);
+        store.patch(otherTable, id, { [otherField]: reverse });
+      }
+    }
+
+    // 제거된 link: 반대편 record에서 이 recordId 제거
+    for (const id of prevSet) {
+      if (newSet.has(id)) continue;
+      const otherRec = store.get(otherTable, id);
+      if (!otherRec) continue;
+      const reverse = Array.isArray(otherRec.fields[otherField])
+        ? (otherRec.fields[otherField] as unknown[]).filter(
+            (v) => v !== recordId,
+          )
+        : [];
+      store.patch(otherTable, id, { [otherField]: reverse });
+    }
+  }
+}
+
+/**
+ * 모든 lookup 재계산. transitive lookup 처리 위해 2회 패스.
+ *
+ * 1패스: source가 stored value인 lookup (예: 입고관리.LOT번호 ← LOT별 재고.LOT번호)
+ * 2패스: source가 1패스에서 계산된 lookup인 transitive (예: 출고관리.LOT번호 ← 입고관리.LOT번호)
+ */
+function rebuildAllLookups(): void {
+  for (let pass = 0; pass < 2; pass++) {
+    for (const def of LOOKUPS) {
+      for (const rec of store.list(def.table)) {
+        const linkedId = firstLinkedId(rec.fields[def.via]);
+        if (!linkedId) continue;
+        const linkedRec = store.get(def.targetTable, linkedId);
+        if (!linkedRec) continue;
+        const raw = linkedRec.fields[def.targetField];
+        const value =
+          typeof raw === "string"
+            ? raw
+            : Array.isArray(raw) && raw.length > 0
+              ? String(raw[0] ?? "")
+              : raw ?? "";
+        if (value === "" || value == null) continue;
+        store.patch(def.table, rec.id, { [def.field]: value });
+      }
+    }
+  }
+}
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -154,6 +307,8 @@ async function airtableHandler(
   if (method === "POST" && !recordId) {
     if (!body.fields) return jsonResponse(422, { error: "fields missing" });
     const rec = store.create(table, body.fields);
+    syncBidirectionalLinks(table, rec.id, {});
+    rebuildAllLookups();
     applyFormulas(table, rec.id);
     return jsonResponse(200, store.get(table, rec.id) ?? rec);
   }
@@ -161,8 +316,12 @@ async function airtableHandler(
   // PATCH update
   if (method === "PATCH" && recordId) {
     if (!body.fields) return jsonResponse(422, { error: "fields missing" });
+    const prevRec = store.get(table, recordId);
+    const prevFields = prevRec ? { ...prevRec.fields } : {};
     const rec = store.patch(table, recordId, body.fields);
     if (!rec) return jsonResponse(404, { error: { type: "NOT_FOUND" } });
+    syncBidirectionalLinks(table, recordId, prevFields);
+    rebuildAllLookups();
     applyFormulas(table, recordId);
     return jsonResponse(200, store.get(table, recordId) ?? rec);
   }
