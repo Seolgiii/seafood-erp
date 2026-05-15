@@ -54,6 +54,13 @@ export async function GET() {
       olderTotal: 4,
       staleCount: 2,
     },
+    health: {
+      negativeStockLots: 0,
+      invalidRemainingInbound: 1,
+      outboundCostNull: 0,
+      lockedPins: 0,
+      yesterdayThroughput: { requested: 7, processed: 5, pending: 2 },
+    },
     threshold: 10,
     thresholdExceeded: false,
   };

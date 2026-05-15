@@ -54,6 +54,31 @@ export interface PendingByType {
   TRANSFER: number;
 }
 
+/**
+ * 운영 건강도 지표 (데이터 상태 기반)
+ *
+ * 모두 0이면 정상. >0이면 운영자가 조치해야 할 항목이 있음을 의미.
+ */
+export interface HealthMetrics {
+  /** LOT.재고수량 < 0 인 LOT 수 (음수 재고는 정합성 깨짐) */
+  negativeStockLots: number;
+  /** 입고 관리.잔여수량 < 0 OR > 입고수량 인 입고관리 수 (잔여수량 정합성 깨짐) */
+  invalidRemainingInbound: number;
+  /** 승인 완료 출고 중 출고시점 판매원가가 0/빈 값인 건 (E1 가드 실패 조기 발견) */
+  outboundCostNull: number;
+  /** 활성 작업자 중 pin_locked_until > now (PIN 잠금 상태) */
+  lockedPins: number;
+  /** 어제 신청 결재의 당일 처리 현황 */
+  yesterdayThroughput: {
+    /** 어제 createdTime 기준 신규 신청 건수 */
+    requested: number;
+    /** 그 중 어제 안에 처리된 (승인 완료 OR 반려) 건수 */
+    processed: number;
+    /** 아직 미처리 (승인 대기 / 최종 승인 대기) */
+    pending: number;
+  };
+}
+
 export interface DailyReport {
   /** 어제 날짜 (YYYY-MM-DD) — 정산 대상일 */
   date: string;
@@ -76,6 +101,7 @@ export interface DailyReport {
     olderTotal: number;
     staleCount: number; // 24시간 이상 미처리 (older 중 createdTime 기준)
   };
+  health: HealthMetrics;
   threshold: number;
   thresholdExceeded: boolean;
 }
@@ -164,6 +190,106 @@ async function fetchLotRemainingMap(
     }
   }
   return map;
+}
+
+// ──────────────────────────────────────────────
+// 운영 건강도 지표 (Airtable 데이터 상태)
+// ──────────────────────────────────────────────
+
+/** ISO datetime → KST YYYY-MM-DD */
+function toKstDateString(iso: string | undefined): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const kst = new Date(t + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+async function countAirtableMatch(
+  tableName: string,
+  formula: string,
+): Promise<number> {
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  if (!apiKey || !baseId) return 0;
+
+  try {
+    const params = new URLSearchParams({ filterByFormula: formula });
+    // fields[]를 비워두면 모든 필드 반환되니까 최소 1개만 요청 (count 목적이라 값 자체는 무관)
+    params.append("fields[]", "Name");
+    const tbl = encodeURIComponent(tableName);
+    let total = 0;
+    let offset: string | undefined;
+    // pageSize 100 페이지네이션 (보통 0건 또는 소수 — 안전망)
+    do {
+      const url = `https://api.airtable.com/v0/${baseId}/${tbl}?${params}${offset ? `&offset=${offset}` : ""}&pageSize=100`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: "no-store",
+      });
+      if (!res.ok) return total;
+      const data = (await res.json()) as {
+        records?: unknown[];
+        offset?: string;
+      };
+      total += (data.records ?? []).length;
+      offset = data.offset;
+    } while (offset);
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchHealthMetrics(
+  allItems: RequestItem[],
+): Promise<HealthMetrics> {
+  const yesterday = yesterdayKstISO();
+  const now = Date.now();
+
+  // 4건 병렬 조회 — 운영 건강도는 빠른 응답 우선
+  const [
+    negativeStockLots,
+    invalidRemainingInbound,
+    outboundCostNull,
+    lockedPins,
+  ] = await Promise.all([
+    countAirtableMatch("LOT별 재고", "{재고수량}<0"),
+    countAirtableMatch("입고 관리", "OR({잔여수량}<0,{잔여수량}>{입고수량})"),
+    countAirtableMatch(
+      "출고 관리",
+      `AND({승인상태}="승인 완료",OR({출고시점 판매원가}=0,{출고시점 판매원가}=BLANK()))`,
+    ),
+    countAirtableMatch("작업자", `AND({활성}=1,{pin_locked_until}>${now})`),
+  ]);
+
+  // 어제 throughput — allItems에서 createdTime 기준 집계 (추가 API 호출 X)
+  let requested = 0;
+  let processed = 0;
+  let pending = 0;
+  for (const item of allItems) {
+    if (toKstDateString(item.createdTime) !== yesterday) continue;
+    requested++;
+    if (item.status === "승인 완료" || item.status === "반려") {
+      processed++;
+    } else if (
+      item.status === "승인 대기" ||
+      item.status === "최종 승인 대기"
+    ) {
+      pending++;
+    }
+  }
+
+  return {
+    negativeStockLots,
+    invalidRemainingInbound,
+    outboundCostNull,
+    lockedPins,
+    yesterdayThroughput: { requested, processed, pending },
+  };
 }
 
 // ──────────────────────────────────────────────
@@ -302,6 +428,9 @@ export async function buildDailyReport(threshold: number): Promise<DailyReport> 
   const olderTotal = Object.values(olderBy).reduce((a, b) => a + b, 0);
   const totalPending = yesterdayTotal + olderTotal;
 
+  // 운영 건강도 지표 (실패해도 보고서 생성은 계속)
+  const health = await fetchHealthMetrics(allItems);
+
   return {
     date: yesterday,
     yesterday: {
@@ -323,6 +452,7 @@ export async function buildDailyReport(threshold: number): Promise<DailyReport> 
       olderTotal,
       staleCount,
     },
+    health,
     threshold,
     thresholdExceeded: totalPending >= threshold,
   };
@@ -409,6 +539,47 @@ function renderTransferList(items: TransferLine[]): string {
   return `<table class="line-table"><thead><tr><th>#</th><th>품목명</th><th>규격</th><th>박스</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function renderHealthSection(h: HealthMetrics): string {
+  const rows = [
+    {
+      label: "음수 재고 LOT",
+      value: h.negativeStockLots,
+      hint: "LOT 재고수량이 0 미만 — 차감 정합성 점검 필요",
+    },
+    {
+      label: "잔여수량 정합성 깨진 입고관리",
+      value: h.invalidRemainingInbound,
+      hint: "잔여수량 < 0 또는 잔여수량 > 입고수량",
+    },
+    {
+      label: "출고시점 비용 NULL",
+      value: h.outboundCostNull,
+      hint: "승인된 출고 중 출고시점 판매원가가 비어있음 (E1 가드 실패 조기 발견)",
+    },
+    {
+      label: "잠긴 PIN",
+      value: h.lockedPins,
+      hint: "활성 작업자 중 PIN 5회 실패로 잠금 상태",
+    },
+  ];
+
+  const cells = rows
+    .map((r) => {
+      const cls = r.value > 0 ? "health-bad" : "health-ok";
+      return `<tr><td>${escapeHtml(r.label)}</td><td class="num ${cls}">${r.value}건</td><td class="hint">${escapeHtml(r.hint)}</td></tr>`;
+    })
+    .join("");
+
+  const t = h.yesterdayThroughput;
+  const ratePct =
+    t.requested > 0 ? Math.round((t.processed / t.requested) * 100) : 100;
+  const rateClass =
+    t.requested === 0 ? "health-ok" : ratePct >= 80 ? "health-ok" : "health-bad";
+  const throughputRow = `<tr class="throughput"><td>어제 신청 결재 당일 처리율</td><td class="num ${rateClass}">${ratePct}%</td><td class="hint">신청 ${t.requested}건 / 처리 ${t.processed}건 / 미처리 ${t.pending}건</td></tr>`;
+
+  return `<table class="health-table"><tbody>${cells}${throughputRow}</tbody></table>`;
+}
+
 function renderPendingTable(by: PendingByType, total: number): string {
   const rows = (Object.keys(TYPE_LABELS) as (keyof PendingByType)[])
     .map(
@@ -482,6 +653,13 @@ export function buildReportHtml(
 
   .stale { color: #b45309; font-weight: 700; font-size: 13px; margin-top: 8px; }
 
+  .health-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; vertical-align: top; }
+  .health-table td.num { text-align: right; font-weight: 700; width: 70px; white-space: nowrap; }
+  .health-table td.hint { color: #9ca3af; font-size: 11px; }
+  .health-table tr.throughput td { border-top: 1px solid #d1d5db; padding-top: 12px; }
+  .health-ok { color: #00C471; }
+  .health-bad { color: #ef4444; }
+
   .cta-wrap { margin: 22px 0 4px; text-align: center; }
   .cta { display: inline-block; background: #191F28; color: #fff; padding: 11px 22px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; }
 
@@ -538,6 +716,9 @@ export function buildReportHtml(
       </div>
     </div>
     ${report.pending.staleCount > 0 ? `<p class="stale">⏰ 24시간 이상 미처리: ${report.pending.staleCount}건</p>` : ""}
+
+    <h2>🩺 운영 건강도</h2>
+    ${renderHealthSection(report.health)}
 
     ${dashboardLink}
 
