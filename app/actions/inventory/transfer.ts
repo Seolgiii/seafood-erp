@@ -349,12 +349,12 @@ export async function approveTransfer(
     return { success: false, message: `잔여수량 부족 (잔여: ${currentRemain}박스, 이동: ${이동수량}박스)` };
   }
 
-  // 4. 옵션 B 가격/이월 경비 산정
-  //    새 수매가         = 원본 수매가 × 비율 (단가만 이월)
-  //    새 이월냉장료     = (원본 누적냉장료 + 원본 이월냉장료) × 비율
-  //    새 이월입출고비   = (원본 입출고비 + 원본 이월입출고비) × 비율
-  //    새 이월노조비     = (원본 노조비 + 원본 이월노조비) × 비율
-  //    새 이월동결비     = (원본 동결비 + 원본 이월동결비) × 비율
+  // 4. C안 가격/이월 경비 산정 (+ 동결비 특례)
+  //    새 수매가         = 원본 수매가 (박스당 그대로, 비례 X)
+  //    새 이월X (총액)   = (원본 박스당 X + 원본 이월X / 입고박스수) × 이동박스수
+  //    동결비 특례: 새 LOT.동결비 = 0 (아래 7단계에서 보관처 비용 이력 적용 시 skip)
+  //                 이월동결비는 원본 동결비 cost basis를 박스당 단위로 보존
+  const sourceInboxQty = num(lotFields["입고수량(BOX)"]);
   const pricing = calculateTransferPricing({
     purchasePrice: num(lotFields["수매가"]),
     refrigerationCostAccum: num(lotFields["누적냉장료"]),
@@ -365,7 +365,7 @@ export async function approveTransfer(
     carriedInOutFee: num(lotFields["이월입출고비"]),
     carriedUnionFee: num(lotFields["이월노조비"]),
     carriedFreezeFee: num(lotFields["이월동결비"]),
-    currentStock,
+    sourceInboxQty,
     transferQty: 이동수량,
   });
 
@@ -473,7 +473,8 @@ export async function approveTransfer(
       if (cost?.refrigerationFee != null) lotInventoryFields["냉장료단가"] = cost.refrigerationFee;
       if (cost?.inOutFee != null) lotInventoryFields["입출고비"] = cost.inOutFee;
       if (cost?.unionFee != null) lotInventoryFields["노조비"] = cost.unionFee;
-      if (cost?.freezeFee != null) lotInventoryFields["동결비"] = cost.freezeFee;
+      // 동결비 특례: 이동된 LOT은 이미 동결된 상태라 새 보관처에서 동결비 부과 X.
+      // 원본 동결비 cost basis는 이월동결비(박스당 × 이동박스수)로 보존됨.
     } catch (e) {
       logWarn("[approveTransfer] 새 보관처 비용 조회 실패 (승인 계속 진행):", e);
     }

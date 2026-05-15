@@ -653,6 +653,7 @@ async function deductStockOnOutboundApproval(
         const breakdown = calculateOutboundCost({
           purchasePrice: num(lotFields["수매가"]),
           totalWeight: num(lotFields["총중량"]),
+          inboxQty: num(lotFields["입고수량(BOX)"]),
           refrigerationFeePerUnit: num(lotFields["냉장료단가"]),
           inOutFee: num(lotFields["입출고비"]),
           unionFee: num(lotFields["노조비"]),
@@ -664,6 +665,7 @@ async function deductStockOnOutboundApproval(
           saleAmount,
           inboundDate: String(lotFields["이동입고일"] ?? lotFields["최초입고일"] ?? "").trim(),
           outboundDate: String(outFields["출고일"] ?? "").trim(),
+          outQty,
         });
 
         costPatchOk = await patchRecord("출고 관리", outboundRecordId, {
